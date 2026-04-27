@@ -5,6 +5,8 @@ import {
   ScrollView,
   StatusBar,
   TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -38,82 +40,88 @@ export default function RegisterScreen() {
 
       {/*<ScreenHeader />*/}
 
-      <ScrollView
-        contentContainerStyle={shared.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={shared.keyboardView}
+        keyboardVerticalOffset={20}
       >
-        {/* ── Hero ── */}
-        <View style={shared.heroSection}>
-          <Text style={local.heroTitle}>Únete a la comunidad</Text>
-          <Text style={shared.heroSubtitle}>
-            Comienza tu viaje de observación hoy
-          </Text>
-        </View>
-
-        {/* ── Formulario ── */}
-        <View style={shared.card}>
-          <InputField
-            label="Nombre completo"
-            placeholder="Tu nombre"
-            iconSymbol="👤"
-          />
-          <InputField
-            label="Nombre de usuario"
-            placeholder="birdwatcher_99"
-            iconSymbol="@"
-          />
-          <InputField
-            label="Correo electrónico"
-            placeholder="ejemplo@birdify.com"
-            iconSymbol="✉️"
-            keyboardType="email-address"
-          />
-          <InputField
-            label="Contraseña"
-            placeholder="••••••••"
-            iconSymbol="🔒"
-            secureTextEntry
-            showToggle
-          />
-
-          <InputField
-            label="Confirmar Contraseña"
-            placeholder="••••••••"
-            iconSymbol="🔒"
-            secureTextEntry
-            showToggle
-          />
-
-          <AppButton
-            label="Crear Cuenta"
-            color={Colors.primary}
-            style={{ marginTop: 8, marginBottom: 16 }}
-          />
-
-          <View style={shared.dividerRow}>
-            <View style={shared.dividerLine} />
-            <Text style={shared.dividerText}>O regístrate con</Text>
-            <View style={shared.dividerLine} />
-          </View>
-
-          <View style={shared.socialRow}>
-            <SocialButton label="Google" iconSymbol="🔵" />
-            <SocialButton label="Apple"  iconSymbol="🍎" />
-          </View>
-        </View>
-
-        {/* ── Link de login ── */}
-        <TouchableOpacity
-          style={shared.navRow}
-          activeOpacity={0.7}
-          onPress={() => navigation.navigate('Login')}
+        <ScrollView
+          contentContainerStyle={shared.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <Text style={shared.navText}>¿Ya tienes cuenta? </Text>
-          <Text style={shared.navLink}>Inicia Sesión </Text>
-          <Text style={shared.navArrow}>→</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          {/* ── Hero ── */}
+          <View style={shared.heroSection}>
+            <Text style={local.heroTitle}>Únete a la comunidad</Text>
+            <Text style={shared.heroSubtitle}>
+              Comienza tu viaje de observación hoy
+            </Text>
+          </View>
+
+          {/* ── Formulario ── */}
+          <View style={shared.card}>
+            <InputField
+              label="Nombre completo"
+              placeholder="Tu nombre"
+              iconSymbol="👤"
+            />
+            <InputField
+              label="Nombre de usuario"
+              placeholder="birdwatcher_99"
+              iconSymbol="@"
+            />
+            <InputField
+              label="Correo electrónico"
+              placeholder="ejemplo@birdify.com"
+              iconSymbol="✉️"
+              keyboardType="email-address"
+            />
+            <InputField
+              label="Contraseña"
+              placeholder="••••••••"
+              iconSymbol="🔒"
+              secureTextEntry
+              showToggle
+            />
+
+            <InputField
+              label="Confirmar Contraseña"
+              placeholder="••••••••"
+              iconSymbol="🔒"
+              secureTextEntry
+              showToggle
+            />
+
+            <AppButton
+              label="Crear Cuenta"
+              color={Colors.primary}
+              style={{ marginTop: 8, marginBottom: 16 }}
+            />
+
+            <View style={shared.dividerRow}>
+              <View style={shared.dividerLine} />
+              <Text style={shared.dividerText}>O regístrate con</Text>
+              <View style={shared.dividerLine} />
+            </View>
+
+            <View style={shared.socialRow}>
+              <SocialButton label="Google" iconSymbol="🔵" />
+              <SocialButton label="Apple"  iconSymbol="🍎" />
+            </View>
+          </View>
+
+          {/* ── Link de login ── */}
+          <TouchableOpacity
+            style={shared.navRow}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('Login')}
+          >
+            <Text style={shared.navText}>¿Ya tienes cuenta? </Text>
+            <Text style={shared.navLink}>Inicia Sesión </Text>
+            <Text style={shared.navArrow}>→</Text>
+          </TouchableOpacity>
+        </ScrollView>
+    </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
