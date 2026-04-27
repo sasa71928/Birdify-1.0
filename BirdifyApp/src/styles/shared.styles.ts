@@ -10,6 +10,7 @@ const sharedStyles = StyleSheet.create({
   // ── Contenedor raíz ────────────────────────────────────────────────────────
   safe: {
     flex: 1,
+    paddingTop: Spacing.lg,
     backgroundColor: Colors.background,
   },
 

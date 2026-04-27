@@ -77,6 +77,14 @@ export default function RegisterScreen() {
             showToggle
           />
 
+          <InputField
+            label="Confirmar Contraseña"
+            placeholder="••••••••"
+            iconSymbol="🔒"
+            secureTextEntry
+            showToggle
+          />
+
           <AppButton
             label="Crear Cuenta"
             color={Colors.primary}
