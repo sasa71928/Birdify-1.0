@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -14,23 +14,27 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ScreenHeader from '../components/ScreenHeader';
 import AppButton    from '../components/AppButton';
 import InputField   from '../components/InputField';
-import AvatarIcon   from '../components/AvatarIcon';
 import SocialButton from '../components/SocialButton';
 
 // ── Estilos ───────────────────────────────────────────────────────────────────
-import shared  from '../styles/shared.styles';
-import local   from '../styles/registerScreen.styles';
+import shared from '../styles/shared.styles';
+import local  from '../styles/loginScreen.styles';
 import { Colors } from '../theme';
 
 // ── Navegación ────────────────────────────────────────────────────────────────
 import { RootStackParamList } from '../navigation/AppNavigator';
-type RegisterNavProp = NativeStackNavigationProp<RootStackParamList, 'Register'>;
+type LoginNavProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
-// Cuando exista el asset real, descomenta y pasa al prop imageSource:
-// const birdAsset = require('../../assets/icon.png');
+export default function LoginScreen() {
+  const navigation = useNavigation<LoginNavProp>();
+  const [remember, setRemember] = useState(false);
 
-export default function RegisterScreen() {
-  const navigation = useNavigation<RegisterNavProp>();
+  // Link "¿Olvidaste?" que se pasa como labelRight al InputField
+  const ForgotLink = (
+    <TouchableOpacity activeOpacity={0.7}>
+      <Text style={local.forgotLink}>¿Olvidaste tu contraseña?</Text>
+    </TouchableOpacity>
+  );
 
   return (
     <SafeAreaView style={shared.safe}>
@@ -45,66 +49,78 @@ export default function RegisterScreen() {
       >
         {/* ── Hero ── */}
         <View style={shared.heroSection}>
-          <Text style={local.heroTitle}>Únete a la comunidad</Text>
+          <Text style={local.heroTitle}>Bienvenido</Text>
           <Text style={shared.heroSubtitle}>
-            Comienza tu viaje de observación hoy
+            Continúa tu viaje de observación hoy.
           </Text>
         </View>
 
         {/* ── Formulario ── */}
         <View style={shared.card}>
           <InputField
-            label="Nombre completo"
-            placeholder="Tu nombre"
+            label="Usuario o Correo"
+            placeholder="nombre@ejemplo.com"
             iconSymbol="👤"
-          />
-          <InputField
-            label="Nombre de usuario"
-            placeholder="birdwatcher_99"
-            iconSymbol="@"
-          />
-          <InputField
-            label="Correo electrónico"
-            placeholder="ejemplo@birdify.com"
-            iconSymbol="✉️"
             keyboardType="email-address"
           />
+
+          {/* Contraseña con link "¿Olvidaste?" inline en el label */}
           <InputField
             label="Contraseña"
+            labelRight={ForgotLink}
             placeholder="••••••••"
             iconSymbol="🔒"
             secureTextEntry
             showToggle
           />
 
+          {/* Recordarme en este dispositivo */}
+          <TouchableOpacity
+            style={local.rememberRow}
+            onPress={() => setRemember(!remember)}
+            activeOpacity={0.8}
+          >
+            <View style={[local.checkbox, remember && local.checkboxChecked]}>
+              {remember && <Text style={local.checkmark}>✓</Text>}
+            </View>
+            <Text style={local.rememberText}>Recordarme en este dispositivo</Text>
+          </TouchableOpacity>
+
           <AppButton
-            label="Crear Cuenta"
+            label="Iniciar Sesión →"
             color={Colors.primary}
-            style={{ marginTop: 8, marginBottom: 16 }}
+            style={{ marginBottom: 16 }}
           />
 
           <View style={shared.dividerRow}>
             <View style={shared.dividerLine} />
-            <Text style={shared.dividerText}>O regístrate con</Text>
+            <Text style={shared.dividerText}>O continuar con</Text>
             <View style={shared.dividerLine} />
           </View>
 
           <View style={shared.socialRow}>
-            <SocialButton label="Google" iconSymbol="🔵" />
-            <SocialButton label="Apple"  iconSymbol="🍎" />
+            <SocialButton label="Google"   iconSymbol="🔵" />
+            <SocialButton label="Facebook" iconSymbol="📘" />
           </View>
         </View>
 
-        {/* ── Link de login ── */}
+        {/* ── Link de registro ── */}
         <TouchableOpacity
           style={shared.navRow}
           activeOpacity={0.7}
-          onPress={() => navigation.navigate('Login')}
+          onPress={() => navigation.navigate('Register')}
         >
-          <Text style={shared.navText}>¿Ya tienes cuenta? </Text>
-          <Text style={shared.navLink}>Inicia Sesión </Text>
-          <Text style={shared.navArrow}>→</Text>
+          <Text style={shared.navText}>¿No tienes cuenta? </Text>
+          <Text style={shared.navLink}>Regístrate</Text>
         </TouchableOpacity>
+
+        {/* ── Pie legal ── */}
+        <Text style={local.legalText}>
+          Al iniciar sesión, aceptas nuestros{' '}
+          <Text style={local.legalLink}>Términos de Servicio</Text>
+          {' '}y{' '}
+          <Text style={local.legalLink}>Política de Privacidad</Text>.
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );

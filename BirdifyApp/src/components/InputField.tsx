@@ -2,7 +2,8 @@
  * InputField — Campo de formulario reutilizable
  *
  * Props:
- *  label            — etiqueta superior del campo
+ *  label            — etiqueta superior izquierda
+ *  labelRight       — elemento opcional a la derecha del label (ej: link "¿Olvidaste?")
  *  placeholder      — texto de ayuda dentro del input
  *  iconSymbol       — emoji o string corto como ícono izquierdo
  *  secureTextEntry  — oculta el texto (contraseña)
@@ -12,7 +13,7 @@
  *  onChangeText     — callback de cambio
  *  editable         — si el campo acepta entrada (default: true)
  */
-import React, { useState } from 'react';
+import React, { useState, ReactNode } from 'react';
 import {
   View,
   Text,
@@ -25,6 +26,7 @@ import { Colors, Typography, Spacing, Radius } from '../theme';
 
 type InputFieldProps = {
   label: string;
+  labelRight?: ReactNode;
   placeholder: string;
   iconSymbol: string;
   secureTextEntry?: boolean;
@@ -37,6 +39,7 @@ type InputFieldProps = {
 
 export default function InputField({
   label,
+  labelRight,
   placeholder,
   iconSymbol,
   secureTextEntry = false,
@@ -47,10 +50,16 @@ export default function InputField({
   editable = true,
 }: InputFieldProps) {
   const [isSecure, setIsSecure] = useState(secureTextEntry);
+  const hasLabel = label.length > 0 || labelRight;
 
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.label}>{label}</Text>
+      {hasLabel && (
+        <View style={styles.labelRow}>
+          <Text style={styles.label}>{label}</Text>
+          {labelRight && <View>{labelRight}</View>}
+        </View>
+      )}
       <View style={styles.container}>
         <Text style={styles.icon}>{iconSymbol}</Text>
         <TextInput
@@ -82,12 +91,17 @@ const styles = StyleSheet.create({
   wrapper: {
     marginBottom: Spacing.md,
   },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+    marginLeft: 2,
+  },
   label: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.semiBold,
     color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
-    marginLeft: 2,
   },
   container: {
     flexDirection: 'row',
@@ -108,7 +122,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: Typography.fontSize.md,
     color: Colors.textPrimary,
-    height: '100%',
+    alignSelf: 'stretch', 
   },
   toggle: {
     padding: Spacing.xs,
