@@ -35,6 +35,7 @@ export const Colors = {
 
   // Barra superior
   headerBorder: '#B2D8C8',   // Línea punteada azul-verdosa del header
+
 };
 
 // ─── TIPOGRAFÍA ─────────────────────────────────────────────────────────────

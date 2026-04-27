@@ -10,7 +10,7 @@ const sharedStyles = StyleSheet.create({
   // ── Contenedor raíz ────────────────────────────────────────────────────────
   safe: {
     flex: 1,
-    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
     backgroundColor: Colors.background,
   },
 
@@ -40,8 +40,9 @@ const sharedStyles = StyleSheet.create({
 
   // ── ScrollView ─────────────────────────────────────────────────────────────
   scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.xxl,
+    margin: 0,
   },
 
   // ── Hero ───────────────────────────────────────────────────────────────────
@@ -114,6 +115,11 @@ const sharedStyles = StyleSheet.create({
     color: Colors.accent,
     fontWeight: Typography.fontWeight.bold,
   },
+  keyboardView: {
+    flex: 1,
+    paddingTop: Spacing.lg,
+    backgroundColor: Colors.transparent
+  }
 });
 
 export default sharedStyles;
