@@ -1,3 +1,3 @@
-# Birdify-1.0 primera modificacion
+# Birdify-1.0
 
-Prueba git
+Red social para ornitologos
