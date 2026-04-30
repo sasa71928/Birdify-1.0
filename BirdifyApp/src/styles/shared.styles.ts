@@ -11,7 +11,7 @@ const sharedStyles = StyleSheet.create({
   safe: {
     flex: 1,
     paddingBottom: Spacing.md,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.surface,
   },
 
   // ── Header (logo + nombre) ─────────────────────────────────────────────────

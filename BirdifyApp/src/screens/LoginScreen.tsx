@@ -11,7 +11,6 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 // ── Componentes reutilizables ────────────────────────────────────────────────
-import ScreenHeader from '../components/ScreenHeader';
 import AppButton    from '../components/AppButton';
 import InputField   from '../components/InputField';
 import SocialButton from '../components/SocialButton';
@@ -90,6 +89,7 @@ export default function LoginScreen() {
             label="Iniciar Sesión →"
             color={Colors.primary}
             style={{ marginBottom: 16 }}
+            onPress={() => navigation.navigate('Feed')}
           />
 
           <View style={shared.dividerRow}>
