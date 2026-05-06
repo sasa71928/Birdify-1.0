@@ -27,6 +27,8 @@ type AvatarIconProps = {
   style?: ViewStyle;
 };
 
+import styles from '../styles/AvatarIcon.styles';
+
 export default function AvatarIcon({
   imageSource,
   fallback = '🕊️',
@@ -55,11 +57,3 @@ export default function AvatarIcon({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  base: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-});

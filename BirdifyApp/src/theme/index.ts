@@ -1,45 +1,62 @@
-// ─── COLORES ────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// BIRDIFY DESIGN SYSTEM
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─── PALETA PRIMARIA ─────────────────────────────────────────────────────────
 export const Colors = {
-  // Marca principal
-  primary: '#1B6E4B',        // Verde oscuro (botones, logo, íconos principales)
-  primaryLight: '#2E8B62',   // Verde medio (hover / press states)
-  primaryDark: '#144F36',    // Verde muy oscuro
+  // Primary Palette — Action & Brand Anchors
+  primary: '#154212',         // Forest Green  — botones principales, logo
+  container: '#305A27',       // Misty Pine     — contenedores activos
+  subContainer: '#90D880',    // Sapling Tint   — sub-contenedores, chips
+  springMoss: '#A3D494',      // Spring Moss    — estados hover, tintes suaves
 
-  // Fondo
-  background: '#F0F4F3',     // Gris-verde muy claro (fondo general)
-  surface: '#FFFFFF',        // Blanco (tarjetas / formularios)
+  // Surface & Canvas — Backgrounds & Materiality
+  surface: '#F8F8F8',         // Surface        — fondo de pantallas
+  surfaceDim: '#E8DAD8',      // Surface Dim    — fondo tenue, modales
+  canvasPure: '#FEFEFE',      // Canvas Pure    — blanco puro, tarjetas
+  componentBase: '#F7F8F7',   // Component Base — bases de inputs/botones
+  deepTerrain: '#1F3131',     // Deep Terrain   — headers oscuros, nav bars
 
-  // Inputs
-  inputBackground: '#F2F4F3', // Gris clarísimo para los campos
-  inputBorder: '#DDE3E0',     // Borde sutil de inputs
-  placeholder: '#A0AEAA',     // Texto placeholder
+  // Secondary & Accents — Notifications & Semantics
+  secondaryBlue: '#30628A',   // Secondary Blue — información, links
+  tertiaryBrown: '#553132',   // Tertiary Brown — alertas secundarias
+  errorRed: '#8A1A1A',        // Error Red      — errores, destructivo
+  outlineGrey: '#77796E',     // Outline Grey   — bordes inactivos, iconos
 
-  // Texto
-  textPrimary: '#1A2B25',    // Casi negro con tinte verde
-  textSecondary: '#6B7E78',  // Gris-verde para subtítulos / labels
-  textOnPrimary: '#FFFFFF',  // Blanco sobre fondo verde
-
-  // Acento / link
-  accent: '#1B6E4B',         // Mismo verde para links activos
-
-  // Bordes y divisores
-  border: '#DDE3E0',
-
-  // Social buttons
-  googleBg: '#FFFFFF',
-  appleBg: '#FFFFFF',
+  // Aliases semánticos (retrocompatibilidad)
+  background: '#F8F8F8',
+  inputBackground: '#F7F8F7',
+  inputBorder: '#77796E',
+  placeholder: '#77796E',
+  textPrimary: '#1F3131',
+  textSecondary: '#77796E',
+  textOnPrimary: '#FEFEFE',
+  accent: '#305A27',
+  border: '#77796E',
+  headerBorder: '#90D880',
 
   // Utilidad
-  white: '#FFFFFF',
+  white: '#FEFEFE',
+  black: '#1F3131',
   transparent: 'transparent',
 
-  // Barra superior
-  headerBorder: '#B2D8C8',   // Línea punteada azul-verdosa del header
+  // Social buttons
+  googleBg: '#FEFEFE',
+  appleBg: '#FEFEFE',
 
+  // Aliases heredados (para no romper pantallas existentes)
+  primaryLight: '#305A27',
+  primaryDark: '#154212',
 };
 
-// ─── TIPOGRAFÍA ─────────────────────────────────────────────────────────────
+// ─── TIPOGRAFÍA ──────────────────────────────────────────────────────────────
 export const Typography = {
+  // Fuente de títulos/navegación — Plus Jakarta Sans
+  fontFamilyDisplay: 'PlusJakartaSans',
+
+  // Fuente de cuerpo/lectura — Be Vietnam Pro
+  fontFamilyBody: 'BeVietnamPro',
+
   // Tamaños
   fontSize: {
     xs: 11,
@@ -48,6 +65,7 @@ export const Typography = {
     lg: 18,
     xl: 26,
     xxl: 32,
+    xxxl: 40,
   },
 
   // Pesos
@@ -61,14 +79,14 @@ export const Typography = {
 
   // Altura de línea
   lineHeight: {
-    tight: 20,
+    tight: 18,
     normal: 24,
     relaxed: 32,
     loose: 40,
   },
 };
 
-// ─── ESPACIADO ───────────────────────────────────────────────────────────────
+// ─── ESPACIADO ────────────────────────────────────────────────────────────────
 export const Spacing = {
   xs: 4,
   sm: 8,
@@ -78,7 +96,7 @@ export const Spacing = {
   xxl: 48,
 };
 
-// ─── BORDES ──────────────────────────────────────────────────────────────────
+// ─── BORDES ───────────────────────────────────────────────────────────────────
 export const Radius = {
   sm: 8,
   md: 12,
@@ -87,17 +105,45 @@ export const Radius = {
   full: 9999,
 };
 
-// ─── SOMBRAS ─────────────────────────────────────────────────────────────────
+// ─── ELEVACIÓN / SOMBRAS ──────────────────────────────────────────────────────
+// Level 0: Base — no shadow
+// Level 1: Cards — 4px blur
+// Level 2: Modals — 12px blur
+// Level 3: Active — Primary Glow
 export const Shadows = {
+  // Level 0
+  none: {},
+
+  // Level 1 — Cards
   card: {
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowRadius: 4,
+    elevation: 2,
   },
+
+  // Level 2 — Modals
+  modal: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+
+  // Level 3 — Active / Primary Glow
+  active: {
+    shadowColor: '#154212',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+
+  // Alias retrocompatible
   button: {
-    shadowColor: '#1B6E4B',
+    shadowColor: '#154212',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,

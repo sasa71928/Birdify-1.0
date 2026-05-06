@@ -31,6 +31,8 @@ type AppButtonProps = {
   style?: ViewStyle;
 };
 
+import styles from '../styles/AppButton.styles';
+
 export default function AppButton({
   label,
   onPress,
@@ -63,16 +65,3 @@ export default function AppButton({
     </TouchableOpacity>
   );
 }
-
-const styles = StyleSheet.create({
-  button: {
-    borderRadius: Radius.lg,
-    height: 54,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  label: {
-    fontWeight: Typography.fontWeight.bold,
-    letterSpacing: 0.3,
-  },
-});

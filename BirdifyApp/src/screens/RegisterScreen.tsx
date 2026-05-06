@@ -28,6 +28,8 @@ import { Colors } from '../theme';
 import { RootStackParamList } from '../navigation/AppNavigator';
 type RegisterNavProp = NativeStackNavigationProp<RootStackParamList, 'Register'>;
 
+import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+
 // Cuando exista el asset real, descomenta y pasa al prop imageSource:
 // const birdAsset = require('../../assets/icon.png');
 
@@ -63,23 +65,23 @@ export default function RegisterScreen() {
             <InputField
               label="Nombre completo"
               placeholder="Tu nombre"
-              iconSymbol="👤"
+              iconSymbol={<Ionicons name="person-outline" size={20} color={Colors.textSecondary} />}
             />
             <InputField
               label="Nombre de usuario"
               placeholder="birdwatcher_99"
-              iconSymbol="@"
+              iconSymbol={<Ionicons name="at-outline" size={20} color={Colors.textSecondary} />}
             />
             <InputField
               label="Correo electrónico"
               placeholder="ejemplo@birdify.com"
-              iconSymbol="✉️"
+              iconSymbol={<Ionicons name="mail-outline" size={20} color={Colors.textSecondary} />}
               keyboardType="email-address"
             />
             <InputField
               label="Contraseña"
               placeholder="••••••••"
-              iconSymbol="🔒"
+              iconSymbol={<Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} />}
               secureTextEntry
               showToggle
             />
@@ -87,7 +89,7 @@ export default function RegisterScreen() {
             <InputField
               label="Confirmar Contraseña"
               placeholder="••••••••"
-              iconSymbol="🔒"
+              iconSymbol={<Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} />}
               secureTextEntry
               showToggle
             />
@@ -105,8 +107,8 @@ export default function RegisterScreen() {
             </View>
 
             <View style={shared.socialRow}>
-              <SocialButton label="Google" iconSymbol="🔵" />
-              <SocialButton label="Apple"  iconSymbol="🍎" />
+              <SocialButton label="Google" iconSymbol={<FontAwesome5 name="google" size={18} color="#DB4437" />} />
+              <SocialButton label="Facebook"  iconSymbol={<FontAwesome5 name="facebook" size={18} color="#4267B2" />} />
             </View>
           </View>
 

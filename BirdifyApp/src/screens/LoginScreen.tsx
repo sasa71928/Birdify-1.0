@@ -24,6 +24,8 @@ import { Colors } from '../theme';
 import { RootStackParamList } from '../navigation/AppNavigator';
 type LoginNavProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
+import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+
 export default function LoginScreen() {
   const navigation = useNavigation<LoginNavProp>();
   const [remember, setRemember] = useState(false);
@@ -59,7 +61,7 @@ export default function LoginScreen() {
           <InputField
             label="Usuario o Correo"
             placeholder="nombre@ejemplo.com"
-            iconSymbol="👤"
+            iconSymbol={<Ionicons name="person-outline" size={20} color={Colors.textSecondary} />}
             keyboardType="email-address"
           />
 
@@ -68,7 +70,7 @@ export default function LoginScreen() {
             label="Contraseña"
             labelRight={ForgotLink}
             placeholder="••••••••"
-            iconSymbol="🔒"
+            iconSymbol={<Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} />}
             secureTextEntry
             showToggle
           />
@@ -99,8 +101,8 @@ export default function LoginScreen() {
           </View>
 
           <View style={shared.socialRow}>
-            <SocialButton label="Google"   iconSymbol="🔵" />
-            <SocialButton label="Facebook" iconSymbol="📘" />
+            <SocialButton label="Google"   iconSymbol={<FontAwesome5 name="google" size={18} color="#DB4437" />} />
+            <SocialButton label="Facebook" iconSymbol={<FontAwesome5 name="facebook" size={18} color="#4267B2" />} />
           </View>
         </View>
 

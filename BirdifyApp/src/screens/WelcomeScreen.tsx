@@ -30,14 +30,14 @@ export default function WelcomeScreen() {
           </View>
 
           <View style={styles.footer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.signUpButton}
               onPress={() => navigation.navigate('Register')}
             >
               <Text style={styles.signUpText}>Sign up</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.loginButton}
               onPress={() => navigation.navigate('Login')}
             >
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: 'rgba(21, 66, 18, 0.25)', // Forest Green tint overlay
     padding: Spacing.xl,
     justifyContent: 'flex-end',
   },
@@ -70,16 +70,16 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 42,
-    fontWeight: 'bold',
-    color: Colors.white,
-    lineHeight: 50,
+    fontFamily: 'PlusJakartaSans-Bold',
+    color: Colors.canvasPure,
+    lineHeight: 52,
   },
   footer: {
     gap: Spacing.md,
     marginBottom: Spacing.xl,
   },
   signUpButton: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.canvasPure,
     height: 56,
     borderRadius: Radius.md,
     justifyContent: 'center',
@@ -87,11 +87,11 @@ const styles = StyleSheet.create({
   },
   signUpText: {
     fontSize: Typography.fontSize.md,
-    fontWeight: 'bold',
-    color: '#1B4D3E',
+    fontFamily: 'PlusJakartaSans-Bold',
+    color: Colors.primary,    // Forest Green
   },
   loginButton: {
-    backgroundColor: '#34A853',
+    backgroundColor: Colors.container, // Misty Pine
     height: 56,
     borderRadius: Radius.md,
     justifyContent: 'center',
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   },
   loginText: {
     fontSize: Typography.fontSize.md,
-    fontWeight: 'bold',
-    color: Colors.white,
+    fontFamily: 'PlusJakartaSans-Bold',
+    color: Colors.canvasPure,
   },
 });

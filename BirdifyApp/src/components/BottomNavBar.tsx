@@ -2,29 +2,34 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
+import styles from '../styles/BottomNavBar.styles';
+
 export default function BottomNavBar() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute();
+  const currentRoute = route.name;
+
   return (
     <View style={styles.container}>
       <View style={styles.innerContainer}>
         <TouchableOpacity 
-          style={[styles.navItem, styles.activeItem]}
+          style={[styles.navItem, currentRoute === 'Feed' && styles.activeItem]}
           onPress={() => navigation.navigate('Feed')}
         >
-          <Ionicons name="home-outline" size={24} color={Colors.primary} />
+          <Ionicons name="home-outline" size={currentRoute === 'Feed' ? 26 : 24} color={currentRoute === 'Feed' ? Colors.primary : Colors.textSecondary} />
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={styles.navItem}
+          style={[styles.navItem, currentRoute === 'Explore' && styles.activeItem]}
           onPress={() => navigation.navigate('Explore')}
         >
-          <Ionicons name="compass-outline" size={24} color={Colors.textSecondary} />
+          <Ionicons name="compass-outline" size={currentRoute === 'Explore' ? 26 : 24} color={currentRoute === 'Explore' ? Colors.primary : Colors.textSecondary} />
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -37,79 +42,19 @@ export default function BottomNavBar() {
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={styles.navItem}
+          style={[styles.navItem, currentRoute === 'Dictionary' && styles.activeItem]}
           onPress={() => navigation.navigate('Dictionary')}
         >
-          <Ionicons name="book-outline" size={24} color={Colors.textSecondary} />
+          <Ionicons name="book-outline" size={currentRoute === 'Dictionary' ? 26 : 24} color={currentRoute === 'Dictionary' ? Colors.primary : Colors.textSecondary} />
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={styles.navItem}
+          style={[styles.navItem, currentRoute === 'Messages' && styles.activeItem]}
           onPress={() => navigation.navigate('Messages')}
         >
-          <Ionicons name="chatbubble-outline" size={24} color={Colors.textSecondary} />
+          <Ionicons name="chatbubble-outline" size={currentRoute === 'Messages' ? 26 : 24} color={currentRoute === 'Messages' ? Colors.primary : Colors.textSecondary} />
         </TouchableOpacity>
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: Colors.surface,
-    paddingBottom: 20, // To account for bottom safe area
-    paddingTop: 10,
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  innerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-  },
-  navItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 70,
-  },
-  activeItem: {
-    backgroundColor: '#E8F5E9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: Radius.lg,
-  },
-  navText: {
-    fontSize: 10,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  activeText: {
-    fontSize: 10,
-    color: Colors.primary,
-    fontWeight: 'bold',
-    marginTop: 2,
-  },
-  addButton: {
-    top: -10,
-  },
-  plusContainer: {
-    backgroundColor: '#2D5A27', // Darker green as in image
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
-  },
-});

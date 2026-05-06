@@ -8,6 +8,16 @@
  *  iconSymbol       — emoji o string corto como ícono izquierdo
  *  secureTextEntry  — oculta el texto (contraseña)
  *  showToggle       — muestra botón ojo para revelar/ocultar
+/**
+ * InputField — Campo de formulario reutilizable
+ *
+ * Props:
+ *  label            — etiqueta superior izquierda
+ *  labelRight       — elemento opcional a la derecha del label (ej: link "¿Olvidaste?")
+ *  placeholder      — texto de ayuda dentro del input
+ *  iconSymbol       — emoji o string corto como ícono izquierdo
+ *  secureTextEntry  — oculta el texto (contraseña)
+ *  showToggle       — muestra botón ojo para revelar/ocultar
  *  keyboardType     — tipo de teclado
  *  value            — valor controlado
  *  onChangeText     — callback de cambio
@@ -19,16 +29,16 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   KeyboardTypeOptions,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 
 type InputFieldProps = {
   label: string;
   labelRight?: ReactNode;
   placeholder: string;
-  iconSymbol: string;
+  iconSymbol?: ReactNode;
   secureTextEntry?: boolean;
   showToggle?: boolean;
   keyboardType?: KeyboardTypeOptions;
@@ -36,6 +46,8 @@ type InputFieldProps = {
   onChangeText?: (text: string) => void;
   editable?: boolean;
 };
+
+import styles from '../styles/InputField.styles';
 
 export default function InputField({
   label,
@@ -61,7 +73,11 @@ export default function InputField({
         </View>
       )}
       <View style={styles.container}>
-        <Text style={styles.icon}>{iconSymbol}</Text>
+        {iconSymbol && (
+          <View style={{ marginRight: 8, opacity: 0.7, justifyContent: 'center' }}>
+            {typeof iconSymbol === 'string' ? <Text style={{ fontSize: 16 }}>{iconSymbol}</Text> : iconSymbol}
+          </View>
+        )}
         <TextInput
           style={styles.input}
           placeholder={placeholder}
@@ -79,56 +95,14 @@ export default function InputField({
             style={styles.toggle}
             activeOpacity={0.7}
           >
-            <Text style={styles.toggleIcon}>{isSecure ? '👁️' : '🙈'}</Text>
+            <Ionicons
+              name={isSecure ? 'eye-outline' : 'eye-off-outline'}
+              size={20}
+              color={Colors.textSecondary}
+            />
           </TouchableOpacity>
         )}
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrapper: {
-    marginBottom: Spacing.md,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
-    marginLeft: 2,
-  },
-  label: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semiBold,
-    color: Colors.textPrimary,
-  },
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.inputBackground,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.inputBorder,
-    paddingHorizontal: Spacing.md,
-    height: 48,
-  },
-  icon: {
-    fontSize: 16,
-    marginRight: Spacing.sm,
-    opacity: 0.7,
-  },
-  input: {
-    flex: 1,
-    fontSize: Typography.fontSize.md,
-    color: Colors.textPrimary,
-    alignSelf: 'stretch', 
-  },
-  toggle: {
-    padding: Spacing.xs,
-  },
-  toggleIcon: {
-    fontSize: 16,
-    opacity: 0.6,
-  },
-});
