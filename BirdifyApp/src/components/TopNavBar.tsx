@@ -24,7 +24,7 @@ export default function TopNavBar() {
         </View>
       </View>
       <View style={styles.right}>
-        <TouchableOpacity style={styles.iconButton}>
+        <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Search')}>
           <Ionicons name="search-outline" size={24} color={Colors.primary} />
         </TouchableOpacity>
         <TouchableOpacity 
