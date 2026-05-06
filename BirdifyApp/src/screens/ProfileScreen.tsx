@@ -18,11 +18,6 @@ import BottomNavBar from '../components/BottomNavBar';
 import shared from '../styles/shared.styles';
 import styles from '../styles/profileScreen.styles';
 
-const { width } = Dimensions.get('window');
-const GRID_SPACING = 6;
-const COLUMN_COUNT = 3;
-const ITEM_WIDTH = (width - Spacing.md * 2 - GRID_SPACING * (COLUMN_COUNT - 1)) / COLUMN_COUNT;
-
 // ── Datos de ejemplo ──────────────────────────────────────────────────────────
 const SIGHTING_PHOTOS = [
   { uri: 'https://images.unsplash.com/photo-1555169062-013468b47731?auto=format&fit=crop&q=80&w=300', location: 'La Paz' },

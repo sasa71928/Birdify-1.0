@@ -1,5 +1,10 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Dimensions } from 'react-native';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
+
+const { width } = Dimensions.get('window');
+const GRID_SPACING = 6;
+const COLUMN_COUNT = 3;
+const ITEM_WIDTH = (width - Spacing.md * 2 - GRID_SPACING * (COLUMN_COUNT - 1)) / COLUMN_COUNT;
 
 export default StyleSheet.create({
   scroll: { flex: 1 },

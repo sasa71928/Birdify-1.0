@@ -21,12 +21,11 @@ export default StyleSheet.create({
     alignItems: 'center',
   },
   appLogo: {
-    width: 28,
-    height: 28,
+    width: 32,
+    height: 32,
     marginRight: 8,
     resizeMode: 'contain',
     borderRadius: 100,
-    overflow: 'hidden',
   },
   logoText: {
     fontSize: 20,
