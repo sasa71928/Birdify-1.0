@@ -11,6 +11,27 @@ import MessagesScreen       from '../screens/MessagesScreen';
 import ExploreScreen        from '../screens/ExploreScreen';
 import WelcomeScreen        from '../screens/WelcomeScreen';
 import SearchScreen         from '../screens/SearchScreen';
+import BirdDetailScreen     from '../screens/BirdDetailScreen';
+
+// ── Shared types ──────────────────────────────────────────────────────────────
+export interface BirdSpeciesData {
+  id: string;
+  name: string;
+  scientificName: string;
+  image: string;
+  status: 'RESIDENTE' | 'MIGRATORIA';
+  overview: string;
+  habitat: string;
+  conservationStatus: string;
+  classification?: {
+    kingdom: string;
+    phylum: string;
+    class: string;
+    order: string;
+    family: string;
+    genus: string;
+  };
+}
 
 // ── Tipos de rutas de la app ──────────────────────────────────────────────────
 export type RootStackParamList = {
@@ -24,6 +45,7 @@ export type RootStackParamList = {
   Messages: undefined;
   Explore: undefined;
   Search: undefined;
+  BirdDetail: { bird: BirdSpeciesData };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -45,6 +67,7 @@ export default function AppNavigator() {
       <Stack.Screen name="Messages"       component={MessagesScreen} />
       <Stack.Screen name="Explore"        component={ExploreScreen} />
       <Stack.Screen name="Search"         component={SearchScreen} />
+      <Stack.Screen name="BirdDetail"      component={BirdDetailScreen} />
     </Stack.Navigator>
   );
 }
