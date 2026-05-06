@@ -25,6 +25,8 @@ export default StyleSheet.create({
     height: 28,
     marginRight: 8,
     resizeMode: 'contain',
+    borderRadius: 100,
+    overflow: 'hidden',
   },
   logoText: {
     fontSize: 20,

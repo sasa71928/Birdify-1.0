@@ -20,7 +20,7 @@ export default function TopNavBar() {
       <View style={styles.left}>
         <View style={styles.logoContainer}>
           <Image 
-            source={require('../../assets/logo.png')} 
+            source={require('../../assets/icon.png')} 
             style={styles.appLogo as any} 
           />
           <Text style={styles.logoText}>Birdify</Text>
