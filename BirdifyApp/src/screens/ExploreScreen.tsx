@@ -71,13 +71,16 @@ const MOCK_SIGHTINGS = [
 ];
 
 export default function ExploreScreen() {
+  const mapboxToken = process.env.EXPO_PUBLIC_MAPBOX_API_KEY;
+  const mapUri = `https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/-99.1332,19.4326,13,0/800x1600?access_token=${mapboxToken}`;
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
       {/* ── Mapa Estático (Fallback para Expo Go) ── */}
       <Image 
-        source={{ uri: 'https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/-99.1332,19.4326,13,0/800x1600?access_token=pk.eyJ1IjoiY2hpdHUiLCJhIjoiY2tobnVnZzJvMGNxZzJzbXowam1vM3Z1ciJ9.9_n6rFv_Y0Z_X_1_1_1_1' }} 
+        source={{ uri: mapUri }} 
         style={styles.map} 
       />
 

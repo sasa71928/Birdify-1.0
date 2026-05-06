@@ -46,7 +46,9 @@ export default StyleSheet.create({
     height: 32,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#eee',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   profileImage: {
     width: '100%',
