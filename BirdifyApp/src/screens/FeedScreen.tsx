@@ -5,6 +5,7 @@ import { Colors } from '../theme';
 import FeedItem, { Post } from '../components/FeedItem';
 import TopNavBar from '../components/TopNavBar';
 import shared from '../styles/shared.styles';
+import styles from '../styles/feedScreen.styles';
 
 const MOCK_POSTS: Post[] = [
   {
@@ -50,14 +51,3 @@ export default function FeedScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  listContent: {
-    padding: 16,
-    paddingBottom: 100, // Space for bottom nav
-  },
-});

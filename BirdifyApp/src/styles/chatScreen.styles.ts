@@ -1,0 +1,159 @@
+import { StyleSheet } from 'react-native';
+import { Colors, Typography, Spacing, Radius } from '../theme';
+
+export default StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+  },
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.06)',
+    backgroundColor: Colors.surface,
+  },
+  backBtn: {
+    padding: 4,
+    marginRight: Spacing.sm,
+  },
+  headerCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  headerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.componentBase,
+  },
+  headerGroupAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E8F0FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerName: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.textPrimary,
+  },
+  headerStatus: {
+    fontSize: Typography.fontSize.xs,
+    color: '#34A853',
+    marginTop: 1,
+  },
+  headerAction: {
+    padding: 4,
+  },
+
+  // Message list
+  messageList: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    paddingBottom: Spacing.lg,
+  },
+  msgRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginBottom: Spacing.sm,
+  },
+  msgRowMine: {
+    justifyContent: 'flex-end',
+  },
+  msgAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 6,
+    backgroundColor: Colors.componentBase,
+  },
+  bubble: {
+    maxWidth: '75%',
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    overflow: 'hidden',
+  },
+  bubbleTheirs: {
+    backgroundColor: Colors.componentBase,
+    borderBottomLeftRadius: 4,
+  },
+  bubbleMine: {
+    backgroundColor: Colors.primary,
+    borderBottomRightRadius: 4,
+  },
+  bubbleImage: {
+    width: 200,
+    height: 160,
+    borderRadius: Radius.md,
+    marginBottom: 6,
+  },
+  bubbleText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textPrimary,
+    lineHeight: 20,
+  },
+  bubbleTextMine: {
+    color: Colors.canvasPure,
+  },
+  bubbleTime: {
+    fontSize: 10,
+    color: Colors.outlineGrey,
+    marginTop: 4,
+    alignSelf: 'flex-end',
+  },
+  bubbleTimeMine: {
+    color: Colors.springMoss,
+  },
+
+  // Input bar
+  inputBar: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.06)',
+    backgroundColor: Colors.surface,
+    gap: Spacing.sm,
+  },
+  attachBtn: {
+    padding: 6,
+    marginBottom: 2,
+  },
+  inputWrapper: {
+    flex: 1,
+    backgroundColor: Colors.componentBase,
+    borderRadius: Radius.xl,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
+    maxHeight: 120,
+  },
+  input: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textPrimary,
+    padding: 0,
+  },
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  sendBtnDisabled: {
+    backgroundColor: Colors.outlineGrey,
+  },
+});
+
