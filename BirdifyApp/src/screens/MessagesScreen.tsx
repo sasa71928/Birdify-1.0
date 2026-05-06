@@ -10,24 +10,18 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TopNavBar from '../components/TopNavBar';
 import BottomNavBar from '../components/BottomNavBar';
 import shared from '../styles/shared.styles';
+import { RootStackParamList, ChatThread } from '../navigation/AppNavigator';
 
-interface MessageThread {
-  id: string;
-  name: string;
-  avatar: string;
-  lastMessage: string;
-  time: string;
-  unreadCount?: number;
-  isOnline?: boolean;
-  isGroup?: boolean;
-}
+type MessagesNavProp = NativeStackNavigationProp<RootStackParamList, 'Messages'>;
 
-const MOCK_THREADS: MessageThread[] = [
+const MOCK_THREADS: ChatThread[] = [
   {
     id: '1',
     name: 'Sarah Jenkins',
@@ -62,8 +56,14 @@ const MOCK_THREADS: MessageThread[] = [
 ];
 
 export default function MessagesScreen() {
-  const renderItem = ({ item }: { item: MessageThread }) => (
-    <TouchableOpacity style={[styles.threadItem, item.unreadCount ? styles.unreadThread : null]}>
+  const navigation = useNavigation<MessagesNavProp>();
+
+  const renderItem = ({ item }: { item: ChatThread }) => (
+    <TouchableOpacity
+      style={[styles.threadItem, item.unreadCount ? styles.unreadThread : null]}
+      activeOpacity={0.75}
+      onPress={() => navigation.navigate('Chat', { thread: item })}
+    >
       <View style={styles.avatarContainer}>
         {item.isGroup ? (
             <View style={styles.groupAvatar}>
@@ -97,14 +97,24 @@ export default function MessagesScreen() {
       <TopNavBar />
 
       <View style={styles.container}>
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color={Colors.textSecondary} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search messages..."
-            placeholderTextColor={Colors.placeholder}
-          />
+        {/* ── Encabezado con título y botón crear grupo ── */}
+        <View style={styles.screenHeader}>
+          <Text style={styles.screenTitle}>Messages</Text>
+          <TouchableOpacity style={styles.createGroupBtn} activeOpacity={0.8} onPress={() => navigation.navigate('CreateGroup')}>
+            <MaterialCommunityIcons name="account-multiple-plus-outline" size={20} color={Colors.canvasPure} />
+            <Text style={styles.createGroupText}>New Group</Text>
+          </TouchableOpacity>
         </View>
+
+        {/* ── Búsqueda ── */}
+        <TouchableOpacity
+          style={styles.searchContainer}
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('SearchMessages')}
+        >
+          <Ionicons name="search" size={20} color={Colors.textSecondary} />
+          <Text style={styles.searchPlaceholder}>Search messages...</Text>
+        </TouchableOpacity>
 
         <FlatList
           data={MOCK_THREADS}
@@ -125,21 +135,52 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: Spacing.md,
   },
+  screenHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  screenTitle: {
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.textPrimary,
+  },
+  createGroupBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs + 2,
+    gap: 6,
+  },
+  createGroupText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semiBold,
+    color: Colors.canvasPure,
+  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F4F3',
+    backgroundColor: Colors.componentBase,
     borderRadius: Radius.lg,
     paddingHorizontal: Spacing.md,
-    height: 50,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.lg,
+    height: 46,
+    marginBottom: Spacing.md,
   },
   searchInput: {
     flex: 1,
     marginLeft: Spacing.sm,
     fontSize: Typography.fontSize.md,
     color: Colors.textPrimary,
+  },
+  searchPlaceholder: {
+    flex: 1,
+    marginLeft: Spacing.sm,
+    fontSize: Typography.fontSize.md,
+    color: Colors.placeholder,
   },
   listContent: {
     paddingBottom: 100,

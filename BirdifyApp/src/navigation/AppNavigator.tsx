@@ -12,6 +12,9 @@ import ExploreScreen        from '../screens/ExploreScreen';
 import WelcomeScreen        from '../screens/WelcomeScreen';
 import SearchScreen         from '../screens/SearchScreen';
 import BirdDetailScreen     from '../screens/BirdDetailScreen';
+import ChatScreen           from '../screens/ChatScreen';
+import CreateGroupScreen    from '../screens/CreateGroupScreen';
+import SearchMessagesScreen from '../screens/SearchMessagesScreen';
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 export interface BirdSpeciesData {
@@ -33,6 +36,17 @@ export interface BirdSpeciesData {
   };
 }
 
+export interface ChatThread {
+  id: string;
+  name: string;
+  avatar: string;
+  lastMessage: string;
+  time: string;
+  unreadCount?: number;
+  isOnline?: boolean;
+  isGroup?: boolean;
+}
+
 // ── Tipos de rutas de la app ──────────────────────────────────────────────────
 export type RootStackParamList = {
   Welcome: undefined;
@@ -46,6 +60,9 @@ export type RootStackParamList = {
   Explore: undefined;
   Search: undefined;
   BirdDetail: { bird: BirdSpeciesData };
+  Chat: { thread: ChatThread };
+  CreateGroup: undefined;
+  SearchMessages: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -68,6 +85,9 @@ export default function AppNavigator() {
       <Stack.Screen name="Explore"        component={ExploreScreen} />
       <Stack.Screen name="Search"         component={SearchScreen} />
       <Stack.Screen name="BirdDetail"      component={BirdDetailScreen} />
+      <Stack.Screen name="Chat"            component={ChatScreen} />
+      <Stack.Screen name="CreateGroup"      component={CreateGroupScreen} />
+      <Stack.Screen name="SearchMessages"   component={SearchMessagesScreen} />
     </Stack.Navigator>
   );
 }
