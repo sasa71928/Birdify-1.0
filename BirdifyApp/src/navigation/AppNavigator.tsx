@@ -1,5 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import BottomNavBar from '../components/BottomNavBar';
 
 import RegisterScreen from '../screens/RegisterScreen';
 import LoginScreen    from '../screens/LoginScreen';
@@ -67,9 +69,27 @@ export type RootStackParamList = {
   SearchMessages: undefined;
   Settings: undefined;
   OfflineStorage: undefined;
+  MainTabs: { screen?: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createMaterialTopTabNavigator();
+
+function MainTabs() {
+  return (
+    <Tab.Navigator
+      tabBar={(props) => <BottomNavBar {...props} />}
+      tabBarPosition="bottom"
+      initialRouteName="Feed"
+      screenOptions={{ swipeEnabled: true }}
+    >
+      <Tab.Screen name="Feed" component={FeedScreen} />
+      <Tab.Screen name="Explore" component={ExploreScreen} />
+      <Tab.Screen name="Dictionary" component={DictionaryScreen} />
+      <Tab.Screen name="Messages" component={MessagesScreen} />
+    </Tab.Navigator>
+  );
+}
 
 export default function AppNavigator() {
   return (
@@ -81,12 +101,11 @@ export default function AppNavigator() {
       <Stack.Screen name="Welcome"  component={WelcomeScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
       <Stack.Screen name="Login"    component={LoginScreen}    />
-      <Stack.Screen name="Feed"     component={FeedScreen}     />
+      <Stack.Screen name="MainTabs" component={MainTabs} />
+      
+      {/* ── Modal/Fullscreen screens ── */}
       <Stack.Screen name="RecordSighting" component={RecordSightingScreen} />
       <Stack.Screen name="Profile"        component={ProfileScreen} />
-      <Stack.Screen name="Dictionary"     component={DictionaryScreen} />
-      <Stack.Screen name="Messages"       component={MessagesScreen} />
-      <Stack.Screen name="Explore"        component={ExploreScreen} />
       <Stack.Screen name="Search"         component={SearchScreen} />
       <Stack.Screen name="BirdDetail"      component={BirdDetailScreen} />
       <Stack.Screen name="Chat"            component={ChatScreen} />

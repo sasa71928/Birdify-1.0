@@ -16,7 +16,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import TopNavBar from '../components/TopNavBar';
-import BottomNavBar from '../components/BottomNavBar';
 import shared from '../styles/shared.styles';
 import { RootStackParamList, BirdSpeciesData } from '../navigation/AppNavigator';
 
@@ -148,8 +147,6 @@ export default function DictionaryScreen() {
           showsVerticalScrollIndicator={false}
         />
       </View>
-
-      <BottomNavBar />
     </SafeAreaView>
   );
 }

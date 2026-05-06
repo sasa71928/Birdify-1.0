@@ -19,9 +19,10 @@ export default function TopNavBar() {
     <View style={styles.container}>
       <View style={styles.left}>
         <View style={styles.logoContainer}>
-            <View style={styles.logoCircle}>
-                <MaterialCommunityIcons name="bird" size={16} color="white" />
-            </View>
+          <Image 
+            source={require('../../assets/logo.png')} 
+            style={styles.appLogo as any} 
+          />
           <Text style={styles.logoText}>Birdify</Text>
         </View>
       </View>

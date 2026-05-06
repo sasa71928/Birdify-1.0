@@ -69,7 +69,6 @@ export default function InputField({
       {hasLabel && (
         <View style={styles.labelRow}>
           <Text style={styles.label}>{label}</Text>
-          {labelRight && <View>{labelRight}</View>}
         </View>
       )}
       <View style={styles.container}>
@@ -103,6 +102,7 @@ export default function InputField({
           </TouchableOpacity>
         )}
       </View>
+      {labelRight && <View style={styles.labelRight}>{labelRight}</View>}
     </View>
   );
 }

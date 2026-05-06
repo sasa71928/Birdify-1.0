@@ -4,7 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../theme';
 import FeedItem, { Post } from '../components/FeedItem';
 import TopNavBar from '../components/TopNavBar';
-import BottomNavBar from '../components/BottomNavBar';
 import shared from '../styles/shared.styles';
 
 const MOCK_POSTS: Post[] = [
@@ -48,8 +47,6 @@ export default function FeedScreen() {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
-
-      <BottomNavBar />
     </SafeAreaView>
   );
 }

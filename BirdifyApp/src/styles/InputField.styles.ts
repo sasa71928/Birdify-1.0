@@ -45,4 +45,9 @@ export default StyleSheet.create({
     fontSize: 16,
     opacity: 0.6,
   },
+  labelRight: {
+    marginTop: Spacing.xs,
+    alignSelf: 'flex-end',
+    marginRight: 4,
+  },
 });

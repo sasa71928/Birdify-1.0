@@ -15,7 +15,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TopNavBar from '../components/TopNavBar';
-import BottomNavBar from '../components/BottomNavBar';
 import shared from '../styles/shared.styles';
 import { RootStackParamList, ChatThread } from '../navigation/AppNavigator';
 
@@ -124,8 +123,6 @@ export default function MessagesScreen() {
           showsVerticalScrollIndicator={false}
         />
       </View>
-
-      <BottomNavBar />
     </SafeAreaView>
   );
 }

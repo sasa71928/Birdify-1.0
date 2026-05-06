@@ -10,24 +10,26 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 import styles from '../styles/BottomNavBar.styles';
 
-export default function BottomNavBar() {
+export default function BottomNavBar({ state }: any) {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute();
-  const currentRoute = route.name;
+  
+  // If used as a custom tab bar, state is provided. Otherwise, fallback to standard route.name.
+  const currentRoute = state ? state.routes[state.index].name : route.name;
 
   return (
     <View style={styles.container}>
       <View style={styles.innerContainer}>
         <TouchableOpacity 
           style={[styles.navItem, currentRoute === 'Feed' && styles.activeItem]}
-          onPress={() => navigation.navigate('Feed')}
+          onPress={() => navigation.navigate('MainTabs', { screen: 'Feed' })}
         >
           <Ionicons name="home-outline" size={currentRoute === 'Feed' ? 26 : 24} color={currentRoute === 'Feed' ? Colors.primary : Colors.textSecondary} />
         </TouchableOpacity>
 
         <TouchableOpacity 
           style={[styles.navItem, currentRoute === 'Explore' && styles.activeItem]}
-          onPress={() => navigation.navigate('Explore')}
+          onPress={() => navigation.navigate('MainTabs', { screen: 'Explore' })}
         >
           <Ionicons name="compass-outline" size={currentRoute === 'Explore' ? 26 : 24} color={currentRoute === 'Explore' ? Colors.primary : Colors.textSecondary} />
         </TouchableOpacity>
@@ -43,14 +45,14 @@ export default function BottomNavBar() {
 
         <TouchableOpacity 
           style={[styles.navItem, currentRoute === 'Dictionary' && styles.activeItem]}
-          onPress={() => navigation.navigate('Dictionary')}
+          onPress={() => navigation.navigate('MainTabs', { screen: 'Dictionary' })}
         >
           <Ionicons name="book-outline" size={currentRoute === 'Dictionary' ? 26 : 24} color={currentRoute === 'Dictionary' ? Colors.primary : Colors.textSecondary} />
         </TouchableOpacity>
 
         <TouchableOpacity 
           style={[styles.navItem, currentRoute === 'Messages' && styles.activeItem]}
-          onPress={() => navigation.navigate('Messages')}
+          onPress={() => navigation.navigate('MainTabs', { screen: 'Messages' })}
         >
           <Ionicons name="chatbubble-outline" size={currentRoute === 'Messages' ? 26 : 24} color={currentRoute === 'Messages' ? Colors.primary : Colors.textSecondary} />
         </TouchableOpacity>

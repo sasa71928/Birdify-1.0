@@ -98,6 +98,7 @@ export default function RegisterScreen() {
               label="Crear Cuenta"
               color={Colors.primary}
               style={{ marginTop: 8, marginBottom: 16 }}
+              onPress={() => navigation.navigate('MainTabs', { screen: 'Feed' })}
             />
 
             <View style={shared.dividerRow}>

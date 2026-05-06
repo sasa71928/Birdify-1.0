@@ -91,7 +91,7 @@ export default function LoginScreen() {
             label="Iniciar Sesión →"
             color={Colors.primary}
             style={{ marginBottom: 16 }}
-            onPress={() => navigation.navigate('Feed')}
+            onPress={() => navigation.navigate('MainTabs', { screen: 'Feed' })}
           />
 
           <View style={shared.dividerRow}>

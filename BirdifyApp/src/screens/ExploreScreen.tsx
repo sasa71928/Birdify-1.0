@@ -10,7 +10,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Radius, Shadows, Spacing } from '../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import BottomNavBar from '../components/BottomNavBar';
 
 const MAP_STYLE = [
   {
@@ -119,8 +118,6 @@ export default function ExploreScreen() {
       <TouchableOpacity style={styles.locationButton} activeOpacity={0.8}>
         <MaterialCommunityIcons name="target" size={24} color={Colors.textPrimary} />
       </TouchableOpacity>
-
-      <BottomNavBar />
     </View>
   );
 }

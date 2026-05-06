@@ -20,14 +20,11 @@ export default StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  logoCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+  appLogo: {
+    width: 28,
+    height: 28,
     marginRight: 8,
+    resizeMode: 'contain',
   },
   logoText: {
     fontSize: 20,
