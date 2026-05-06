@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Colors, Typography, Spacing } from '../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 
@@ -12,6 +12,8 @@ import styles from '../styles/TopNavBar.styles';
 
 export default function TopNavBar() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute();
+  const isProfile = route.name === 'Profile';
 
   return (
     <View style={styles.container}>
@@ -29,12 +31,22 @@ export default function TopNavBar() {
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.profileButton}
-          onPress={() => navigation.navigate('Profile')}
+          onPress={() => {
+            if (!isProfile) {
+              navigation.navigate('Profile');
+            } else {
+              navigation.navigate('Settings');
+            }
+          }}
         >
-          <Image 
-            source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=100' }} 
-            style={styles.profileImage} 
-          />
+          {isProfile ? (
+            <Ionicons name="settings-outline" size={26} color={Colors.primary} />
+          ) : (
+            <Image 
+              source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=100' }} 
+              style={styles.profileImage} 
+            />
+          )}
         </TouchableOpacity>
       </View>
     </View>

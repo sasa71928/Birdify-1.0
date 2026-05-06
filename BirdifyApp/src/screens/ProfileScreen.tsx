@@ -59,79 +59,73 @@ export default function ProfileScreen() {
       <StatusBar barStyle="dark-content" />
       <TopNavBar />
 
+      {/* ── Profile Header (fijo, no scroll) ── */}
+      <View style={styles.profileHeader}>
+        <View style={styles.avatarWrapper}>
+          <Image
+            source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=300' }}
+            style={styles.avatar}
+          />
+          <View style={styles.verifiedBadge}>
+            <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
+          </View>
+        </View>
+
+        <Text style={styles.name}>Ana Ruiz</Text>
+        <View style={styles.professionBadge}>
+          <MaterialCommunityIcons name="leaf" size={14} color={Colors.primary} />
+          <Text style={styles.professionText}>Professional Birder</Text>
+        </View>
+
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>1.2k</Text>
+            <Text style={styles.statLabel}>Followers</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>842</Text>
+            <Text style={styles.statLabel}>Following</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{LOGBOOK_ENTRIES.length}</Text>
+            <Text style={styles.statLabel}>Species</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>82</Text>
+            <Text style={styles.statLabel}>Sightings</Text>
+          </View>
+        </View>
+
+        <Text style={styles.bio}>
+          Passionate ornithologist exploring the Baja peninsula. Focused on coastal species and conservation. 🌿📸
+        </Text>
+      </View>
+
+      {/* ── Tab bar horizontal (fijo) ── */}
+      <View style={styles.tabsContainer}>
+        {(['Sightings', 'Logbook', 'Likes'] as Tab[]).map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tab, activeTab === tab && styles.activeTab]}
+            onPress={() => setActiveTab(tab)}
+          >
+            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* ── Contenido scrollable del tab activo ── */}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[1]} // makes tabs sticky
       >
-        {/* ── Profile Header ── */}
-        <View style={styles.profileHeader}>
-          <View style={styles.avatarWrapper}>
-            <Image
-              source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=300' }}
-              style={styles.avatar}
-            />
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
-            </View>
-          </View>
-
-          <Text style={styles.name}>Ana Ruiz</Text>
-          <View style={styles.professionBadge}>
-            <MaterialCommunityIcons name="leaf" size={14} color={Colors.primary} />
-            <Text style={styles.professionText}>Professional Birder</Text>
-          </View>
-
-          {/* Stats */}
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>1.2k</Text>
-              <Text style={styles.statLabel}>Followers</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>842</Text>
-              <Text style={styles.statLabel}>Following</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{LOGBOOK_ENTRIES.length}</Text>
-              <Text style={styles.statLabel}>Species</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>82</Text>
-              <Text style={styles.statLabel}>Sightings</Text>
-            </View>
-          </View>
-
-          <Text style={styles.bio}>
-            Passionate ornithologist exploring the Baja peninsula. Focused on coastal species and conservation. 🌿📸
-          </Text>
-        </View>
-
-        {/* ── Tabs (sticky) ── */}
-        <View style={styles.tabsContainer}>
-          {(['Sightings', 'Logbook', 'Likes'] as Tab[]).map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tab, activeTab === tab && styles.activeTab]}
-              onPress={() => setActiveTab(tab)}
-            >
-              {tab === 'Sightings' && <Ionicons name="camera-outline" size={16} color={activeTab === tab ? Colors.primary : Colors.textSecondary} />}
-              {tab === 'Logbook'   && <MaterialCommunityIcons name="notebook-outline" size={16} color={activeTab === tab ? Colors.primary : Colors.textSecondary} />}
-              {tab === 'Likes'     && <Ionicons name="heart-outline" size={16} color={activeTab === tab ? Colors.primary : Colors.textSecondary} />}
-              <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* ── Tab content ── */}
         {activeTab === 'Sightings' && <SightingsGrid />}
         {activeTab === 'Logbook'   && <LogbookView />}
         {activeTab === 'Likes'     && <LikesView />}
-
       </ScrollView>
 
       <BottomNavBar />
@@ -231,23 +225,13 @@ function LogbookView() {
 // ── Likes ─────────────────────────────────────────────────────────────────────
 function LikesView() {
   return (
-    <View style={styles.likesContainer}>
+    <View style={styles.grid}>
       {LIKED_POSTS.map((post) => (
-        <TouchableOpacity key={post.id} style={styles.likeCard} activeOpacity={0.88}>
-          <Image source={{ uri: post.image }} style={styles.likeImage} />
-          <View style={styles.likeOverlay}>
-            <View style={styles.likeAuthorRow}>
-              <Image source={{ uri: post.avatar }} style={styles.likeAvatar} />
-              <Text style={styles.likeUser}>{post.user}</Text>
-            </View>
-            <View style={styles.likeBirdTag}>
-              <MaterialCommunityIcons name="bird" size={12} color={Colors.springMoss} />
-              <Text style={styles.likeBirdName}>{post.bird}</Text>
-            </View>
-          </View>
-          <View style={styles.likeCountRow}>
-            <Ionicons name="heart" size={14} color={Colors.errorRed} />
-            <Text style={styles.likeCount}>{post.likes}</Text>
+        <TouchableOpacity key={post.id} style={styles.gridItem} activeOpacity={0.85}>
+          <Image source={{ uri: post.image }} style={styles.gridImage} />
+          <View style={styles.likeHeartBadge}>
+            <Ionicons name="heart" size={11} color={Colors.errorRed} />
+            <Text style={styles.likeGridCount}>{post.likes}</Text>
           </View>
         </TouchableOpacity>
       ))}
@@ -334,11 +318,9 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: Spacing.md,
-    gap: 5,
   },
   activeTab: {
     borderBottomWidth: 2,
@@ -494,62 +476,21 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.medium,
   },
 
-  // Likes
-  likesContainer: { padding: Spacing.md, gap: Spacing.md },
-  likeCard: {
-    borderRadius: Radius.lg,
-    overflow: 'hidden',
-    height: 200,
-    position: 'relative',
-    ...Shadows.card,
-  },
-  likeImage: { width: '100%', height: '100%' },
-  likeOverlay: {
+  // Likes (grid)
+  likeHeartBadge: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: Spacing.md,
-    backgroundColor: 'rgba(21,66,18,0.6)',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  likeAuthorRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  likeAvatar: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, borderColor: Colors.springMoss },
-  likeUser: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semiBold,
-    color: Colors.canvasPure,
-  },
-  likeBirdTag: {
+    bottom: 6,
+    right: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    gap: 2,
+    backgroundColor: 'rgba(0,0,0,0.45)',
     borderRadius: Radius.full,
-    paddingHorizontal: 8,
+    paddingHorizontal: 5,
     paddingVertical: 3,
   },
-  likeBirdName: {
-    fontSize: 10,
-    color: Colors.springMoss,
-    fontWeight: Typography.fontWeight.medium,
-  },
-  likeCountRow: {
-    position: 'absolute',
-    top: Spacing.sm,
-    right: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: Radius.full,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  likeCount: {
-    fontSize: Typography.fontSize.xs,
+  likeGridCount: {
+    fontSize: 9,
     color: Colors.canvasPure,
     fontWeight: Typography.fontWeight.bold,
   },

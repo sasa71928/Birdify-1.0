@@ -15,6 +15,8 @@ import BirdDetailScreen     from '../screens/BirdDetailScreen';
 import ChatScreen           from '../screens/ChatScreen';
 import CreateGroupScreen    from '../screens/CreateGroupScreen';
 import SearchMessagesScreen from '../screens/SearchMessagesScreen';
+import SettingsScreen       from '../screens/SettingsScreen';
+import OfflineStorageScreen from '../screens/OfflineStorageScreen';
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 export interface BirdSpeciesData {
@@ -63,6 +65,8 @@ export type RootStackParamList = {
   Chat: { thread: ChatThread };
   CreateGroup: undefined;
   SearchMessages: undefined;
+  Settings: undefined;
+  OfflineStorage: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -88,6 +92,8 @@ export default function AppNavigator() {
       <Stack.Screen name="Chat"            component={ChatScreen} />
       <Stack.Screen name="CreateGroup"      component={CreateGroupScreen} />
       <Stack.Screen name="SearchMessages"   component={SearchMessagesScreen} />
+      <Stack.Screen name="Settings"         component={SettingsScreen} />
+      <Stack.Screen name="OfflineStorage"   component={OfflineStorageScreen} />
     </Stack.Navigator>
   );
 }
