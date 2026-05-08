@@ -8,7 +8,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-import styles from '../styles/TopNavBar.styles';
+import styles from '../styles/components/TopNavBar.styles';
 
 export default function TopNavBar() {
   const navigation = useNavigation<NavigationProp>();

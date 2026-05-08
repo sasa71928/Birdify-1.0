@@ -31,7 +31,7 @@ type AppButtonProps = {
   style?: ViewStyle;
 };
 
-import styles from '../styles/AppButton.styles';
+import styles from '../styles/components/AppButton.styles';
 
 export default function AppButton({
   label,

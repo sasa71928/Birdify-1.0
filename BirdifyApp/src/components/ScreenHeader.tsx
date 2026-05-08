@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { View, Text } from 'react-native';
-import shared from '../styles/shared.styles';
+import shared from '../styles/shared/shared.styles';
 
 type ScreenHeaderProps = {
   icon?: string;

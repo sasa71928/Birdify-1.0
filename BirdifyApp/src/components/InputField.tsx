@@ -47,7 +47,7 @@ type InputFieldProps = {
   editable?: boolean;
 };
 
-import styles from '../styles/InputField.styles';
+import styles from '../styles/components/InputField.styles';
 
 export default function InputField({
   label,

@@ -8,7 +8,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-import styles from '../styles/BottomNavBar.styles';
+import styles from '../styles/components/BottomNavBar.styles';
 
 export default function BottomNavBar({ state }: any) {
   const navigation = useNavigation<NavigationProp>();

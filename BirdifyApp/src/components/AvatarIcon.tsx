@@ -27,7 +27,7 @@ type AvatarIconProps = {
   style?: ViewStyle;
 };
 
-import styles from '../styles/AvatarIcon.styles';
+import styles from '../styles/components/AvatarIcon.styles';
 
 export default function AvatarIcon({
   imageSource,

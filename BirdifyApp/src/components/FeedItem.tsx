@@ -21,7 +21,7 @@ interface FeedItemProps {
   post: Post;
 }
 
-import styles from '../styles/FeedItem.styles';
+import styles from '../styles/components/FeedItem.styles';
 
 export default function FeedItem({ post }: FeedItemProps) {
   return (

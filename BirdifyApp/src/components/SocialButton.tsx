@@ -23,7 +23,7 @@ type SocialButtonProps = {
   style?: ViewStyle;
 };
 
-import styles from '../styles/SocialButton.styles';
+import styles from '../styles/components/SocialButton.styles';
 
 export default function SocialButton({
   label,
