@@ -129,9 +129,9 @@ export default function OfflineStorageScreen() {
                     {pkg.status === 'downloading' && (
                       <View style={styles.downloadProgressWrap}>
                         <View style={styles.downloadTrack}>
-                          <View style={[styles.downloadFill, { width: `${pkg.progress}%` }]} />
+                          <View style={[styles.downloadFill, { width: `${pkg.progress ?? 0}%` }]} />
                         </View>
-                        <Text style={styles.downloadPercent}>{pkg.progress}%</Text>
+                        <Text style={styles.downloadPercent}>{pkg.progress ?? 0}%</Text>
                       </View>
                     )}
                   </View>

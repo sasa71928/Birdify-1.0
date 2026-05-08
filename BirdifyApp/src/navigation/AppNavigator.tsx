@@ -19,6 +19,13 @@ import CreateGroupScreen    from '../screens/CreateGroupScreen';
 import SearchMessagesScreen from '../screens/SearchMessagesScreen';
 import SettingsScreen       from '../screens/SettingsScreen';
 import OfflineStorageScreen from '../screens/OfflineStorageScreen';
+import LanguageSettingsScreen from '../screens/LanguageSettingsScreen';
+import PrivacySettingsScreen from '../screens/PrivacySettingsScreen';
+import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
+import ThemeSettingsScreen from '../screens/ThemeSettingsScreen';
+import HelpSupportScreen from '../screens/HelpSupportScreen';
+import AboutBirdifyScreen from '../screens/AboutBirdifyScreen';
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 export interface BirdSpeciesData {
@@ -69,6 +76,13 @@ export type RootStackParamList = {
   SearchMessages: undefined;
   Settings: undefined;
   OfflineStorage: undefined;
+  LanguageSettings: undefined;
+  PrivacySettings: undefined;
+  NotificationSettings: undefined;
+  EditProfile: undefined;
+  ThemeSettings: undefined;
+  HelpSupport: undefined;
+  AboutBirdify: undefined;
   MainTabs: { screen?: string };
 };
 
@@ -113,6 +127,13 @@ export default function AppNavigator() {
       <Stack.Screen name="SearchMessages"   component={SearchMessagesScreen} />
       <Stack.Screen name="Settings"         component={SettingsScreen} />
       <Stack.Screen name="OfflineStorage"   component={OfflineStorageScreen} />
+      <Stack.Screen name="LanguageSettings" component={LanguageSettingsScreen} />
+      <Stack.Screen name="PrivacySettings"  component={PrivacySettingsScreen} />
+      <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+      <Stack.Screen name="EditProfile"      component={EditProfileScreen} />
+      <Stack.Screen name="ThemeSettings"    component={ThemeSettingsScreen} />
+      <Stack.Screen name="HelpSupport"      component={HelpSupportScreen} />
+      <Stack.Screen name="AboutBirdify"      component={AboutBirdifyScreen} />
     </Stack.Navigator>
   );
 }

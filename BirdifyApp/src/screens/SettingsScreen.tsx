@@ -25,7 +25,12 @@ interface SettingItem {
   danger?: boolean;
 }
 
-const SETTING_SECTIONS = [
+interface SettingSection {
+  title: string;
+  data: SettingItem[];
+}
+
+const SETTING_SECTIONS: SettingSection[] = [
   {
     title: 'Account',
     data: [
@@ -72,6 +77,20 @@ export default function SettingsScreen() {
         index: 0,
         routes: [{ name: 'Welcome' }],
       });
+    } else if (item.id === '1') {
+      navigation.navigate('EditProfile' as any);
+    } else if (item.id === '2') {
+      navigation.navigate('PrivacySettings' as any);
+    } else if (item.id === '3') {
+      navigation.navigate('NotificationSettings' as any);
+    } else if (item.id === '4') {
+      navigation.navigate('LanguageSettings' as any);
+    } else if (item.id === '5') {
+      navigation.navigate('ThemeSettings' as any);
+    } else if (item.id === '6') {
+      navigation.navigate('HelpSupport' as any);
+    } else if (item.id === '7') {
+      navigation.navigate('AboutBirdify' as any);
     } else if (item.id === 'offline') {
       navigation.navigate('OfflineStorage' as any);
     } else {
@@ -106,7 +125,7 @@ export default function SettingsScreen() {
                     <TouchableOpacity
                       style={styles.itemRow}
                       activeOpacity={0.7}
-                      onPress={() => handlePress(item as SettingItem)}
+                      onPress={() => handlePress(item)}
                     >
                       <View style={[styles.iconWrap, item.danger && styles.iconWrapDanger]}>
                         <Ionicons
@@ -137,4 +156,3 @@ export default function SettingsScreen() {
   );
 }
 
-// ── Estilos ───────────────────────────────────────────────────────────────────
