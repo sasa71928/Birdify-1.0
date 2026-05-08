@@ -86,15 +86,20 @@ export default function HelpSupportScreen() {
           <Ionicons name="chevron-forward" size={20} color={Colors.outlineGrey} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.contactCard, { marginTop: Spacing.sm }]} activeOpacity={0.8}>
+        <TouchableOpacity style={[styles.contactCard, { marginTop: Spacing.sm, opacity: 0.5 }]} disabled={true} activeOpacity={1}>
           <View style={{ backgroundColor: Colors.secondaryBlue + '15', padding: Spacing.sm, borderRadius: 12 }}>
             <Ionicons name="chatbubbles" size={24} color={Colors.secondaryBlue} />
           </View>
           <View style={styles.contactInfo}>
-            <Text style={styles.contactTitle}>Community Forum</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.contactTitle}>Community Forum</Text>
+              <View style={{ backgroundColor: '#EEE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 }}>
+                <Text style={{ fontSize: 10, color: '#666', fontWeight: 'bold' }}>SOON</Text>
+              </View>
+            </View>
             <Text style={styles.contactSubtitle}>Ask other users for tips and tricks.</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={Colors.outlineGrey} />
+          <Ionicons name="lock-closed-outline" size={18} color={Colors.outlineGrey} />
         </TouchableOpacity>
 
       </ScrollView>

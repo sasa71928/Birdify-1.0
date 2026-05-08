@@ -67,15 +67,21 @@ export default function PrivacySettingsScreen() {
 
         <View style={styles.settingsCard}>
           <View style={styles.settingRow}>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingLabel}>Two-Factor Authentication</Text>
+            <View style={[styles.settingContent, { opacity: 0.5 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={styles.settingLabel}>Two-Factor Authentication</Text>
+                <View style={{ backgroundColor: '#EEE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 }}>
+                  <Text style={{ fontSize: 10, color: '#666', fontWeight: 'bold' }}>SOON</Text>
+                </View>
+              </View>
               <Text style={styles.settingSublabel}>Secure your account with a code.</Text>
             </View>
             <Switch
-              value={is2FAEnabled}
-              onValueChange={setIs2FAEnabled}
+              value={false}
+              disabled={true}
               trackColor={{ false: '#D1D1D1', true: Colors.primary }}
               thumbColor={Colors.white}
+              style={{ opacity: 0.5 }}
             />
           </View>
           <View style={styles.settingDivider} />

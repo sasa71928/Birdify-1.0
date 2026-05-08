@@ -139,9 +139,9 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F0F0F0',
     overflow: 'hidden',
+    paddingHorizontal: Spacing.md,
     marginBottom: Spacing.lg,
     ...Shadows.card,
-    paddingHorizontal: Spacing.md,
   },
   settingRow: {
     flexDirection: 'row',

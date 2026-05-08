@@ -58,9 +58,14 @@ export default function AboutBirdifyScreen() {
             <Ionicons name="chevron-forward" size={18} color={Colors.outlineGrey} />
           </TouchableOpacity>
           
-          <TouchableOpacity style={[styles.linkRow, { borderBottomWidth: 0 }]} activeOpacity={0.7}>
-            <Text style={styles.linkText}>Visit Website</Text>
-            <Ionicons name="globe-outline" size={18} color={Colors.outlineGrey} />
+          <TouchableOpacity style={[styles.linkRow, { borderBottomWidth: 0, opacity: 0.5 }]} disabled={true} activeOpacity={1}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.linkText}>Visit Website</Text>
+              <View style={{ backgroundColor: '#EEE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 }}>
+                <Text style={{ fontSize: 10, color: '#666', fontWeight: 'bold' }}>SOON</Text>
+              </View>
+            </View>
+            <Ionicons name="lock-closed-outline" size={16} color={Colors.outlineGrey} />
           </TouchableOpacity>
         </View>
 
