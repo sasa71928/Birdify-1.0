@@ -35,14 +35,14 @@ export default function AboutBirdifyScreen() {
             <Ionicons name="leaf" size={40} color={Colors.white} />
           </View>
           <Text style={styles.appName}>Birdify</Text>
-          <Text style={styles.appVersion}>Version 1.0.4 (Build 42)</Text>
+          <Text style={styles.appVersion}>Version 0.1 (Build 42)</Text>
         </View>
 
         <Text style={styles.aboutDescription}>
           Birdify is the ultimate companion for bird enthusiasts. Our mission is to connect people with nature and help document the diverse avian life around us.
         </Text>
 
-        <View style={styles.settingsCard}>
+        <View style={styles.aboutCard}>
           <TouchableOpacity style={styles.linkRow} activeOpacity={0.7}>
             <Text style={styles.linkText}>Terms of Service</Text>
             <Ionicons name="open-outline" size={18} color={Colors.outlineGrey} />

@@ -133,6 +133,16 @@ export default StyleSheet.create({
     marginBottom: Spacing.lg,
     ...Shadows.card,
   },
+  aboutCard: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    overflow: 'hidden',
+    marginBottom: Spacing.lg,
+    ...Shadows.card,
+    paddingHorizontal: Spacing.md,
+  },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
