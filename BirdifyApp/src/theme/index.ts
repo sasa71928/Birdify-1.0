@@ -40,13 +40,50 @@ export const Colors = {
   black: '#1F3131',
   transparent: 'transparent',
 
-  // Social buttons
-  googleBg: '#FEFEFE',
-  appleBg: '#FEFEFE',
-
-  // Aliases heredados (para no romper pantallas existentes)
   primaryLight: '#305A27',
   primaryDark: '#154212',
+};
+
+export const DarkColors = {
+  // Primary Palette (inverted for dark mode)
+  primary: '#A3D494',         // Spring Moss as primary
+  container: '#154212',
+  subContainer: '#305A27',
+  springMoss: '#154212',
+
+  // Surface & Canvas — Backgrounds
+  surface: '#121212',         // Deep Black
+  surfaceDim: '#1F1F1F',      // Dark Grey
+  canvasPure: '#1E1E1E',      // Card Background
+  componentBase: '#2C2C2C',   // Input Base
+  deepTerrain: '#000000',
+
+  // Secondary & Accents
+  secondaryBlue: '#4A90E2',
+  tertiaryBrown: '#A67B7C',
+  errorRed: '#FF5252',
+  outlineGrey: '#555555',
+
+  // Aliases semánticos
+  background: '#121212',
+  inputBackground: '#1E1E1E',
+  inputBorder: '#444444',
+  placeholder: '#888888',
+  textPrimary: '#FEFEFE',
+  textSecondary: '#A0A0A0',
+  textOnPrimary: '#121212',
+  accent: '#A3D494',
+  border: '#333333',
+  headerBorder: '#154212',
+
+  // Utilidad
+  white: '#FEFEFE',
+  black: '#000000',
+  transparent: 'transparent',
+
+  // Social
+  googleBg: '#1E1E1E',
+  appleBg: '#1E1E1E',
 };
 
 // ─── TIPOGRAFÍA ──────────────────────────────────────────────────────────────

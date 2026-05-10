@@ -1,15 +1,15 @@
 import { StyleSheet } from 'react-native';
-import { Colors, Radius, Spacing } from '../../theme';
+import { Radius, Spacing } from '../../theme';
 
-export default StyleSheet.create({
+export const createStyles = (colors: any) => StyleSheet.create({
   container: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     paddingBottom: 20, // To account for bottom safe area
     paddingTop: 10,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    borderColor: colors.border + '20',
     position: 'absolute',
     bottom: 0,
     left: 0,
@@ -27,19 +27,19 @@ export default StyleSheet.create({
     minWidth: 70,
   },
   activeItem: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: colors.primary + '15',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: Radius.lg,
   },
   navText: {
     fontSize: 10,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   activeText: {
     fontSize: 10,
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: 'bold',
     marginTop: 2,
   },
@@ -47,7 +47,7 @@ export default StyleSheet.create({
     top: -10,
   },
   plusContainer: {
-    backgroundColor: '#2D5A27', // Darker green as in image
+    backgroundColor: colors.primary, // Using primary color for the add button
     width: 56,
     height: 56,
     borderRadius: 28,

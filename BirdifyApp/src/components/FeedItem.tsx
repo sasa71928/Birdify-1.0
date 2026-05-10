@@ -5,7 +5,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import styles from '../styles/components/FeedItem.styles';
+import { createStyles } from '../styles/components/FeedItem.styles';
+import { useDynamicStyles } from '../hooks/useDynamicStyles';
 
 export interface Comment {
   id: string;
@@ -38,6 +39,7 @@ const INITIAL_COMMENTS_DISPLAY = 5;
 
 export default function FeedItem({ post }: FeedItemProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const [isCaptionExpanded, setIsCaptionExpanded] = React.useState(false);
   const [showComments, setShowComments] = React.useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = React.useState(false);

@@ -4,8 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../../theme';
 import FeedItem, { Post } from '../../components/FeedItem';
 import TopNavBar from '../../components/TopNavBar';
-import shared from '../../styles/shared/shared.styles';
-import styles from '../../styles/screens/main/feedScreen.styles';
+import { createStyles } from '../../styles/screens/main/feedScreen.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 const MOCK_POSTS: Post[] = [
   {
@@ -56,16 +56,18 @@ const MOCK_POSTS: Post[] = [
 ];
 
 export default function FeedScreen() {
+  const { shared, screen, isDark } = useDynamicStyles(createStyles);
+
   return (
     <SafeAreaView style={shared.safe}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <TopNavBar />
       
       <FlatList
         data={MOCK_POSTS}
         renderItem={({ item }) => <FeedItem post={item} />}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={screen.listContent}
         showsVerticalScrollIndicator={false}
         initialNumToRender={2}
         maxToRenderPerBatch={2}

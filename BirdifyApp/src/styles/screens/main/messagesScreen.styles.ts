@@ -1,7 +1,7 @@
 import { StyleSheet } from 'react-native';
 import { Colors, Typography, Spacing, Radius } from '../../../theme';
 
-export default StyleSheet.create({
+export const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: Spacing.md,
@@ -16,12 +16,12 @@ export default StyleSheet.create({
   screenTitle: {
     fontSize: Typography.fontSize.xl,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   createGroupBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: Radius.full,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs + 2,
@@ -30,12 +30,12 @@ export default StyleSheet.create({
   createGroupText: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.semiBold,
-    color: Colors.canvasPure,
+    color: colors.canvasPure,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F4F3',
+    backgroundColor: colors.componentBase,
     borderRadius: Radius.lg,
     paddingHorizontal: Spacing.md,
     height: 46,
@@ -45,13 +45,13 @@ export default StyleSheet.create({
     flex: 1,
     marginLeft: Spacing.sm,
     fontSize: Typography.fontSize.md,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   searchPlaceholder: {
     flex: 1,
     marginLeft: Spacing.sm,
     fontSize: Typography.fontSize.md,
-    color: Colors.placeholder,
+    color: colors.placeholder,
   },
   listContent: {
     paddingBottom: 100,
@@ -63,7 +63,7 @@ export default StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   unreadThread: {
-    backgroundColor: '#F8FAF9',
+    backgroundColor: colors.springMoss + '20',
     borderRadius: Radius.lg,
     paddingHorizontal: Spacing.sm,
     marginHorizontal: -Spacing.sm,
@@ -80,7 +80,7 @@ export default StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#E8F0FF',
+    backgroundColor: colors.componentBase,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -93,7 +93,7 @@ export default StyleSheet.create({
     borderRadius: 7,
     backgroundColor: '#34A853',
     borderWidth: 2,
-    borderColor: Colors.surface,
+    borderColor: colors.surface,
   },
   threadInfo: {
     flex: 1,
@@ -108,7 +108,7 @@ export default StyleSheet.create({
   name: {
     fontSize: Typography.fontSize.md,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   time: {
     fontSize: 12,
@@ -122,13 +122,13 @@ export default StyleSheet.create({
   },
   lastMessage: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     flex: 1,
     marginRight: Spacing.sm,
     lineHeight: 18,
   },
   unreadBadge: {
-    backgroundColor: '#1B4D3E',
+    backgroundColor: colors.primary,
     width: 20,
     height: 20,
     borderRadius: 10,
@@ -136,7 +136,7 @@ export default StyleSheet.create({
     alignItems: 'center',
   },
   unreadText: {
-    color: Colors.white,
+    color: colors.white,
     fontSize: 10,
     fontWeight: 'bold',
   },

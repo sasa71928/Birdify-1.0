@@ -1,10 +1,10 @@
 import { StyleSheet } from 'react-native';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../../../theme';
 
-export default StyleSheet.create({
+export const createStyles = (colors: any) => StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
 
   // Header
@@ -14,7 +14,7 @@ export default StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
+    borderBottomColor: colors.border + '20',
   },
   backBtn: {
     padding: 4,
@@ -23,25 +23,25 @@ export default StyleSheet.create({
     flex: 1,
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginLeft: Spacing.md,
   },
   createBtn: {
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: Radius.full,
     paddingHorizontal: Spacing.md,
     paddingVertical: 6,
   },
   createBtnDisabled: {
-    backgroundColor: Colors.componentBase,
+    backgroundColor: colors.componentBase,
   },
   createBtnText: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.canvasPure,
+    color: colors.canvasPure,
   },
   createBtnTextDisabled: {
-    color: Colors.outlineGrey,
+    color: colors.placeholder,
   },
 
   // Group icon
@@ -53,14 +53,14 @@ export default StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: Colors.componentBase,
+    backgroundColor: colors.componentBase,
     borderWidth: 2,
-    borderColor: Colors.border,
+    borderColor: colors.border + '50',
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.sm,
-    overflow: 'hidden', // Added for image
+    overflow: 'hidden', 
   },
   groupIconImage: {
     width: '100%',
@@ -68,13 +68,13 @@ export default StyleSheet.create({
   },
   iconHint: {
     fontSize: Typography.fontSize.xs,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   // Form
   formCard: {
     marginHorizontal: Spacing.md,
-    backgroundColor: Colors.canvasPure,
+    backgroundColor: colors.canvasPure,
     borderRadius: Radius.lg,
     paddingHorizontal: Spacing.md,
     ...Shadows.card,
@@ -89,11 +89,11 @@ export default StyleSheet.create({
   fieldInput: {
     flex: 1,
     fontSize: Typography.fontSize.md,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   divider: {
     height: 1,
-    backgroundColor: Colors.componentBase,
+    backgroundColor: colors.border + '20',
     marginLeft: 28,
   },
 
@@ -105,7 +105,7 @@ export default StyleSheet.create({
   sectionLabel: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.semiBold,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: Spacing.sm,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
@@ -117,13 +117,13 @@ export default StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.springMoss + '40',
+    backgroundColor: colors.primary + '20',
     borderRadius: Radius.full,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     gap: 4,
     borderWidth: 1,
-    borderColor: Colors.primary + '50',
+    borderColor: colors.primary + '50',
   },
   chipAvatar: {
     width: 22,
@@ -133,7 +133,7 @@ export default StyleSheet.create({
   chipName: {
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.semiBold,
-    color: Colors.primary,
+    color: colors.primary,
   },
 
   // Contacts
@@ -146,7 +146,7 @@ export default StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.04)',
+    borderBottomColor: colors.border + '20',
   },
   contactAvatarWrap: {
     position: 'relative',
@@ -156,7 +156,7 @@ export default StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Colors.componentBase,
+    backgroundColor: colors.componentBase,
   },
   onlineDot: {
     position: 'absolute',
@@ -167,26 +167,26 @@ export default StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#34A853',
     borderWidth: 2,
-    borderColor: Colors.surface,
+    borderColor: colors.surface,
   },
   contactName: {
     flex: 1,
     fontSize: Typography.fontSize.md,
     fontWeight: Typography.fontWeight.medium,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   checkbox: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxChecked: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
 });
 

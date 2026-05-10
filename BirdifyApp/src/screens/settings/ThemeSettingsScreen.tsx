@@ -5,12 +5,14 @@ import {
   TouchableOpacity,
   ScrollView,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import styles from '../../styles/screens/settings/settingsSubScreens.styles';
-import { Colors } from '../../theme';
+import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { useTheme } from '../../context/ThemeContext';
 
 const THEMES = [
   { id: 'light', name: 'Light Mode', icon: 'sunny-outline' },
@@ -18,18 +20,30 @@ const THEMES = [
   { id: 'system', name: 'System Default', icon: 'settings-outline' },
 ];
 
+
 export default function ThemeSettingsScreen() {
   const navigation = useNavigation();
-  const [selectedTheme, setSelectedTheme] = useState('light');
+  const { theme, setTheme } = useTheme();
+  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const [selectedTheme, setSelectedTheme] = useState(theme);
+
+  const handleSave = () => {
+    setTheme(selectedTheme as any);
+    Alert.alert(
+      'Theme Updated',
+      `Birdify is now set to ${THEMES.find(t => t.id === selectedTheme)?.name}.`,
+      [{ text: 'Great!', onPress: () => navigation.goBack() }]
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.primary} />
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Theme</Text>
       </View>
@@ -51,9 +65,10 @@ export default function ThemeSettingsScreen() {
                 onPress={() => setSelectedTheme(theme.id)}
               >
                 <View style={styles.langIcon}>
-                  <Ionicons name={theme.icon as any} size={20} color={Colors.textPrimary} />
+                  <Ionicons name={theme.icon as any} size={20} color={isActive ? colors.primary : colors.textPrimary} />
                 </View>
                 <Text style={styles.langName}>{theme.name}</Text>
+                <View style={{ flex: 1 }} />
                 <View style={[styles.radioOuter, isActive && styles.radioOuterActive]}>
                   {isActive && <View style={styles.radioInner} />}
                 </View>
@@ -63,11 +78,15 @@ export default function ThemeSettingsScreen() {
         </View>
 
         <View style={styles.infoBox}>
-          <Ionicons name="sparkles-outline" size={20} color={Colors.primary} />
+          <Ionicons name="sparkles-outline" size={20} color={colors.primary} />
           <Text style={styles.infoText}>
             Dark mode is designed to reduce eye strain in low-light environments and save battery life on OLED screens.
           </Text>
         </View>
+
+        <TouchableOpacity style={[styles.saveBtn, { marginTop: 40 }]} onPress={handleSave}>
+          <Text style={styles.saveBtnText}>Save Appearance</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );

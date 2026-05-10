@@ -18,6 +18,7 @@ import {
 } from '@expo-google-fonts/be-vietnam-pro';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from './src/theme';
+import { ThemeProvider } from './src/context/ThemeContext';
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -44,8 +45,10 @@ export default function App() {
 
   return (
     // @ts-ignore - React 19 type mismatch
-    <NavigationContainer>
-      <AppNavigator />
-    </NavigationContainer>
+    <ThemeProvider>
+      <NavigationContainer>
+        <AppNavigator />
+      </NavigationContainer>
+    </ThemeProvider>
   );
 }

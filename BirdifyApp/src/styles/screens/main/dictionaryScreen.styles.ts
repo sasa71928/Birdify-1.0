@@ -1,14 +1,14 @@
 import { StyleSheet } from 'react-native';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../../../theme';
 
-export default StyleSheet.create({
+export const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F4F3',
+    backgroundColor: colors.componentBase,
     borderRadius: Radius.lg,
     paddingHorizontal: Spacing.md,
     height: 50,
@@ -20,7 +20,7 @@ export default StyleSheet.create({
     flex: 1,
     marginLeft: Spacing.sm,
     fontSize: Typography.fontSize.md,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   filtersWrapper: {
     marginBottom: Spacing.lg,
@@ -33,25 +33,25 @@ export default StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: Radius.full,
-    backgroundColor: '#E8EDEB',
+    backgroundColor: colors.componentBase,
   },
   activeFilter: {
-    backgroundColor: '#1B4D3E',
+    backgroundColor: colors.primary,
   },
   filterText: {
     fontSize: 12,
     fontWeight: Typography.fontWeight.medium,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   activeFilterText: {
-    color: Colors.white,
+    color: colors.white,
   },
   listContent: {
     paddingHorizontal: Spacing.md,
     paddingBottom: 100,
   },
   birdCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.xl,
     marginBottom: Spacing.lg,
     overflow: 'hidden',
@@ -77,7 +77,7 @@ export default StyleSheet.create({
   statusText: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   birdInfo: {
     padding: Spacing.md,
@@ -85,12 +85,12 @@ export default StyleSheet.create({
   birdName: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   scientificName: {
     fontSize: 12,
     fontStyle: 'italic',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   sectionHeader: {
@@ -102,7 +102,7 @@ export default StyleSheet.create({
   sectionTitle: {
     fontSize: Typography.fontSize.md,
     fontWeight: Typography.fontWeight.bold,
-    color: '#1B4D3E',
+    color: colors.primary,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },

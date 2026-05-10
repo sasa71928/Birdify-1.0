@@ -8,9 +8,10 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors, Radius, Shadows, Spacing } from '../../theme';
+import { Spacing, Radius, Shadows } from '../../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import styles from '../../styles/screens/main/exploreScreen.styles';
+import { createStyles } from '../../styles/screens/main/exploreScreen.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 const MAP_STYLE = [
   {
@@ -71,12 +72,14 @@ const MOCK_SIGHTINGS = [
 ];
 
 export default function ExploreScreen() {
+  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const mapboxToken = process.env.EXPO_PUBLIC_MAPBOX_API_KEY;
-  const mapUri = `https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/-99.1332,19.4326,13,0/800x1600?access_token=${mapboxToken}`;
+  const mapStyle = isDark ? 'dark-v11' : 'outdoors-v12';
+  const mapUri = `https://api.mapbox.com/styles/v1/mapbox/${mapStyle}/static/-99.1332,19.4326,13,0/800x1600?access_token=${mapboxToken}`;
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       
       {/* ── Mapa Estático (Fallback para Expo Go) ── */}
       <Image 
@@ -87,14 +90,14 @@ export default function ExploreScreen() {
       {/* Pines manuales sobre la imagen */}
       <View style={[styles.pinWrapper, { position: 'absolute', top: '35%', left: '25%' }]}>
         <View style={styles.pinCircle}>
-          <MaterialCommunityIcons name="bird" size={20} color={Colors.white} />
+          <MaterialCommunityIcons name="bird" size={20} color={colors.canvasPure} />
         </View>
         <View style={styles.pinArrow} />
       </View>
 
       <View style={[styles.pinWrapper, { position: 'absolute', top: '55%', left: '65%' }]}>
         <View style={styles.pinCircle}>
-          <MaterialCommunityIcons name="duck" size={20} color={Colors.white} />
+          <MaterialCommunityIcons name="duck" size={20} color={colors.canvasPure} />
         </View>
         <View style={styles.pinArrow} />
       </View>
@@ -103,21 +106,21 @@ export default function ExploreScreen() {
       <SafeAreaView style={styles.overlay} pointerEvents="box-none">
         {/* Barra de búsqueda */}
         <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color={Colors.textSecondary} style={styles.searchIcon} />
+          <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
           <TextInput 
             style={styles.searchInput}
             placeholder="Search locations or species..."
-            placeholderTextColor={Colors.placeholder}
+            placeholderTextColor={colors.placeholder}
           />
           <TouchableOpacity style={styles.filterButton}>
-            <MaterialCommunityIcons name="filter-variant" size={20} color={Colors.textPrimary} />
+            <MaterialCommunityIcons name="filter-variant" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
         </View>
       </SafeAreaView>
 
       {/* Botón de ubicación flotante */}
       <TouchableOpacity style={styles.locationButton} activeOpacity={0.8}>
-        <MaterialCommunityIcons name="target" size={24} color={Colors.textPrimary} />
+        <MaterialCommunityIcons name="target" size={24} color={colors.textPrimary} />
       </TouchableOpacity>
     </View>
   );

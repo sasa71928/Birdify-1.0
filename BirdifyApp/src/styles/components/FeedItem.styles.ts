@@ -1,9 +1,9 @@
 import { StyleSheet, Platform } from 'react-native';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
 
-export default StyleSheet.create({
+export const createStyles = (colors: any) => StyleSheet.create({
   container: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.xl,
     marginBottom: Spacing.lg,
     overflow: 'hidden',
@@ -23,7 +23,7 @@ export default StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#eee',
+    backgroundColor: colors.componentBase,
   },
   userText: {
     marginLeft: Spacing.sm,
@@ -35,14 +35,14 @@ export default StyleSheet.create({
   username: {
     fontSize: Typography.fontSize.md,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   verifiedIcon: {
     marginLeft: 4,
   },
   location: {
     fontSize: Typography.fontSize.xs,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   imageContainer: {
     position: 'relative',
@@ -88,7 +88,7 @@ export default StyleSheet.create({
   },
   actionText: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginLeft: 4,
     fontWeight: Typography.fontWeight.medium,
   },
@@ -98,7 +98,7 @@ export default StyleSheet.create({
   },
   caption: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     lineHeight: Typography.lineHeight.tight,
   },
   captionUsername: {
@@ -106,12 +106,12 @@ export default StyleSheet.create({
   },
   timeAgo: {
     fontSize: Typography.fontSize.xs,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 4,
     textTransform: 'uppercase',
   },
   seeMore: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: Typography.fontWeight.bold,
   },
   modalOverlayContainer: {
@@ -123,7 +123,7 @@ export default StyleSheet.create({
     backgroundColor: '#000',
   },
   modalContent: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
     height: '75%',
@@ -131,14 +131,14 @@ export default StyleSheet.create({
   },
   modalDragArea: {
     paddingTop: 10,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
   },
   modalHandle: {
     width: 40,
     height: 5,
-    backgroundColor: '#ddd',
+    backgroundColor: colors.border,
     borderRadius: 3,
     alignSelf: 'center',
     marginTop: 10,
@@ -148,13 +148,13 @@ export default StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.componentBase,
     alignItems: 'center',
   },
   modalTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     textAlign: 'center',
   },
   modalScrollView: {
@@ -165,8 +165,8 @@ export default StyleSheet.create({
   modalInputContainer: {
     padding: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    backgroundColor: Colors.surface,
+    borderTopColor: colors.componentBase,
+    backgroundColor: colors.surface,
   },
   commentItem: {
     marginBottom: Spacing.sm,
@@ -178,12 +178,12 @@ export default StyleSheet.create({
   commentUsername: {
     fontWeight: Typography.fontWeight.bold,
     fontSize: Typography.fontSize.sm,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginRight: 4,
   },
   commentText: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     flexShrink: 1,
   },
   repliesContainer: {
@@ -195,7 +195,7 @@ export default StyleSheet.create({
   },
   viewRepliesText: {
     fontSize: Typography.fontSize.xs,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: Typography.fontWeight.medium,
   },
   repliesList: {
@@ -212,7 +212,7 @@ export default StyleSheet.create({
   },
   loadMoreText: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: Typography.fontWeight.bold,
   },
   replyButton: {
@@ -221,20 +221,20 @@ export default StyleSheet.create({
   },
   replyButtonText: {
     fontSize: Typography.fontSize.xs,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: Typography.fontWeight.medium,
   },
   commentInputContainer: {
     marginTop: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: colors.componentBase,
     paddingTop: Spacing.sm,
   },
   replyingToBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.componentBase,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: Radius.sm,
@@ -242,12 +242,12 @@ export default StyleSheet.create({
   },
   replyingToText: {
     fontSize: Typography.fontSize.xs,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f8f8',
+    backgroundColor: colors.componentBase,
     borderRadius: Radius.lg,
     paddingHorizontal: Spacing.sm,
     minHeight: 45,
@@ -255,7 +255,7 @@ export default StyleSheet.create({
   commentInput: {
     flex: 1,
     fontSize: Typography.fontSize.sm,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     maxHeight: 100,
     paddingVertical: 8,
   },
@@ -272,7 +272,7 @@ export default StyleSheet.create({
     justifyContent: 'flex-end',
   },
   optionsContent: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
     paddingBottom: Platform.OS === 'ios' ? 40 : 20,
@@ -288,13 +288,13 @@ export default StyleSheet.create({
   },
   optionText: {
     fontSize: Typography.fontSize.md,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginLeft: Spacing.md,
     fontWeight: Typography.fontWeight.medium,
   },
   optionDivider: {
     height: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.componentBase,
     marginVertical: Spacing.xs,
   },
   heartOverlay: {

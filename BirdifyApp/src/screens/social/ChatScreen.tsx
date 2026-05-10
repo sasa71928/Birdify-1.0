@@ -18,9 +18,10 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
+import { Typography, Spacing, Radius, Shadows } from '../../theme';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import styles from '../../styles/screens/social/chatScreen.styles';
+import { createStyles } from '../../styles/screens/social/chatScreen.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 type ChatNavProp = NativeStackNavigationProp<RootStackParamList, 'Chat'>;
 type ChatRouteProp = RouteProp<RootStackParamList, 'Chat'>;
@@ -61,6 +62,7 @@ const MOCK_MESSAGES: Message[] = [
 // ── Componente ────────────────────────────────────────────────────────────────
 export default function ChatScreen() {
   const navigation = useNavigation<ChatNavProp>();
+  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const route = useRoute<ChatRouteProp>();
   const { thread } = route.params;
 
@@ -230,18 +232,18 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* ── Header ── */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
 
         <View style={styles.headerCenter}>
           {thread.isGroup ? (
             <View style={styles.headerGroupAvatar}>
-              <Ionicons name="people" size={20} color={Colors.secondaryBlue} />
+              <Ionicons name="people" size={20} color={colors.secondaryBlue} />
             </View>
           ) : (
             <Image source={{ uri: thread.avatar }} style={styles.headerAvatar} />
@@ -255,7 +257,7 @@ export default function ChatScreen() {
         </View>
 
         <TouchableOpacity style={styles.headerAction}>
-          <Ionicons name="ellipsis-vertical" size={20} color={Colors.textPrimary} />
+          <Ionicons name="ellipsis-vertical" size={20} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -273,7 +275,6 @@ export default function ChatScreen() {
           contentContainerStyle={styles.messageList}
           showsVerticalScrollIndicator={false}
           onScrollToIndexFailed={(info) => {
-            // Fallback if scrollToIndex fails (e.g. items not rendered yet)
             listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
           }}
         />
@@ -292,14 +293,14 @@ export default function ChatScreen() {
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setReplyingTo(null)}>
-                <Ionicons name="close-circle" size={20} color={Colors.textSecondary} />
+                <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
           )}
 
           <View style={styles.inputBar}>
             <TouchableOpacity style={styles.attachBtn} onPress={pickImage}>
-              <Ionicons name="image-outline" size={24} color={Colors.textSecondary} />
+              <Ionicons name="image-outline" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
 
             <View style={styles.inputWrapper}>
@@ -308,7 +309,7 @@ export default function ChatScreen() {
                 value={input}
                 onChangeText={setInput}
                 placeholder="Message..."
-                placeholderTextColor={Colors.placeholder}
+                placeholderTextColor={colors.placeholder}
                 multiline
                 returnKeyType="send"
                 onSubmitEditing={sendMessage}
@@ -320,7 +321,7 @@ export default function ChatScreen() {
               onPress={sendMessage}
               disabled={!input.trim()}
             >
-              <Ionicons name="send" size={20} color={Colors.canvasPure} />
+              <Ionicons name="send" size={20} color={colors.canvasPure} />
             </TouchableOpacity>
           </View>
         </View>

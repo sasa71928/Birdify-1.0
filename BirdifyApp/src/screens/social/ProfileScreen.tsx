@@ -15,12 +15,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
+import { Typography, Spacing, Radius, Shadows } from '../../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TopNavBar from '../../components/TopNavBar';
 import BottomNavBar from '../../components/BottomNavBar';
-import shared from '../../styles/shared/shared.styles';
-import styles from '../../styles/screens/social/profileScreen.styles';
+import { createStyles } from '../../styles/screens/social/profileScreen.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 type ProfileRouteProp = RouteProp<RootStackParamList, 'Profile'>;
 
@@ -74,6 +74,7 @@ type Tab = 'Sightings' | 'Logbook' | 'Likes';
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<ProfileRouteProp>();
+  const { shared, screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const userId = route.params?.userId;
   const isMe = !userId || userId === 'me';
   
@@ -101,7 +102,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={shared.safe}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <TopNavBar />
 
       {/* ── Profile Header (fijo, no scroll) ── */}
@@ -113,7 +114,7 @@ export default function ProfileScreen() {
           />
           {isMe && (
             <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
+              <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
             </View>
           )}
         </View>
@@ -125,13 +126,13 @@ export default function ProfileScreen() {
               style={styles.editIconBtn}
               onPress={() => navigation.navigate('EditProfile')}
             >
-              <Ionicons name="create-outline" size={20} color={Colors.primary} />
+              <Ionicons name="create-outline" size={20} color={colors.primary} />
             </TouchableOpacity>
           )}
         </View>
 
         <View style={styles.professionBadge}>
-          <MaterialCommunityIcons name="leaf" size={14} color={Colors.primary} />
+          <MaterialCommunityIcons name="leaf" size={14} color={colors.primary} />
           <Text style={styles.professionText}>{userData.profession || 'Bird Watcher'}</Text>
         </View>
 
@@ -163,7 +164,7 @@ export default function ProfileScreen() {
               <Text style={styles.followMainBtnText}>Follow</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.messageMainBtn} onPress={() => navigation.navigate('Chat', { thread: { id: userId, name: userData.name, avatar: userData.avatar, lastMessage: '', time: '' } })}>
-              <Ionicons name="chatbubble-outline" size={20} color={Colors.primary} />
+              <Ionicons name="chatbubble-outline" size={20} color={colors.primary} />
             </TouchableOpacity>
           </View>
         )}
@@ -174,7 +175,7 @@ export default function ProfileScreen() {
       {userData.isPrivate && !isMe ? (
         <View style={styles.privateContainer}>
           <View style={styles.privateIconCircle}>
-            <Ionicons name="lock-closed-outline" size={40} color={Colors.textSecondary} />
+            <Ionicons name="lock-closed-outline" size={40} color={colors.textSecondary} />
           </View>
           <Text style={styles.privateTitle}>This Account is Private</Text>
           <Text style={styles.privateSubtitle}>Follow this account to see their sightings and activity.</Text>
@@ -219,7 +220,7 @@ export default function ProfileScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{followModalType}</Text>
               <TouchableOpacity onPress={() => setFollowModalVisible(false)}>
-                <Ionicons name="close" size={24} color={Colors.textPrimary} />
+                <Ionicons name="close" size={24} color={colors.textPrimary} />
               </TouchableOpacity>
             </View>
             
@@ -265,13 +266,14 @@ export default function ProfileScreen() {
 
 // ── Sightings grid ────────────────────────────────────────────────────────────
 function SightingsGrid() {
+  const { screen: styles, colors } = useDynamicStyles(createStyles);
   return (
     <View style={styles.grid}>
       {SIGHTING_PHOTOS.map((item, i) => (
         <TouchableOpacity key={i} style={styles.gridItem} activeOpacity={0.85}>
           <Image source={{ uri: item.uri }} style={styles.gridImage} />
           <View style={styles.locationBadge}>
-            <Ionicons name="location" size={11} color={Colors.white} />
+            <Ionicons name="location" size={11} color={colors.white} />
           </View>
         </TouchableOpacity>
       ))}
@@ -281,6 +283,7 @@ function SightingsGrid() {
 
 // ── Logbook ───────────────────────────────────────────────────────────────────
 function LogbookView() {
+  const { screen: styles, colors } = useDynamicStyles(createStyles);
   const totalSpecies = LOGBOOK_ENTRIES.length;
   const rareCount    = LOGBOOK_ENTRIES.filter((e) => e.rare).length;
   const totalSightings = LOGBOOK_ENTRIES.reduce((sum, e) => sum + e.count, 0);
@@ -291,19 +294,19 @@ function LogbookView() {
       {/* Summary bar */}
       <View style={styles.logbookSummary}>
         <View style={styles.logbookStat}>
-          <MaterialCommunityIcons name="bird" size={22} color={Colors.primary} />
+          <MaterialCommunityIcons name="bird" size={22} color={colors.primary} />
           <Text style={styles.logbookStatValue}>{totalSpecies}</Text>
           <Text style={styles.logbookStatLabel}>Species</Text>
         </View>
         <View style={styles.logbookStatDivider} />
         <View style={styles.logbookStat}>
-          <MaterialCommunityIcons name="star-outline" size={22} color={Colors.tertiaryBrown} />
+          <MaterialCommunityIcons name="star-outline" size={22} color={colors.tertiaryBrown} />
           <Text style={styles.logbookStatValue}>{rareCount}</Text>
           <Text style={styles.logbookStatLabel}>Rare</Text>
         </View>
         <View style={styles.logbookStatDivider} />
         <View style={styles.logbookStat}>
-          <Ionicons name="eye-outline" size={22} color={Colors.secondaryBlue} />
+          <Ionicons name="eye-outline" size={22} color={colors.secondaryBlue} />
           <Text style={styles.logbookStatValue}>{totalSightings}</Text>
           <Text style={styles.logbookStatLabel}>Sightings</Text>
         </View>
@@ -319,7 +322,7 @@ function LogbookView() {
               <Image source={{ uri: entry.image }} style={styles.stampImage} />
               {entry.rare && (
                 <View style={styles.rareBadge}>
-                  <MaterialCommunityIcons name="star" size={10} color={Colors.canvasPure} />
+                  <MaterialCommunityIcons name="star" size={10} color={colors.canvasPure} />
                 </View>
               )}
               {/* Perforation dots top */}
@@ -341,7 +344,7 @@ function LogbookView() {
 
             {/* Count badge */}
             <View style={styles.stampCountRow}>
-              <Ionicons name="eye-outline" size={11} color={Colors.textSecondary} />
+              <Ionicons name="eye-outline" size={11} color={colors.textSecondary} />
               <Text style={styles.stampCount}>×{entry.count}</Text>
             </View>
           </TouchableOpacity>
@@ -354,13 +357,14 @@ function LogbookView() {
 
 // ── Likes ─────────────────────────────────────────────────────────────────────
 function LikesView() {
+  const { screen: styles, colors } = useDynamicStyles(createStyles);
   return (
     <View style={styles.grid}>
       {LIKED_POSTS.map((post) => (
         <TouchableOpacity key={post.id} style={styles.gridItem} activeOpacity={0.85}>
           <Image source={{ uri: post.image }} style={styles.gridImage} />
           <View style={styles.likeHeartBadge}>
-            <Ionicons name="heart" size={11} color={Colors.errorRed} />
+            <Ionicons name="heart" size={11} color={colors.errorRed} />
             <Text style={styles.likeGridCount}>{post.likes}</Text>
           </View>
         </TouchableOpacity>

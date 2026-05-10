@@ -18,15 +18,16 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
+import { Typography, Spacing, Radius, Shadows } from '../../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TopNavBar from '../../components/TopNavBar';
 import BottomNavBar from '../../components/BottomNavBar';
-import shared from '../../styles/shared/shared.styles';
-import styles from '../../styles/screens/bird/recordSightingScreen.styles';
+import { createStyles } from '../../styles/screens/bird/recordSightingScreen.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 export default function RecordSightingScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { shared, screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const [birdName, setBirdName] = useState('');
   const [notes, setNotes] = useState('');
   const [image, setImage] = useState<string | null>(null);
@@ -62,9 +63,12 @@ export default function RecordSightingScreen() {
     ]);
   };
 
+  const mapStyle = isDark ? 'dark-v11' : 'streets-v11';
+  const mapUri = `https://api.mapbox.com/styles/v1/mapbox/${mapStyle}/static/-73.9653,40.7829,14,0/600x300?access_token=pk.eyJ1IjoiY2hpdHUiLCJhIjoiY2tobnVnZzJvMGNxZzJzbXowam1vM3Z1ciJ9.9_n6rFv_Y0Z_X_1_1_1_1`;
+
   return (
     <SafeAreaView style={shared.safe}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <TopNavBar />
 
       <KeyboardAvoidingView
@@ -87,9 +91,9 @@ export default function RecordSightingScreen() {
           ) : (
             <View style={styles.photoInner}>
               <View style={styles.cameraIconBg}>
-                  <Ionicons name="camera-outline" size={32} color={Colors.primary} />
+                  <Ionicons name="camera-outline" size={32} color={colors.primary} />
                   <View style={styles.plusIconBadge}>
-                      <Ionicons name="add" size={12} color={Colors.primary} />
+                      <Ionicons name="add" size={12} color={colors.primary} />
                   </View>
               </View>
               <Text style={styles.photoTitle}>Tap to add photo</Text>
@@ -102,11 +106,11 @@ export default function RecordSightingScreen() {
         <View style={styles.section}>
           <Text style={styles.label}>Identify Bird</Text>
           <View style={styles.searchContainer}>
-            <Ionicons name="search-outline" size={20} color={Colors.textSecondary} style={styles.searchIcon} />
+            <Ionicons name="search-outline" size={20} color={colors.textSecondary} style={styles.searchIcon} />
             <TextInput 
               style={styles.searchInput}
               placeholder="Search species or enter unknown..."
-              placeholderTextColor={Colors.placeholder}
+              placeholderTextColor={colors.placeholder}
               value={birdName}
               onChangeText={setBirdName}
             />
@@ -119,7 +123,7 @@ export default function RecordSightingScreen() {
             <TextInput 
               style={styles.notesInput}
               placeholder="What was it doing? Describe its behavior, song, or habitat..."
-              placeholderTextColor={Colors.placeholder}
+              placeholderTextColor={colors.placeholder}
               multiline
               numberOfLines={4}
               textAlignVertical="top"
@@ -134,20 +138,20 @@ export default function RecordSightingScreen() {
           <View style={styles.locationHeader}>
             <Text style={styles.label}>Location</Text>
             <TouchableOpacity style={styles.useCurrentBtn}>
-              <MaterialCommunityIcons name="target" size={18} color={Colors.primary} />
+              <MaterialCommunityIcons name="target" size={18} color={colors.primary} />
               <Text style={styles.useCurrentText}>Use current</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.mapContainer}>
             <Image 
-              source={{ uri: 'https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/-73.9653,40.7829,14,0/600x300?access_token=pk.eyJ1IjoiY2hpdHUiLCJhIjoiY2tobnVnZzJvMGNxZzJzbXowam1vM3Z1ciJ9.9_n6rFv_Y0Z_X_1_1_1_1' }} 
+              source={{ uri: mapUri }} 
               style={styles.mapImage} 
             />
             <View style={styles.mapPin}>
-                <Ionicons name="location" size={30} color="#1B4D3E" />
+                <Ionicons name="location" size={30} color={colors.primary} />
             </View>
             <TouchableOpacity style={styles.adjustPinBtn}>
-              <Ionicons name="location-outline" size={16} color={Colors.textPrimary} />
+              <Ionicons name="location-outline" size={16} color={colors.textPrimary} />
               <Text style={styles.adjustPinText}>Adjust Pin</Text>
             </TouchableOpacity>
           </View>
@@ -156,7 +160,7 @@ export default function RecordSightingScreen() {
         {/* Private Location Toggle */}
         <View style={styles.toggleCard}>
           <View style={styles.toggleLeft}>
-            <MaterialCommunityIcons name="eye-off-outline" size={22} color={Colors.textSecondary} />
+            <MaterialCommunityIcons name="eye-off-outline" size={22} color={colors.textSecondary} />
             <View style={styles.toggleTextContainer}>
               <Text style={styles.toggleTitle}>Private Location</Text>
               <Text style={styles.toggleSubtitle}>Hide exact coordinates from public feed</Text>
@@ -165,14 +169,14 @@ export default function RecordSightingScreen() {
           <Switch 
             value={isPrivate}
             onValueChange={setIsPrivate}
-            trackColor={{ false: '#DDE3E0', true: Colors.primary }}
-            thumbColor={Colors.white}
+            trackColor={{ false: colors.componentBase, true: colors.primary }}
+            thumbColor={colors.canvasPure}
           />
         </View>
 
         {/* Post Button */}
         <TouchableOpacity style={styles.postButton} onPress={handlePost}>
-          <Ionicons name="paper-plane" size={20} color={Colors.white} style={styles.postIcon} />
+          <Ionicons name="paper-plane" size={20} color={colors.canvasPure} style={styles.postIcon} />
           <Text style={styles.postButtonText}>Post Sighting</Text>
         </TouchableOpacity>
       </ScrollView>

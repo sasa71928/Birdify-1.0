@@ -1,10 +1,10 @@
 import { StyleSheet } from 'react-native';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../../../theme';
 
-export default StyleSheet.create({
+export const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.surface,
   },
   scroll: {
     flex: 1,
@@ -16,11 +16,11 @@ export default StyleSheet.create({
   title: {
     fontSize: Typography.fontSize.xxl,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   subtitle: {
     fontSize: Typography.fontSize.md,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: Spacing.lg,
     marginTop: 4,
   },
@@ -28,10 +28,10 @@ export default StyleSheet.create({
     width: '100%',
     aspectRatio: 1.2,
     borderWidth: 2,
-    borderColor: '#C8D1CE',
+    borderColor: colors.border + '50',
     borderStyle: 'dashed',
     borderRadius: Radius.xl,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.canvasPure,
     marginBottom: Spacing.xl,
     overflow: 'hidden',
   },
@@ -44,7 +44,7 @@ export default StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#F0F7F4',
+    backgroundColor: colors.primary + '15',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.md,
@@ -57,11 +57,11 @@ export default StyleSheet.create({
   photoTitle: {
     fontSize: Typography.fontSize.md,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.primary,
+    color: colors.primary,
   },
   photoSubtitle: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 4,
   },
   uploadedImage: {
@@ -75,13 +75,13 @@ export default StyleSheet.create({
   label: {
     fontSize: Typography.fontSize.md,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: Spacing.sm,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ECF0EF',
+    backgroundColor: colors.componentBase,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.md,
     height: 50,
@@ -92,17 +92,17 @@ export default StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: Typography.fontSize.md,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   notesContainer: {
-    backgroundColor: '#ECF0EF',
+    backgroundColor: colors.componentBase,
     borderRadius: Radius.md,
     padding: Spacing.md,
     minHeight: 120,
   },
   notesInput: {
     fontSize: Typography.fontSize.md,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   locationHeader: {
     flexDirection: 'row',
@@ -117,7 +117,7 @@ export default StyleSheet.create({
   useCurrentText: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.medium,
-    color: Colors.primary,
+    color: colors.primary,
     marginLeft: 4,
   },
   mapContainer: {
@@ -140,7 +140,7 @@ export default StyleSheet.create({
     position: 'absolute',
     bottom: 12,
     right: 12,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
@@ -151,18 +151,18 @@ export default StyleSheet.create({
   adjustPinText: {
     fontSize: 12,
     fontWeight: Typography.fontWeight.medium,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginLeft: 4,
   },
   toggleCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F8FAF9',
+    backgroundColor: colors.canvasPure,
     borderRadius: Radius.lg,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: '#E8EDEB',
+    borderColor: colors.border + '20',
     marginBottom: Spacing.xl,
   },
   toggleLeft: {
@@ -176,15 +176,15 @@ export default StyleSheet.create({
   toggleTitle: {
     fontSize: Typography.fontSize.md,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   toggleSubtitle: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   postButton: {
-    backgroundColor: '#2D5A27',
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -194,11 +194,11 @@ export default StyleSheet.create({
   },
   postIcon: {
     marginRight: 8,
-    transform: [{ rotate: '45deg' }], // Slight angle for the paper plane
+    transform: [{ rotate: '45deg' }], 
     marginTop: -4,
   },
   postButtonText: {
-    color: Colors.white,
+    color: colors.canvasPure,
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
   },

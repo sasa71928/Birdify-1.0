@@ -16,9 +16,8 @@ import InputField   from '../../components/InputField';
 import SocialButton from '../../components/SocialButton';
 
 // ── Estilos ───────────────────────────────────────────────────────────────────
-import shared from '../../styles/shared/shared.styles';
-import local  from '../../styles/screens/auth/loginScreen.styles';
-import { Colors } from '../../theme';
+import { createStyles } from '../../styles/screens/auth/loginScreen.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 // ── Navegación ────────────────────────────────────────────────────────────────
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -28,6 +27,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 
 export default function LoginScreen() {
   const navigation = useNavigation<LoginNavProp>();
+  const { shared, screen: local, colors, isDark } = useDynamicStyles(createStyles);
   const [remember, setRemember] = useState(false);
 
   // Link "¿Olvidaste?" que se pasa como labelRight al InputField
@@ -39,7 +39,7 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={shared.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/*<ScreenHeader />*/}
 
@@ -61,7 +61,7 @@ export default function LoginScreen() {
           <InputField
             label="Usuario o Correo"
             placeholder="nombre@ejemplo.com"
-            iconSymbol={<Ionicons name="person-outline" size={20} color={Colors.textSecondary} />}
+            iconSymbol={<Ionicons name="person-outline" size={20} color={colors.textSecondary} />}
             keyboardType="email-address"
           />
 
@@ -70,7 +70,7 @@ export default function LoginScreen() {
             label="Contraseña"
             labelRight={ForgotLink}
             placeholder="••••••••"
-            iconSymbol={<Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} />}
+            iconSymbol={<Ionicons name="lock-closed-outline" size={20} color={colors.textSecondary} />}
             secureTextEntry
             showToggle
           />
@@ -89,7 +89,7 @@ export default function LoginScreen() {
 
           <AppButton
             label="Iniciar Sesión →"
-            color={Colors.primary}
+            color={colors.primary}
             style={{ marginBottom: 16 }}
             onPress={() => navigation.navigate('MainTabs', { screen: 'Feed' })}
           />

@@ -6,7 +6,7 @@ const GRID_SPACING = 6;
 const COLUMN_COUNT = 3;
 const ITEM_WIDTH = (width - Spacing.md * 2 - GRID_SPACING * (COLUMN_COUNT - 1)) / COLUMN_COUNT;
 
-export default StyleSheet.create({
+export const createStyles = (colors: any) => StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 120 },
 
@@ -16,7 +16,7 @@ export default StyleSheet.create({
     paddingTop: Spacing.xl,
     paddingBottom: Spacing.md,
     paddingHorizontal: Spacing.lg,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   avatarWrapper: { position: 'relative', marginBottom: Spacing.md },
   avatar: {
@@ -24,13 +24,13 @@ export default StyleSheet.create({
     height: 110,
     borderRadius: 55,
     borderWidth: 3,
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
   },
   verifiedBadge: {
     position: 'absolute',
     bottom: 3,
     right: 3,
-    backgroundColor: Colors.canvasPure,
+    backgroundColor: colors.canvasPure,
     borderRadius: 12,
   },
   nameRow: {
@@ -41,7 +41,7 @@ export default StyleSheet.create({
   name: {
     fontSize: Typography.fontSize.xl,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   editIconBtn: {
     padding: 4,
@@ -49,7 +49,7 @@ export default StyleSheet.create({
   professionBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.springMoss + '30',
+    backgroundColor: colors.springMoss + '30',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: Radius.full,
@@ -58,7 +58,7 @@ export default StyleSheet.create({
   },
   professionText: {
     fontSize: Typography.fontSize.xs,
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: Typography.fontWeight.semiBold,
   },
   statsRow: {
@@ -71,13 +71,13 @@ export default StyleSheet.create({
   statValue: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
-  statLabel: { fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
-  statDivider: { width: 1, height: 28, backgroundColor: Colors.componentBase },
+  statLabel: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  statDivider: { width: 1, height: 28, backgroundColor: colors.componentBase },
   bio: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     paddingHorizontal: Spacing.sm,
@@ -87,8 +87,8 @@ export default StyleSheet.create({
   tabsContainer: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: Colors.componentBase,
-    backgroundColor: Colors.surface,
+    borderBottomColor: colors.componentBase,
+    backgroundColor: colors.surface,
   },
   tab: {
     flex: 1,
@@ -98,14 +98,14 @@ export default StyleSheet.create({
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderBottomColor: Colors.primary,
+    borderBottomColor: colors.primary,
   },
   tabText: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.semiBold,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
-  activeTabText: { color: Colors.primary },
+  activeTabText: { color: colors.primary },
 
   // Sightings grid
   grid: {
@@ -138,7 +138,7 @@ export default StyleSheet.create({
   logbookContainer: { padding: Spacing.md },
   logbookSummary: {
     flexDirection: 'row',
-    backgroundColor: Colors.canvasPure,
+    backgroundColor: colors.canvasPure,
     borderRadius: Radius.lg,
     padding: Spacing.md,
     marginBottom: Spacing.lg,
@@ -148,14 +148,14 @@ export default StyleSheet.create({
   logbookStatValue: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
-  logbookStatLabel: { fontSize: 10, color: Colors.textSecondary },
-  logbookStatDivider: { width: 1, backgroundColor: Colors.componentBase, marginVertical: 4 },
+  logbookStatLabel: { fontSize: 10, color: colors.textSecondary },
+  logbookStatDivider: { width: 1, backgroundColor: colors.componentBase, marginVertical: 4 },
   logbookSectionTitle: {
     fontSize: Typography.fontSize.md,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: Spacing.md,
   },
 
@@ -167,7 +167,7 @@ export default StyleSheet.create({
   },
   stampCard: {
     width: (width - Spacing.md * 2 - Spacing.md) / 2 - 0.5,
-    backgroundColor: Colors.canvasPure,
+    backgroundColor: colors.canvasPure,
     borderRadius: Radius.md,
     padding: Spacing.sm,
     alignItems: 'center',
@@ -180,10 +180,10 @@ export default StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
     borderWidth: 2,
-    borderColor: Colors.componentBase,
+    borderColor: colors.componentBase,
   },
   stampImageRare: {
-    borderColor: Colors.tertiaryBrown + '80',
+    borderColor: colors.tertiaryBrown + '80',
     borderWidth: 2,
   },
   stampImage: { width: '100%', height: '100%' },
@@ -191,7 +191,7 @@ export default StyleSheet.create({
     position: 'absolute',
     top: 6,
     right: 6,
-    backgroundColor: Colors.tertiaryBrown,
+    backgroundColor: colors.tertiaryBrown,
     width: 18,
     height: 18,
     borderRadius: 9,
@@ -218,19 +218,19 @@ export default StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   stampName: {
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginTop: Spacing.sm,
     textAlign: 'center',
   },
   stampScientific: {
     fontSize: 9,
     fontStyle: 'italic',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: 1,
   },
@@ -239,14 +239,14 @@ export default StyleSheet.create({
     alignItems: 'center',
     gap: 3,
     marginTop: 4,
-    backgroundColor: Colors.componentBase,
+    backgroundColor: colors.componentBase,
     borderRadius: Radius.full,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
   stampCount: {
     fontSize: 10,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: Typography.fontWeight.medium,
   },
 
@@ -265,7 +265,7 @@ export default StyleSheet.create({
   },
   likeGridCount: {
     fontSize: 9,
-    color: Colors.canvasPure,
+    color: colors.canvasPure,
     fontWeight: Typography.fontWeight.bold,
   },
   
@@ -276,7 +276,7 @@ export default StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
     height: '70%',
@@ -291,7 +291,7 @@ export default StyleSheet.create({
   modalTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   followItem: {
     flexDirection: 'row',
@@ -303,33 +303,33 @@ export default StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.componentBase,
+    backgroundColor: colors.componentBase,
   },
   followName: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   followUsername: {
     fontSize: Typography.fontSize.xs,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   followBtn: {
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: Radius.full,
   },
   followingBtn: {
-    backgroundColor: Colors.componentBase,
+    backgroundColor: colors.componentBase,
   },
   followBtnText: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: Colors.canvasPure,
+    color: colors.canvasPure,
   },
   followingBtnText: {
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   
   // Private Account View
@@ -343,7 +343,7 @@ export default StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: Colors.componentBase,
+    backgroundColor: colors.componentBase,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
@@ -351,12 +351,12 @@ export default StyleSheet.create({
   privateTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   privateSubtitle: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -371,13 +371,13 @@ export default StyleSheet.create({
   followMainBtn: {
     flex: 1,
     height: 44,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: Radius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
   followMainBtnText: {
-    color: Colors.canvasPure,
+    color: colors.canvasPure,
     fontWeight: 'bold',
     fontSize: 14,
   },
@@ -386,7 +386,7 @@ export default StyleSheet.create({
     height: 44,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },

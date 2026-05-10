@@ -14,12 +14,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
+import { Typography, Spacing, Radius, Shadows } from '../../theme';
 import { Ionicons } from '@expo/vector-icons';
 import TopNavBar from '../../components/TopNavBar';
-import shared from '../../styles/shared/shared.styles';
 import { RootStackParamList, BirdSpeciesData } from '../../navigation/AppNavigator';
-import styles from '../../styles/screens/main/dictionaryScreen.styles';
+import { createStyles } from '../../styles/screens/main/dictionaryScreen.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useRoute, RouteProp } from '@react-navigation/native';
 
 type DictionaryNavProp = NativeStackNavigationProp<RootStackParamList, 'Dictionary'>;
@@ -97,6 +97,7 @@ const FILTERS = ['All', 'A-Z', 'Season', 'Habitat', 'Family'];
 
 export default function DictionaryScreen() {
   const navigation = useNavigation<DictionaryNavProp>();
+  const { shared, screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const route = useRoute<RouteProp<RootStackParamList, 'Dictionary'>>();
   const [searchQuery, setSearchQuery] = React.useState('');
   const [activeFilter, setActiveFilter] = React.useState('All');
@@ -226,16 +227,16 @@ export default function DictionaryScreen() {
 
   return (
     <SafeAreaView style={shared.safe}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <TopNavBar />
 
       <View style={styles.container}>
         <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color={Colors.textSecondary} />
+          <Ionicons name="search" size={20} color={colors.textSecondary} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search by common or scientific name..."
-            placeholderTextColor={Colors.placeholder}
+            placeholderTextColor={colors.placeholder}
             value={searchQuery}
             onChangeText={handleSearch}
           />

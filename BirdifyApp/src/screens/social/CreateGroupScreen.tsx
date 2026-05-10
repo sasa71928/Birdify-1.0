@@ -15,9 +15,10 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
+import { Typography, Spacing, Radius, Shadows } from '../../theme';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import styles from '../../styles/screens/social/createGroupScreen.styles';
+import { createStyles } from '../../styles/screens/social/createGroupScreen.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'CreateGroup'>;
 
@@ -33,6 +34,7 @@ const CONTACTS = [
 
 export default function CreateGroupScreen() {
   const navigation = useNavigation<NavProp>();
+  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const [groupName, setGroupName] = useState('');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState<string | null>(null);
@@ -78,12 +80,12 @@ export default function CreateGroupScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* ── Header ── */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>New Group</Text>
         <TouchableOpacity
@@ -105,7 +107,7 @@ export default function CreateGroupScreen() {
             {image ? (
               <Image source={{ uri: image }} style={styles.groupIconImage} />
             ) : (
-              <MaterialCommunityIcons name="camera-plus-outline" size={28} color={Colors.textSecondary} />
+              <MaterialCommunityIcons name="camera-plus-outline" size={28} color={colors.textSecondary} />
             )}
           </TouchableOpacity>
           <Text style={styles.iconHint}>{image ? 'Tap to change photo' : 'Tap to add a group photo'}</Text>
@@ -114,11 +116,11 @@ export default function CreateGroupScreen() {
         {/* ── Campos del grupo ── */}
         <View style={styles.formCard}>
           <View style={styles.fieldRow}>
-            <MaterialCommunityIcons name="account-group-outline" size={20} color={Colors.primary} />
+            <MaterialCommunityIcons name="account-group-outline" size={20} color={colors.primary} />
             <TextInput
               style={styles.fieldInput}
               placeholder="Group name"
-              placeholderTextColor={Colors.placeholder}
+              placeholderTextColor={colors.placeholder}
               value={groupName}
               onChangeText={setGroupName}
               maxLength={50}
@@ -126,11 +128,11 @@ export default function CreateGroupScreen() {
           </View>
           <View style={styles.divider} />
           <View style={styles.fieldRow}>
-            <Ionicons name="information-circle-outline" size={20} color={Colors.primary} />
+            <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
             <TextInput
               style={styles.fieldInput}
               placeholder="Description (optional)"
-              placeholderTextColor={Colors.placeholder}
+              placeholderTextColor={colors.placeholder}
               value={description}
               onChangeText={setDescription}
               maxLength={120}
@@ -147,7 +149,7 @@ export default function CreateGroupScreen() {
                 <TouchableOpacity key={c.id} style={styles.chip} onPress={() => toggle(c.id)}>
                   <Image source={{ uri: c.avatar }} style={styles.chipAvatar} />
                   <Text style={styles.chipName}>{c.name.split(' ')[0]}</Text>
-                  <Ionicons name="close-circle" size={15} color={Colors.primary} style={{ marginLeft: 2 }} />
+                  <Ionicons name="close-circle" size={15} color={colors.primary} style={{ marginLeft: 2 }} />
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -172,7 +174,7 @@ export default function CreateGroupScreen() {
                 </View>
                 <Text style={styles.contactName}>{contact.name}</Text>
                 <View style={[styles.checkbox, isSelected && styles.checkboxChecked]}>
-                  {isSelected && <Ionicons name="checkmark" size={14} color={Colors.canvasPure} />}
+                  {isSelected && <Ionicons name="checkmark" size={14} color={colors.canvasPure} />}
                 </View>
               </TouchableOpacity>
             );

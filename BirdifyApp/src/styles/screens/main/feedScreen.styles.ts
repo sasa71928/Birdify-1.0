@@ -1,10 +1,10 @@
 import { StyleSheet } from 'react-native';
 import { Colors } from '../../../theme';
 
-export default StyleSheet.create({
+export const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   listContent: {
     padding: 16,

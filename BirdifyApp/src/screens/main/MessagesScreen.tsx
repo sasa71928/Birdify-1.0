@@ -12,12 +12,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
+import { Typography, Spacing, Radius, Shadows } from '../../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TopNavBar from '../../components/TopNavBar';
-import shared from '../../styles/shared/shared.styles';
 import { RootStackParamList, ChatThread } from '../../navigation/AppNavigator';
-import styles from '../../styles/screens/main/messagesScreen.styles';
+import { createStyles } from '../../styles/screens/main/messagesScreen.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 type MessagesNavProp = NativeStackNavigationProp<RootStackParamList, 'Messages'>;
 
@@ -55,8 +55,10 @@ const MOCK_THREADS: ChatThread[] = [
   },
 ];
 
+
 export default function MessagesScreen() {
   const navigation = useNavigation<MessagesNavProp>();
+  const { shared, screen: styles, colors, isDark } = useDynamicStyles(createStyles);
 
   const renderItem = ({ item }: { item: ChatThread }) => (
     <TouchableOpacity
@@ -67,7 +69,7 @@ export default function MessagesScreen() {
       <View style={styles.avatarContainer}>
         {item.isGroup ? (
             <View style={styles.groupAvatar}>
-                <Ionicons name="people" size={24} color="#6B90E3" />
+                <Ionicons name="people" size={24} color={colors.secondaryBlue} />
             </View>
         ) : (
             <Image source={{ uri: item.avatar }} style={styles.avatar} />
@@ -93,7 +95,7 @@ export default function MessagesScreen() {
 
   return (
     <SafeAreaView style={shared.safe}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <TopNavBar />
 
       <View style={styles.container}>
@@ -101,7 +103,7 @@ export default function MessagesScreen() {
         <View style={styles.screenHeader}>
           <Text style={styles.screenTitle}>Messages</Text>
           <TouchableOpacity style={styles.createGroupBtn} activeOpacity={0.8} onPress={() => navigation.navigate('CreateGroup')}>
-            <MaterialCommunityIcons name="account-multiple-plus-outline" size={20} color={Colors.canvasPure} />
+            <MaterialCommunityIcons name="account-multiple-plus-outline" size={20} color={colors.canvasPure} />
             <Text style={styles.createGroupText}>New Group</Text>
           </TouchableOpacity>
         </View>
@@ -112,7 +114,7 @@ export default function MessagesScreen() {
           activeOpacity={0.8}
           onPress={() => navigation.navigate('SearchMessages')}
         >
-          <Ionicons name="search" size={20} color={Colors.textSecondary} />
+          <Ionicons name="search" size={20} color={colors.textSecondary} />
           <Text style={styles.searchPlaceholder}>Search messages...</Text>
         </TouchableOpacity>
 

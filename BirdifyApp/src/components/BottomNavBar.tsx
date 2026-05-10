@@ -8,10 +8,12 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-import styles from '../styles/components/BottomNavBar.styles';
+import { createStyles } from '../styles/components/BottomNavBar.styles';
+import { useDynamicStyles } from '../hooks/useDynamicStyles';
 
 export default function BottomNavBar({ state }: any) {
   const navigation = useNavigation<NavigationProp>();
+  const { screen: styles, colors } = useDynamicStyles(createStyles);
   const route = useRoute();
   
   // If used as a custom tab bar, state is provided. Otherwise, fallback to standard route.name.
@@ -24,14 +26,14 @@ export default function BottomNavBar({ state }: any) {
           style={[styles.navItem, currentRoute === 'Feed' && styles.activeItem]}
           onPress={() => navigation.navigate('MainTabs', { screen: 'Feed' })}
         >
-          <Ionicons name="home-outline" size={currentRoute === 'Feed' ? 26 : 24} color={currentRoute === 'Feed' ? Colors.primary : Colors.textSecondary} />
+          <Ionicons name="home-outline" size={currentRoute === 'Feed' ? 26 : 24} color={currentRoute === 'Feed' ? colors.primary : colors.textSecondary} />
         </TouchableOpacity>
 
         <TouchableOpacity 
           style={[styles.navItem, currentRoute === 'Explore' && styles.activeItem]}
           onPress={() => navigation.navigate('MainTabs', { screen: 'Explore' })}
         >
-          <Ionicons name="compass-outline" size={currentRoute === 'Explore' ? 26 : 24} color={currentRoute === 'Explore' ? Colors.primary : Colors.textSecondary} />
+          <Ionicons name="compass-outline" size={currentRoute === 'Explore' ? 26 : 24} color={currentRoute === 'Explore' ? colors.primary : colors.textSecondary} />
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -39,7 +41,7 @@ export default function BottomNavBar({ state }: any) {
           onPress={() => navigation.navigate('RecordSighting')}
         >
           <View style={styles.plusContainer}>
-            <Ionicons name="add" size={32} color={Colors.white} />
+            <Ionicons name="add" size={32} color={colors.white} />
           </View>
         </TouchableOpacity>
 
@@ -47,14 +49,14 @@ export default function BottomNavBar({ state }: any) {
           style={[styles.navItem, currentRoute === 'Dictionary' && styles.activeItem]}
           onPress={() => navigation.navigate('MainTabs', { screen: 'Dictionary' })}
         >
-          <Ionicons name="book-outline" size={currentRoute === 'Dictionary' ? 26 : 24} color={currentRoute === 'Dictionary' ? Colors.primary : Colors.textSecondary} />
+          <Ionicons name="book-outline" size={currentRoute === 'Dictionary' ? 26 : 24} color={currentRoute === 'Dictionary' ? colors.primary : colors.textSecondary} />
         </TouchableOpacity>
 
         <TouchableOpacity 
           style={[styles.navItem, currentRoute === 'Messages' && styles.activeItem]}
           onPress={() => navigation.navigate('MainTabs', { screen: 'Messages' })}
         >
-          <Ionicons name="chatbubble-outline" size={currentRoute === 'Messages' ? 26 : 24} color={currentRoute === 'Messages' ? Colors.primary : Colors.textSecondary} />
+          <Ionicons name="chatbubble-outline" size={currentRoute === 'Messages' ? 26 : 24} color={currentRoute === 'Messages' ? colors.primary : colors.textSecondary} />
         </TouchableOpacity>
       </View>
     </View>

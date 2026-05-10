@@ -1,10 +1,10 @@
 import { StyleSheet } from 'react-native';
 import { Colors, Typography, Spacing, Radius } from '../../../theme';
 
-export default StyleSheet.create({
+export const createStyles = (colors: any) => StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
 
   // Search bar
@@ -14,7 +14,7 @@ export default StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
+    borderBottomColor: colors.border + '20',
     gap: Spacing.sm,
   },
   backBtn: {
@@ -24,7 +24,7 @@ export default StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.componentBase,
+    backgroundColor: colors.componentBase,
     borderRadius: Radius.full,
     paddingHorizontal: Spacing.md,
     height: 42,
@@ -33,7 +33,7 @@ export default StyleSheet.create({
   input: {
     flex: 1,
     fontSize: Typography.fontSize.md,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     paddingVertical: 0,
   },
 
@@ -48,12 +48,12 @@ export default StyleSheet.create({
   emptyTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginTop: Spacing.md,
   },
   emptySubtitle: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -61,7 +61,7 @@ export default StyleSheet.create({
   // Results
   resultsCount: {
     fontSize: Typography.fontSize.xs,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: Typography.fontWeight.medium,
     marginHorizontal: Spacing.md,
     marginTop: Spacing.md,
@@ -77,7 +77,7 @@ export default StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.04)',
+    borderBottomColor: colors.border + '15',
   },
   avatarWrap: {
     position: 'relative',
@@ -87,13 +87,13 @@ export default StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: Colors.componentBase,
+    backgroundColor: colors.componentBase,
   },
   groupAvatar: {
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: '#E8F0FF',
+    backgroundColor: colors.primary + '15',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -106,7 +106,7 @@ export default StyleSheet.create({
     borderRadius: 7,
     backgroundColor: '#34A853',
     borderWidth: 2,
-    borderColor: Colors.surface,
+    borderColor: colors.surface,
   },
   info: {
     flex: 1,
@@ -120,21 +120,21 @@ export default StyleSheet.create({
   name: {
     fontSize: Typography.fontSize.md,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   time: {
     fontSize: 12,
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: Typography.fontWeight.medium,
   },
   lastMessage: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 18,
   },
   highlight: {
-    backgroundColor: Colors.springMoss + '70',
-    color: Colors.primary,
+    backgroundColor: colors.springMoss + '50',
+    color: colors.primary,
     fontWeight: Typography.fontWeight.bold,
   },
 });

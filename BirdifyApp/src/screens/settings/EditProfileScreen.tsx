@@ -11,23 +11,24 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import styles from '../../styles/screens/settings/settingsSubScreens.styles';
-import { Colors } from '../../theme';
+import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 export default function EditProfileScreen() {
   const navigation = useNavigation();
+  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const [name, setName] = useState('Iván G.');
   const [email, setEmail] = useState('ivan.birdify@example.com');
   const [bio, setBio] = useState('Bird watcher & nature photographer.');
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.primary} />
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Profile</Text>
       </View>
@@ -37,9 +38,9 @@ export default function EditProfileScreen() {
         {/* Avatar Section */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarContainer}>
-            <Ionicons name="person" size={50} color={Colors.outlineGrey} />
+            <Ionicons name="person" size={50} color={colors.placeholder} />
             <TouchableOpacity style={styles.editAvatarBtn} activeOpacity={0.8}>
-              <Ionicons name="camera" size={18} color={Colors.white} />
+              <Ionicons name="camera" size={18} color={colors.canvasPure} />
             </TouchableOpacity>
           </View>
         </View>

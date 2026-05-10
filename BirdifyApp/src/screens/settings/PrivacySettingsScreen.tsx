@@ -10,22 +10,23 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import styles from '../../styles/screens/settings/settingsSubScreens.styles';
-import { Colors } from '../../theme';
+import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 export default function PrivacySettingsScreen() {
   const navigation = useNavigation();
+  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const [isPrivateProfile, setIsPrivateProfile] = useState(true);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.primary} />
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Privacy & Security</Text>
       </View>
@@ -34,7 +35,7 @@ export default function PrivacySettingsScreen() {
         
         {/* Privacy Settings Section */}
         <View style={styles.sectionHeader}>
-          <Ionicons name="shield-outline" size={22} color={Colors.primary} />
+          <Ionicons name="shield-outline" size={22} color={colors.primary} />
           <Text style={styles.sectionTitle}>Privacy Settings</Text>
         </View>
 
@@ -47,21 +48,21 @@ export default function PrivacySettingsScreen() {
             <Switch
               value={isPrivateProfile}
               onValueChange={setIsPrivateProfile}
-              trackColor={{ false: '#D1D1D1', true: Colors.primary }}
-              thumbColor={Colors.white}
+              trackColor={{ false: isDark ? '#444' : '#D1D1D1', true: colors.primary }}
+              thumbColor={colors.canvasPure}
             />
           </View>
           <View style={styles.settingDivider} />
           <TouchableOpacity style={styles.settingRow} activeOpacity={0.7}>
-            <Ionicons name="remove-circle-outline" size={22} color={Colors.textPrimary} style={{marginRight: 12}} />
+            <Ionicons name="remove-circle-outline" size={22} color={colors.textPrimary} style={{marginRight: 12}} />
             <Text style={[styles.settingLabel, {flex: 1}]}>Blocked Users</Text>
-            <Ionicons name="chevron-forward" size={20} color={Colors.outlineGrey} />
+            <Ionicons name="chevron-forward" size={20} color={colors.placeholder} />
           </TouchableOpacity>
         </View>
 
         {/* Account Security Section */}
         <View style={styles.sectionHeader}>
-          <Ionicons name="lock-closed-outline" size={22} color={Colors.primary} />
+          <Ionicons name="lock-closed-outline" size={22} color={colors.primary} />
           <Text style={styles.sectionTitle}>Account Security</Text>
         </View>
 
@@ -79,16 +80,16 @@ export default function PrivacySettingsScreen() {
             <Switch
               value={false}
               disabled={true}
-              trackColor={{ false: '#D1D1D1', true: Colors.primary }}
-              thumbColor={Colors.white}
+              trackColor={{ false: isDark ? '#444' : '#D1D1D1', true: colors.primary }}
+              thumbColor={colors.canvasPure}
               style={{ opacity: 0.5 }}
             />
           </View>
           <View style={styles.settingDivider} />
           <TouchableOpacity style={styles.settingRow} activeOpacity={0.7}>
-            <MaterialCommunityIcons name="dots-horizontal" size={22} color={Colors.textPrimary} style={{marginRight: 12}} />
+            <MaterialCommunityIcons name="dots-horizontal" size={22} color={colors.textPrimary} style={{marginRight: 12}} />
             <Text style={[styles.settingLabel, {flex: 1}]}>Change Password</Text>
-            <Ionicons name="chevron-forward" size={20} color={Colors.outlineGrey} />
+            <Ionicons name="chevron-forward" size={20} color={colors.placeholder} />
           </TouchableOpacity>
         </View>
 
@@ -97,12 +98,12 @@ export default function PrivacySettingsScreen() {
           <View style={{
             backgroundColor: 'transparent',
             borderWidth: 1,
-            borderColor: Colors.errorRed,
+            borderColor: colors.errorRed,
             borderRadius: 4,
             padding: 2,
             marginRight: 8
           }}>
-            <Ionicons name="trash-outline" size={16} color={Colors.errorRed} />
+            <Ionicons name="trash-outline" size={16} color={colors.errorRed} />
           </View>
           <Text style={styles.deleteBtnText}>Delete Account</Text>
         </TouchableOpacity>

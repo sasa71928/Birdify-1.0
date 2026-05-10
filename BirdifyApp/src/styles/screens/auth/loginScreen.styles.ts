@@ -6,12 +6,12 @@
 import { StyleSheet } from 'react-native';
 import { Colors, Typography, Spacing } from '../../../theme';
 
-const loginStyles = StyleSheet.create({
+export const createStyles = (colors: any) => StyleSheet.create({
   // ── Hero (título en verde, diferente al registro) ──────────────────────────
   heroTitle: {
     fontSize: Typography.fontSize.xxl,
     fontWeight: Typography.fontWeight.extraBold,
-    color: Colors.primary,          // verde en login, negro en registro
+    color: colors.primary,          // verde en login, negro en registro
     textAlign: 'center',
     lineHeight: Typography.lineHeight.loose,
     letterSpacing: -0.5,
@@ -21,7 +21,7 @@ const loginStyles = StyleSheet.create({
   forgotLink: {
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.semiBold,
-    color: Colors.accent,
+    color: colors.accent,
   },
 
   // ── Recordarme ────────────────────────────────────────────────────────────
@@ -35,42 +35,40 @@ const loginStyles = StyleSheet.create({
     width: 18,
     height: 18,
     borderWidth: 1.5,
-    borderColor: Colors.inputBorder,
+    borderColor: colors.inputBorder,
     borderRadius: 4,
     marginRight: Spacing.sm,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxChecked: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   checkmark: {
-    color: Colors.white,
+    color: colors.white,
     fontSize: 11,
     fontWeight: Typography.fontWeight.bold,
   },
   rememberText: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     fontWeight: Typography.fontWeight.medium,
   },
 
   // ── Pie legal ─────────────────────────────────────────────────────────────
   legalText: {
     fontSize: Typography.fontSize.xs,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: Spacing.lg,
     lineHeight: Typography.lineHeight.tight,
     paddingHorizontal: Spacing.sm,
   },
   legalLink: {
-    color: Colors.accent,
+    color: colors.accent,
     textDecorationLine: 'underline',
     fontWeight: Typography.fontWeight.medium,
   },
 });
-
-export default loginStyles;

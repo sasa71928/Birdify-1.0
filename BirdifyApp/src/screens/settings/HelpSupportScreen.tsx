@@ -9,8 +9,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import styles from '../../styles/screens/settings/settingsSubScreens.styles';
-import { Colors, Spacing } from '../../theme';
+import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { Spacing } from '../../theme';
 
 const FAQS = [
   {
@@ -32,6 +33,7 @@ const FAQS = [
 
 export default function HelpSupportScreen() {
   const navigation = useNavigation();
+  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const toggleExpand = (id: string) => {
@@ -40,12 +42,12 @@ export default function HelpSupportScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.primary} />
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Help & Support</Text>
       </View>
@@ -66,7 +68,7 @@ export default function HelpSupportScreen() {
               <Ionicons
                 name={expanded === faq.id ? 'chevron-up' : 'chevron-down'}
                 size={20}
-                color={Colors.outlineGrey}
+                color={colors.placeholder}
               />
             </View>
             {expanded === faq.id && (
@@ -76,19 +78,19 @@ export default function HelpSupportScreen() {
         ))}
 
         <TouchableOpacity style={styles.contactCard} activeOpacity={0.8}>
-          <View style={{ backgroundColor: Colors.primary + '15', padding: Spacing.sm, borderRadius: 12 }}>
-            <Ionicons name="mail" size={24} color={Colors.primary} />
+          <View style={{ backgroundColor: colors.primary + '15', padding: Spacing.sm, borderRadius: 12 }}>
+            <Ionicons name="mail" size={24} color={colors.primary} />
           </View>
           <View style={styles.contactInfo}>
             <Text style={styles.contactTitle}>Contact Support</Text>
             <Text style={styles.contactSubtitle}>Get help from our team via email.</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={Colors.outlineGrey} />
+          <Ionicons name="chevron-forward" size={20} color={colors.placeholder} />
         </TouchableOpacity>
 
         <TouchableOpacity style={[styles.contactCard, { marginTop: Spacing.sm, opacity: 0.5 }]} disabled={true} activeOpacity={1}>
-          <View style={{ backgroundColor: Colors.secondaryBlue + '15', padding: Spacing.sm, borderRadius: 12 }}>
-            <Ionicons name="chatbubbles" size={24} color={Colors.secondaryBlue} />
+          <View style={{ backgroundColor: colors.secondaryBlue + '15', padding: Spacing.sm, borderRadius: 12 }}>
+            <Ionicons name="chatbubbles" size={24} color={colors.secondaryBlue} />
           </View>
           <View style={styles.contactInfo}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -99,7 +101,7 @@ export default function HelpSupportScreen() {
             </View>
             <Text style={styles.contactSubtitle}>Ask other users for tips and tricks.</Text>
           </View>
-          <Ionicons name="lock-closed-outline" size={18} color={Colors.outlineGrey} />
+          <Ionicons name="lock-closed-outline" size={18} color={colors.placeholder} />
         </TouchableOpacity>
 
       </ScrollView>

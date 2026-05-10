@@ -1,10 +1,10 @@
 import { StyleSheet } from 'react-native';
 import { Colors, Spacing, Shadows } from '../../../theme';
 
-export default StyleSheet.create({
+export const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#333',
+    backgroundColor: colors.surface,
   },
   map: {
     ...StyleSheet.absoluteFillObject,
@@ -21,7 +21,7 @@ export default StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     height: 56,
     borderRadius: 28,
     paddingHorizontal: Spacing.md,
@@ -34,7 +34,7 @@ export default StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   filterButton: {
     padding: Spacing.xs,
@@ -47,9 +47,9 @@ export default StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#1B4D3E', // Forest Green
+    backgroundColor: colors.primary,
     borderWidth: 2,
-    borderColor: Colors.white,
+    borderColor: colors.canvasPure,
     justifyContent: 'center',
     alignItems: 'center',
     ...Shadows.card,
@@ -64,7 +64,7 @@ export default StyleSheet.create({
     borderTopWidth: 6,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: Colors.white,
+    borderTopColor: colors.canvasPure,
     marginTop: -1,
   },
   // Botón de target
@@ -75,7 +75,7 @@ export default StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     ...Shadows.card,

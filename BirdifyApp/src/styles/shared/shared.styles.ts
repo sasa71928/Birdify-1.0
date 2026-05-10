@@ -6,12 +6,12 @@
 import { StyleSheet } from 'react-native';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
 
-const sharedStyles = StyleSheet.create({
+export const createSharedStyles = (colors: typeof Colors) => StyleSheet.create({
   // ── Contenedor raíz ────────────────────────────────────────────────────────
   safe: {
     flex: 1,
     paddingBottom: Spacing.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
 
   // ── Header (logo + nombre) ─────────────────────────────────────────────────
@@ -20,7 +20,7 @@ const sharedStyles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm + 2,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   logoIcon: {
     fontSize: 22,
@@ -29,12 +29,12 @@ const sharedStyles = StyleSheet.create({
   logoText: {
     fontSize: Typography.fontSize.md,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     letterSpacing: 0.3,
   },
   headerDivider: {
     height: 1.5,
-    backgroundColor: Colors.headerBorder,
+    backgroundColor: colors.headerBorder,
     opacity: 0.6,
   },
 
@@ -54,7 +54,7 @@ const sharedStyles = StyleSheet.create({
   heroSubtitle: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.regular,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: Spacing.xs,
     lineHeight: Typography.lineHeight.normal,
@@ -62,7 +62,7 @@ const sharedStyles = StyleSheet.create({
 
   // ── Tarjeta ────────────────────────────────────────────────────────────────
   card: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.xl,
     padding: Spacing.md,
     paddingTop: Spacing.lg,
@@ -79,12 +79,12 @@ const sharedStyles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: Colors.border,
+    backgroundColor: colors.border,
   },
   dividerText: {
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.medium,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginHorizontal: Spacing.sm,
   },
 
@@ -103,23 +103,21 @@ const sharedStyles = StyleSheet.create({
   },
   navText: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   navLink: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.semiBold,
-    color: Colors.accent,
+    color: colors.accent,
   },
   navArrow: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.accent,
+    color: colors.accent,
     fontWeight: Typography.fontWeight.bold,
   },
   keyboardView: {
     flex: 1,
     paddingTop: Spacing.lg,
-    backgroundColor: Colors.transparent
+    backgroundColor: colors.transparent
   }
 });
-
-export default sharedStyles;

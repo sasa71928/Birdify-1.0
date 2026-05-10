@@ -9,8 +9,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import styles from '../../styles/screens/settings/settingsSubScreens.styles';
-import { Colors } from '../../theme';
+import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 const LANGUAGES = [
   { id: 'en', name: 'English', code: 'EN' },
@@ -21,16 +21,17 @@ const LANGUAGES = [
 
 export default function LanguageSettingsScreen() {
   const navigation = useNavigation();
+  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const [selectedLanguage, setSelectedLanguage] = useState('en');
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.primary} />
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Language</Text>
       </View>
@@ -64,7 +65,7 @@ export default function LanguageSettingsScreen() {
         </View>
 
         <View style={styles.infoBox}>
-          <Ionicons name="information-circle-outline" size={20} color={Colors.secondaryBlue} />
+          <Ionicons name="information-circle-outline" size={20} color={colors.secondaryBlue} />
           <Text style={styles.infoText}>
             Changing the language will reload the application. This does not affect the species data
             already saved in your Journal, which remains in the language it was recorded.

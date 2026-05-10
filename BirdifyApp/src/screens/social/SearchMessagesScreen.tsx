@@ -13,9 +13,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, Radius } from '../../theme';
+import { Typography, Spacing, Radius } from '../../theme';
 import { RootStackParamList, ChatThread } from '../../navigation/AppNavigator';
-import styles from '../../styles/screens/social/searchMessagesScreen.styles';
+import { createStyles } from '../../styles/screens/social/searchMessagesScreen.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'SearchMessages'>;
 
@@ -45,6 +46,7 @@ const ALL_THREADS: ChatThread[] = [
 
 export default function SearchMessagesScreen() {
   const navigation = useNavigation<NavProp>();
+  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const inputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState('');
 
@@ -78,7 +80,7 @@ export default function SearchMessagesScreen() {
       <View style={styles.avatarWrap}>
         {item.isGroup ? (
           <View style={styles.groupAvatar}>
-            <Ionicons name="people" size={22} color={Colors.secondaryBlue} />
+            <Ionicons name="people" size={22} color={colors.secondaryBlue} />
           </View>
         ) : (
           <Image source={{ uri: item.avatar }} style={styles.avatar} />
@@ -100,28 +102,28 @@ export default function SearchMessagesScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* ── Search bar ── */}
       <View style={styles.searchBar}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
 
         <View style={styles.inputWrapper}>
-          <Ionicons name="search-outline" size={18} color={Colors.textSecondary} />
+          <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
           <TextInput
             ref={inputRef}
             autoFocus
             value={query}
             onChangeText={setQuery}
             placeholder="Search conversations..."
-            placeholderTextColor={Colors.placeholder}
+            placeholderTextColor={colors.placeholder}
             style={styles.input}
           />
           {query.length > 0 && (
             <TouchableOpacity onPress={() => setQuery('')}>
-              <Ionicons name="close-circle" size={18} color={Colors.outlineGrey} />
+              <Ionicons name="close-circle" size={18} color={colors.outlineGrey} />
             </TouchableOpacity>
           )}
         </View>
@@ -130,13 +132,13 @@ export default function SearchMessagesScreen() {
       {/* ── Resultados ── */}
       {query.trim().length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="chatbubbles-outline" size={52} color={Colors.outlineGrey} />
+          <Ionicons name="chatbubbles-outline" size={52} color={colors.outlineGrey} />
           <Text style={styles.emptyTitle}>Search conversations</Text>
           <Text style={styles.emptySubtitle}>Find messages by contact name or keywords</Text>
         </View>
       ) : results.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="search-outline" size={48} color={Colors.outlineGrey} />
+          <Ionicons name="search-outline" size={48} color={colors.outlineGrey} />
           <Text style={styles.emptyTitle}>No results</Text>
           <Text style={styles.emptySubtitle}>No conversations match "{query}"</Text>
         </View>

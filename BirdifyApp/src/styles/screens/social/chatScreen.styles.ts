@@ -1,10 +1,10 @@
 import { StyleSheet, Platform } from 'react-native';
 import { Colors, Typography, Spacing, Radius } from '../../../theme';
 
-export default StyleSheet.create({
+export const createStyles = (colors: any) => StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
 
   // Header
@@ -14,8 +14,8 @@ export default StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
-    backgroundColor: Colors.surface,
+    borderBottomColor: colors.border + '20',
+    backgroundColor: colors.surface,
   },
   backBtn: {
     padding: 4,
@@ -31,20 +31,20 @@ export default StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.componentBase,
+    backgroundColor: colors.componentBase,
   },
   headerGroupAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#E8F0FF',
+    backgroundColor: colors.primary + '15',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerName: {
     fontSize: Typography.fontSize.md,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   headerStatus: {
     fontSize: Typography.fontSize.xs,
@@ -79,12 +79,12 @@ export default StyleSheet.create({
     height: 20,
     borderRadius: 10,
     marginRight: 6,
-    backgroundColor: Colors.componentBase,
+    backgroundColor: colors.componentBase,
   },
   senderName: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textTransform: 'uppercase',
   },
   bubbleWrapper: {
@@ -108,7 +108,7 @@ export default StyleSheet.create({
     height: 28,
     borderRadius: 14,
     marginRight: 6,
-    backgroundColor: Colors.componentBase,
+    backgroundColor: colors.componentBase,
   },
   bubble: {
     maxWidth: '75%',
@@ -118,12 +118,12 @@ export default StyleSheet.create({
     overflow: 'hidden',
   },
   bubbleTheirs: {
-    backgroundColor: '#E2E2E2', // Darker grey as requested
+    backgroundColor: colors.componentBase,
     borderTopLeftRadius: 4,
     borderBottomLeftRadius: Radius.lg,
   },
   bubbleMine: {
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderTopRightRadius: 4,
     borderBottomRightRadius: Radius.lg,
   },
@@ -139,43 +139,43 @@ export default StyleSheet.create({
     borderLeftWidth: 3,
   },
   replyQuoteTheirs: {
-    backgroundColor: 'rgba(0,0,0,0.05)',
-    borderLeftColor: Colors.textSecondary,
+    backgroundColor: colors.surface + '80',
+    borderLeftColor: colors.textSecondary,
   },
   replyQuoteMine: {
     backgroundColor: 'rgba(255,255,255,0.15)',
-    borderLeftColor: Colors.canvasPure,
+    borderLeftColor: colors.canvasPure,
   },
   replyQuoteUser: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   replyQuoteText: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
 
   // Input area
   inputContainer: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.06)',
-    paddingBottom: Platform.OS === 'ios' ? 0 : 25, // Avoid system buttons on Android
+    borderTopColor: colors.border + '20',
+    paddingBottom: Platform.OS === 'ios' ? 0 : 25, 
   },
   replyPreviewBar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: colors.componentBase,
     gap: Spacing.sm,
   },
   replyPreviewLine: {
     width: 3,
     height: '100%',
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: 2,
   },
   replyPreviewContent: {
@@ -184,11 +184,11 @@ export default StyleSheet.create({
   replyPreviewUser: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: Colors.primary,
+    color: colors.primary,
   },
   replyPreviewText: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   bubbleImage: {
     width: 200,
@@ -198,20 +198,20 @@ export default StyleSheet.create({
   },
   bubbleText: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     lineHeight: 20,
   },
   bubbleTextMine: {
-    color: Colors.canvasPure,
+    color: colors.canvasPure,
   },
   bubbleTime: {
     fontSize: 10,
-    color: Colors.outlineGrey,
+    color: colors.placeholder,
     marginTop: 4,
     alignSelf: 'flex-end',
   },
   bubbleTimeMine: {
-    color: Colors.springMoss,
+    color: colors.springMoss,
   },
 
   // Input bar
@@ -221,8 +221,8 @@ export default StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.06)',
-    backgroundColor: Colors.surface,
+    borderTopColor: colors.border + '20',
+    backgroundColor: colors.surface,
     gap: Spacing.sm,
   },
   attachBtn: {
@@ -231,7 +231,7 @@ export default StyleSheet.create({
   },
   inputWrapper: {
     flex: 1,
-    backgroundColor: Colors.componentBase,
+    backgroundColor: colors.componentBase,
     borderRadius: Radius.xl,
     paddingHorizontal: Spacing.md,
     paddingVertical: 8,
@@ -239,20 +239,20 @@ export default StyleSheet.create({
   },
   input: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     padding: 0,
   },
   sendBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 2,
   },
   sendBtnDisabled: {
-    backgroundColor: Colors.outlineGrey,
+    backgroundColor: colors.placeholder,
   },
 });
 
