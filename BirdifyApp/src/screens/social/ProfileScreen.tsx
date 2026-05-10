@@ -9,9 +9,10 @@ import {
   Dimensions,
   StatusBar,
   FlatList,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
@@ -21,7 +22,14 @@ import BottomNavBar from '../../components/BottomNavBar';
 import shared from '../../styles/shared/shared.styles';
 import styles from '../../styles/screens/social/profileScreen.styles';
 
+type ProfileRouteProp = RouteProp<RootStackParamList, 'Profile'>;
+
 // ── Datos de ejemplo ──────────────────────────────────────────────────────────
+const OTHER_USERS_MOCK: Record<string, any> = {
+  '1': { name: 'Carlos Mendez', username: 'carlos_m', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300', isPrivate: true, bio: 'Nature lover & bird photographer.', followers: '2.1k', following: '120', sightings: '0' },
+  '2': { name: 'Elena Rios', username: 'elena_bird', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=300', isPrivate: false, bio: 'Finding peace in the forest.', followers: '1.2k', following: '842', sightings: '82' },
+};
+
 const SIGHTING_PHOTOS = [
   { uri: 'https://images.unsplash.com/photo-1555169062-013468b47731?auto=format&fit=crop&q=80&w=300', location: 'La Paz' },
   { uri: 'https://images.unsplash.com/photo-1520638029751-c947dd098db5?auto=format&fit=crop&q=80&w=300', location: 'Ensenada' },
@@ -47,12 +55,49 @@ const LIKED_POSTS = [
   { id: '4', user: 'SarahJ',       avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=100', image: 'https://images.unsplash.com/photo-1550853024-fae8cd4be47f?auto=format&fit=crop&q=80&w=300', bird: 'Hummingbird',       likes: 178 },
 ];
 
+const FOLLOWERS_MOCK = [
+  { id: '1', name: 'Carlos Mendez', username: 'carlos_m', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100', isFollowing: true },
+  { id: '2', name: 'Elena Rios',    username: 'elena_bird', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=100', isFollowing: false },
+  { id: '3', name: 'Mike Thompson', username: 'mike_th', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=100', isFollowing: true },
+  { id: '4', name: 'Sarah Jenkins', username: 'sarah_j', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=100', isFollowing: false },
+];
+
+const FOLLOWING_MOCK = [
+  { id: '1', name: 'David Park',    username: 'david_p', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=100', isFollowing: true },
+  { id: '2', name: 'Anna K.',       username: 'anna_k', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=100', isFollowing: true },
+  { id: '3', name: 'John Doe',      username: 'johndoe', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=100', isFollowing: true },
+];
+
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 type Tab = 'Sightings' | 'Logbook' | 'Likes';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<ProfileRouteProp>();
+  const userId = route.params?.userId;
+  const isMe = !userId || userId === 'me';
+  
+  // Get user data
+  const userData = isMe ? {
+    name: 'Ana Ruiz',
+    username: 'anaruiz_bird',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=300',
+    bio: 'Passionate ornithologist exploring the Baja peninsula. Focused on coastal species and conservation. 🌿📸',
+    isPrivate: false,
+    followers: '1.2k',
+    following: '842',
+    sightings: '82',
+    profession: 'Professional Birder'
+  } : (OTHER_USERS_MOCK[userId] || OTHER_USERS_MOCK['1']);
+
   const [activeTab, setActiveTab] = useState<Tab>('Sightings');
+  const [followModalVisible, setFollowModalVisible] = useState(false);
+  const [followModalType, setFollowModalType] = useState<'Followers' | 'Following'>('Followers');
+
+  const openFollowModal = (type: 'Followers' | 'Following') => {
+    setFollowModalType(type);
+    setFollowModalVisible(true);
+  };
 
   return (
     <SafeAreaView style={shared.safe}>
@@ -63,78 +108,155 @@ export default function ProfileScreen() {
       <View style={styles.profileHeader}>
         <View style={styles.avatarWrapper}>
           <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=300' }}
+            source={{ uri: userData.avatar }}
             style={styles.avatar}
           />
-          <View style={styles.verifiedBadge}>
-            <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
-          </View>
+          {isMe && (
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
+            </View>
+          )}
         </View>
 
         <View style={styles.nameRow}>
-          <Text style={styles.name}>Ana Ruiz</Text>
-          <TouchableOpacity 
-            style={styles.editIconBtn}
-            onPress={() => navigation.navigate('EditProfile')}
-          >
-            <Ionicons name="create-outline" size={20} color={Colors.primary} />
-          </TouchableOpacity>
+          <Text style={styles.name}>{userData.name}</Text>
+          {isMe && (
+            <TouchableOpacity 
+              style={styles.editIconBtn}
+              onPress={() => navigation.navigate('EditProfile')}
+            >
+              <Ionicons name="create-outline" size={20} color={Colors.primary} />
+            </TouchableOpacity>
+          )}
         </View>
+
         <View style={styles.professionBadge}>
           <MaterialCommunityIcons name="leaf" size={14} color={Colors.primary} />
-          <Text style={styles.professionText}>Professional Birder</Text>
+          <Text style={styles.professionText}>{userData.profession || 'Bird Watcher'}</Text>
         </View>
 
         <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>1.2k</Text>
+          <TouchableOpacity style={styles.statItem} onPress={() => openFollowModal('Followers')}>
+            <Text style={styles.statValue}>{userData.followers}</Text>
             <Text style={styles.statLabel}>Followers</Text>
-          </View>
+          </TouchableOpacity>
           <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>842</Text>
+          <TouchableOpacity style={styles.statItem} onPress={() => openFollowModal('Following')}>
+            <Text style={styles.statValue}>{userData.following}</Text>
             <Text style={styles.statLabel}>Following</Text>
-          </View>
+          </TouchableOpacity>
           <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{LOGBOOK_ENTRIES.length}</Text>
+          <TouchableOpacity style={styles.statItem} onPress={() => !userData.isPrivate && setActiveTab('Logbook')}>
+            <Text style={styles.statValue}>{isMe ? LOGBOOK_ENTRIES.length : '0'}</Text>
             <Text style={styles.statLabel}>Species</Text>
-          </View>
+          </TouchableOpacity>
           <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>82</Text>
+          <TouchableOpacity style={styles.statItem} onPress={() => !userData.isPrivate && setActiveTab('Sightings')}>
+            <Text style={styles.statValue}>{userData.sightings}</Text>
             <Text style={styles.statLabel}>Sightings</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
-        <Text style={styles.bio}>
-          Passionate ornithologist exploring the Baja peninsula. Focused on coastal species and conservation. 🌿📸
-        </Text>
+        {!isMe && (
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.followMainBtn}>
+              <Text style={styles.followMainBtnText}>Follow</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.messageMainBtn} onPress={() => navigation.navigate('Chat', { thread: { id: userId, name: userData.name, avatar: userData.avatar, lastMessage: '', time: '' } })}>
+              <Ionicons name="chatbubble-outline" size={20} color={Colors.primary} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <Text style={styles.bio}>{userData.bio}</Text>
       </View>
 
-      {/* ── Tab bar horizontal (fijo) ── */}
-      <View style={styles.tabsContainer}>
-        {(['Sightings', 'Logbook', 'Likes'] as Tab[]).map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && styles.activeTab]}
-            onPress={() => setActiveTab(tab)}
+      {userData.isPrivate && !isMe ? (
+        <View style={styles.privateContainer}>
+          <View style={styles.privateIconCircle}>
+            <Ionicons name="lock-closed-outline" size={40} color={Colors.textSecondary} />
+          </View>
+          <Text style={styles.privateTitle}>This Account is Private</Text>
+          <Text style={styles.privateSubtitle}>Follow this account to see their sightings and activity.</Text>
+        </View>
+      ) : (
+        <>
+          {/* ── Tab bar horizontal ── */}
+          <View style={styles.tabsContainer}>
+            {(['Sightings', 'Logbook', 'Likes'] as Tab[]).map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                style={[styles.tab, activeTab === tab && styles.activeTab]}
+                onPress={() => setActiveTab(tab)}
+              >
+                <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* ── Contenido scrollable del tab activo ── */}
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
           >
-            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+            {activeTab === 'Sightings' && <SightingsGrid />}
+            {activeTab === 'Logbook'   && <LogbookView />}
+            {activeTab === 'Likes'     && <LikesView />}
+          </ScrollView>
+        </>
+      )}
 
-      {/* ── Contenido scrollable del tab activo ── */}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+      {/* ── Follow Modal ── */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={followModalVisible}
+        onRequestClose={() => setFollowModalVisible(false)}
       >
-        {activeTab === 'Sightings' && <SightingsGrid />}
-        {activeTab === 'Logbook'   && <LogbookView />}
-        {activeTab === 'Likes'     && <LikesView />}
-      </ScrollView>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{followModalType}</Text>
+              <TouchableOpacity onPress={() => setFollowModalVisible(false)}>
+                <Ionicons name="close" size={24} color={Colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            
+            <FlatList
+              data={followModalType === 'Followers' ? FOLLOWERS_MOCK : FOLLOWING_MOCK}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity 
+                  style={styles.followItem}
+                  onPress={() => {
+                    setFollowModalVisible(false);
+                    navigation.navigate('Profile', { userId: item.id });
+                  }}
+                >
+                  <Image source={{ uri: item.avatar }} style={styles.followAvatar} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.followName}>{item.name}</Text>
+                    <Text style={styles.followUsername}>@{item.username}</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={[styles.followBtn, item.isFollowing && styles.followingBtn]}
+                    onPress={(e) => {
+                      e.stopPropagation(); // Don't trigger the profile navigation
+                      // Handle follow toggle
+                    }}
+                  >
+                    <Text style={[styles.followBtnText, item.isFollowing && styles.followingBtnText]}>
+                      {item.isFollowing ? 'Following' : 'Follow'}
+                    </Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
 
       <BottomNavBar />
     </SafeAreaView>

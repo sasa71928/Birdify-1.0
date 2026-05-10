@@ -268,5 +268,127 @@ export default StyleSheet.create({
     color: Colors.canvasPure,
     fontWeight: Typography.fontWeight.bold,
   },
+  
+  // Modals
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    height: '70%',
+    padding: Spacing.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  modalTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.textPrimary,
+  },
+  followItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    gap: Spacing.md,
+  },
+  followAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.componentBase,
+  },
+  followName: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.textPrimary,
+  },
+  followUsername: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textSecondary,
+  },
+  followBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: Radius.full,
+  },
+  followingBtn: {
+    backgroundColor: Colors.componentBase,
+  },
+  followBtnText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: Colors.canvasPure,
+  },
+  followingBtnText: {
+    color: Colors.textPrimary,
+  },
+  
+  // Private Account View
+  privateContainer: {
+    flex: 1,
+    alignItems: 'center',
+    paddingTop: 60,
+    paddingHorizontal: 40,
+  },
+  privateIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.componentBase,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  privateTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.textPrimary,
+    marginBottom: 8,
+  },
+  privateSubtitle: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  
+  // Action Buttons (Other profiles)
+  actionRow: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 10,
+    marginVertical: 15,
+  },
+  followMainBtn: {
+    flex: 1,
+    height: 44,
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  followMainBtnText: {
+    color: Colors.canvasPure,
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  messageMainBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
 

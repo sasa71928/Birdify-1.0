@@ -65,7 +65,7 @@ export type RootStackParamList = {
   Login: undefined;
   Feed: undefined;
   RecordSighting: undefined;
-  Profile: undefined;
+  Profile: { userId?: string };
   Dictionary: { searchQuery?: string };
   Messages: undefined;
   Explore: undefined;

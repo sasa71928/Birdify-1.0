@@ -217,7 +217,10 @@ export default function FeedItem({ post }: FeedItemProps) {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.userInfo}>
+        <TouchableOpacity 
+          style={styles.userInfo}
+          onPress={() => navigation.navigate('Profile', { userId: post.username === 'ElenaRios' ? '2' : '1' })}
+        >
           <Image source={{ uri: post.userAvatar }} style={styles.avatar} />
           <View style={styles.userText}>
             <View style={styles.nameRow}>
@@ -228,7 +231,7 @@ export default function FeedItem({ post }: FeedItemProps) {
             </View>
             <Text style={styles.location}>{post.location}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => setShowOptionsMenu(true)}>
           <MaterialCommunityIcons name="dots-horizontal" size={24} color={Colors.textSecondary} />
         </TouchableOpacity>
