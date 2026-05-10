@@ -33,10 +33,18 @@ export default StyleSheet.create({
     backgroundColor: Colors.canvasPure,
     borderRadius: 12,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
   name: {
     fontSize: Typography.fontSize.xl,
     fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
+  },
+  editIconBtn: {
+    padding: 4,
   },
   professionBadge: {
     flexDirection: 'row',

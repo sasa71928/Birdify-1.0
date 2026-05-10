@@ -11,6 +11,9 @@ import {
   FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../navigation/AppNavigator';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TopNavBar from '../../components/TopNavBar';
@@ -48,6 +51,7 @@ const LIKED_POSTS = [
 type Tab = 'Sightings' | 'Logbook' | 'Likes';
 
 export default function ProfileScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [activeTab, setActiveTab] = useState<Tab>('Sightings');
 
   return (
@@ -67,7 +71,15 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <Text style={styles.name}>Ana Ruiz</Text>
+        <View style={styles.nameRow}>
+          <Text style={styles.name}>Ana Ruiz</Text>
+          <TouchableOpacity 
+            style={styles.editIconBtn}
+            onPress={() => navigation.navigate('EditProfile')}
+          >
+            <Ionicons name="create-outline" size={20} color={Colors.primary} />
+          </TouchableOpacity>
+        </View>
         <View style={styles.professionBadge}>
           <MaterialCommunityIcons name="leaf" size={14} color={Colors.primary} />
           <Text style={styles.professionText}>Professional Birder</Text>

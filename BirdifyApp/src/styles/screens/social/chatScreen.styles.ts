@@ -127,6 +127,9 @@ export default StyleSheet.create({
     borderTopRightRadius: 4,
     borderBottomRightRadius: Radius.lg,
   },
+  bubbleGroup: {
+    borderTopLeftRadius: 0,
+  },
   
   // Reply Quotes in Bubbles
   replyQuote: {
