@@ -66,7 +66,7 @@ export type RootStackParamList = {
   Feed: undefined;
   RecordSighting: undefined;
   Profile: undefined;
-  Dictionary: undefined;
+  Dictionary: { searchQuery?: string };
   Messages: undefined;
   Explore: undefined;
   Search: undefined;
@@ -83,7 +83,7 @@ export type RootStackParamList = {
   ThemeSettings: undefined;
   HelpSupport: undefined;
   AboutBirdify: undefined;
-  MainTabs: { screen?: string };
+  MainTabs: { screen?: string, params?: { searchQuery?: string } };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();

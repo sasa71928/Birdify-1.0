@@ -9,6 +9,7 @@ import {
   TextInput,
   ScrollView,
   StatusBar,
+  SectionList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -19,6 +20,7 @@ import TopNavBar from '../../components/TopNavBar';
 import shared from '../../styles/shared/shared.styles';
 import { RootStackParamList, BirdSpeciesData } from '../../navigation/AppNavigator';
 import styles from '../../styles/screens/main/dictionaryScreen.styles';
+import { useRoute, RouteProp } from '@react-navigation/native';
 
 type DictionaryNavProp = NativeStackNavigationProp<RootStackParamList, 'Dictionary'>;
 
@@ -91,10 +93,117 @@ const MOCK_BIRDS: BirdSpeciesData[] = [
   },
 ];
 
-const FILTERS = ['All', 'A-Z', 'Season', 'Habitat', 'Region'];
+const FILTERS = ['All', 'A-Z', 'Season', 'Habitat', 'Family'];
 
 export default function DictionaryScreen() {
   const navigation = useNavigation<DictionaryNavProp>();
+  const route = useRoute<RouteProp<RootStackParamList, 'Dictionary'>>();
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [activeFilter, setActiveFilter] = React.useState('All');
+  const [filteredBirds, setFilteredBirds] = React.useState(MOCK_BIRDS);
+
+  React.useEffect(() => {
+    if (route.params?.searchQuery) {
+      setSearchQuery(route.params.searchQuery);
+      handleSearch(route.params.searchQuery);
+    }
+  }, [route.params?.searchQuery]);
+
+  const handleSearch = (text: string) => {
+    setSearchQuery(text);
+    applyFilterAndSearch(text, activeFilter);
+  };
+
+  const handleFilterSelect = (filter: string) => {
+    setActiveFilter(filter);
+    applyFilterAndSearch(searchQuery, filter);
+  };
+
+  const applyFilterAndSearch = (query: string, filter: string) => {
+    let result = [...MOCK_BIRDS];
+
+    // Search query filter
+    if (query) {
+      result = result.filter(bird => 
+        bird.name.toLowerCase().includes(query.toLowerCase()) ||
+        bird.scientificName.toLowerCase().includes(query.toLowerCase())
+      );
+    }
+
+    // Category sorting/filtering
+    switch (filter) {
+      case 'A-Z':
+        result.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'Season':
+        // Sort by status (Resident vs Migratory)
+        result.sort((a, b) => a.status.localeCompare(b.status));
+        break;
+      case 'Habitat':
+        // Sort by habitat description keyword
+        result.sort((a, b) => a.habitat.localeCompare(b.habitat));
+        break;
+      case 'Family':
+        // Sort by family classification
+        result.sort((a, b) => {
+          const familyA = a.classification?.family || '';
+          const familyB = b.classification?.family || '';
+          return familyA.localeCompare(familyB);
+        });
+        break;
+      default:
+        // 'All' or others - no additional sorting
+        break;
+    }
+
+    setFilteredBirds(result);
+  };
+
+  const getSections = () => {
+    if (activeFilter === 'All') {
+      return [{ title: '', data: filteredBirds }];
+    }
+
+    const groups: Record<string, BirdSpeciesData[]> = {};
+    
+    filteredBirds.forEach(bird => {
+      let key = '';
+      switch (activeFilter) {
+        case 'A-Z':
+          key = bird.name.charAt(0).toUpperCase();
+          break;
+        case 'Season':
+          key = bird.status;
+          break;
+        case 'Habitat':
+          // Extract first word of habitat as category
+          key = bird.habitat.split(',')[0].split(' ')[0];
+          break;
+        case 'Family':
+          key = bird.classification?.family || 'Unknown';
+          break;
+        default:
+          key = 'Results';
+      }
+      
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(bird);
+    });
+
+    return Object.keys(groups).sort().map(key => ({
+      title: key,
+      data: groups[key]
+    }));
+  };
+
+  const renderSectionHeader = ({ section: { title } }: { section: { title: string } }) => {
+    if (!title) return null;
+    return (
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+    );
+  };
 
   const renderBird = ({ item }: { item: BirdSpeciesData }) => (
     <TouchableOpacity
@@ -127,25 +236,39 @@ export default function DictionaryScreen() {
             style={styles.searchInput}
             placeholder="Search by common or scientific name..."
             placeholderTextColor={Colors.placeholder}
+            value={searchQuery}
+            onChangeText={handleSearch}
           />
         </View>
 
         <View style={styles.filtersWrapper}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersScroll}>
             {FILTERS.map((filter, index) => (
-              <TouchableOpacity key={index} style={[styles.filterChip, index === 0 ? styles.activeFilter : null]}>
-                <Text style={[styles.filterText, index === 0 ? styles.activeFilterText : null]}>{filter}</Text>
+              <TouchableOpacity 
+                key={index} 
+                style={[
+                  styles.filterChip, 
+                  activeFilter === filter ? styles.activeFilter : null
+                ]}
+                onPress={() => handleFilterSelect(filter)}
+              >
+                <Text style={[
+                  styles.filterText, 
+                  activeFilter === filter ? styles.activeFilterText : null
+                ]}>{filter}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
 
-        <FlatList
-          data={MOCK_BIRDS}
+        <SectionList
+          sections={getSections()}
           renderItem={renderBird}
+          renderSectionHeader={renderSectionHeader}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          stickySectionHeadersEnabled={false}
         />
       </View>
     </SafeAreaView>

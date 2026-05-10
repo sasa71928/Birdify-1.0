@@ -16,6 +16,7 @@ import {
   BeVietnamPro_600SemiBold,
   BeVietnamPro_700Bold,
 } from '@expo-google-fonts/be-vietnam-pro';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from './src/theme';
 
 export default function App() {
@@ -29,6 +30,8 @@ export default function App() {
     'BeVietnamPro-Medium': BeVietnamPro_500Medium,
     'BeVietnamPro-SemiBold': BeVietnamPro_600SemiBold,
     'BeVietnamPro-Bold': BeVietnamPro_700Bold,
+    ...Ionicons.font,
+    ...MaterialCommunityIcons.font,
   });
 
   if (!fontsLoaded) {

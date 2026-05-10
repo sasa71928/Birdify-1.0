@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
 
 export default StyleSheet.create({
@@ -109,5 +109,198 @@ export default StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 4,
     textTransform: 'uppercase',
+  },
+  seeMore: {
+    color: Colors.primary,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  modalOverlayContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000',
+  },
+  modalContent: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    height: '75%',
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+  },
+  modalDragArea: {
+    paddingTop: 10,
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+  },
+  modalHandle: {
+    width: 40,
+    height: 5,
+    backgroundColor: '#ddd',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  modalHeader: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+  },
+  modalScrollView: {
+    flex: 1,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+  },
+  modalInputContainer: {
+    padding: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    backgroundColor: Colors.surface,
+  },
+  commentItem: {
+    marginBottom: Spacing.sm,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  commentUsername: {
+    fontWeight: Typography.fontWeight.bold,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textPrimary,
+    marginRight: 4,
+  },
+  commentText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textPrimary,
+    flexShrink: 1,
+  },
+  repliesContainer: {
+    marginLeft: Spacing.xl,
+    marginTop: 4,
+  },
+  viewRepliesButton: {
+    paddingVertical: 2,
+  },
+  viewRepliesText: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textSecondary,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  repliesList: {
+    marginTop: 4,
+  },
+  replyItem: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 4,
+  },
+  loadMoreButton: {
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+  },
+  loadMoreText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.primary,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  replyButton: {
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  replyButtonText: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textSecondary,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  commentInputContainer: {
+    marginTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingTop: Spacing.sm,
+  },
+  replyingToBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: Radius.sm,
+    marginBottom: Spacing.xs,
+  },
+  replyingToText: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textSecondary,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.sm,
+    minHeight: 45,
+  },
+  commentInput: {
+    flex: 1,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textPrimary,
+    maxHeight: 100,
+    paddingVertical: 8,
+  },
+  sendButton: {
+    marginLeft: Spacing.sm,
+    padding: 4,
+  },
+  sendButtonDisabled: {
+    opacity: 0.5,
+  },
+  optionsOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'flex-end',
+  },
+  optionsContent: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    paddingHorizontal: Spacing.md,
+  },
+  optionsList: {
+    paddingTop: Spacing.sm,
+  },
+  optionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+  },
+  optionText: {
+    fontSize: Typography.fontSize.md,
+    color: Colors.textPrimary,
+    marginLeft: Spacing.md,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  optionDivider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+    marginVertical: Spacing.xs,
+  },
+  heartOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
 });

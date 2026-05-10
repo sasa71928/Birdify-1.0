@@ -93,5 +93,18 @@ export default StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
+  sectionHeader: {
+    paddingVertical: Spacing.sm,
+    backgroundColor: 'transparent',
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  sectionTitle: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: Typography.fontWeight.bold,
+    color: '#1B4D3E',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
 });
 
