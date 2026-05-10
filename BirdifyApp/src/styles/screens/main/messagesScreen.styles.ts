@@ -35,7 +35,7 @@ export default StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.componentBase,
+    backgroundColor: '#F2F4F3',
     borderRadius: Radius.lg,
     paddingHorizontal: Spacing.md,
     height: 46,

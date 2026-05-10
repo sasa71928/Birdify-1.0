@@ -18,13 +18,17 @@ export default function TopNavBar() {
   return (
     <View style={styles.container}>
       <View style={styles.left}>
-        <View style={styles.logoContainer}>
+        <TouchableOpacity 
+          style={styles.logoContainer}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('MainTabs', { screen: 'Feed' })}
+        >
           <Image 
             source={require('../../assets/icon.png')} 
             style={styles.appLogo as any} 
           />
           <Text style={styles.logoText}>Birdify</Text>
-        </View>
+        </TouchableOpacity>
       </View>
       <View style={styles.right}>
         <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Search')}>

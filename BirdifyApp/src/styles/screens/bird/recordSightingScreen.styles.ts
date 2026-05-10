@@ -64,6 +64,11 @@ export default StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 4,
   },
+  uploadedImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
   section: {
     marginBottom: Spacing.lg,
   },

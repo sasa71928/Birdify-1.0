@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import styles from '../../styles/screens/social/createGroupScreen.styles';
@@ -34,6 +35,7 @@ export default function CreateGroupScreen() {
   const navigation = useNavigation<NavProp>();
   const [groupName, setGroupName] = useState('');
   const [description, setDescription] = useState('');
+  const [image, setImage] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const toggle = (id: string) =>
@@ -42,6 +44,35 @@ export default function CreateGroupScreen() {
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      alert('Se necesita permiso para acceder a la galería.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setImage(result.assets[0].uri);
+    }
+  };
+
+  const handleCreate = () => {
+    if (!canCreate) return;
+    
+    // Simulate API call
+    console.log('Creating group:', { groupName, description, image, members: Array.from(selected) });
+    
+    // Show success alert or navigate back
+    navigation.goBack();
+  };
 
   const canCreate = groupName.trim().length > 0 && selected.size >= 1;
 
@@ -58,7 +89,7 @@ export default function CreateGroupScreen() {
         <TouchableOpacity
           style={[styles.createBtn, !canCreate && styles.createBtnDisabled]}
           disabled={!canCreate}
-          onPress={() => navigation.goBack()}
+          onPress={handleCreate}
         >
           <Text style={[styles.createBtnText, !canCreate && styles.createBtnTextDisabled]}>
             Create
@@ -70,10 +101,14 @@ export default function CreateGroupScreen() {
 
         {/* ── Group icon placeholder ── */}
         <View style={styles.iconSection}>
-          <TouchableOpacity style={styles.groupIconCircle} activeOpacity={0.75}>
-            <MaterialCommunityIcons name="camera-plus-outline" size={28} color={Colors.textSecondary} />
+          <TouchableOpacity style={styles.groupIconCircle} activeOpacity={0.75} onPress={pickImage}>
+            {image ? (
+              <Image source={{ uri: image }} style={styles.groupIconImage} />
+            ) : (
+              <MaterialCommunityIcons name="camera-plus-outline" size={28} color={Colors.textSecondary} />
+            )}
           </TouchableOpacity>
-          <Text style={styles.iconHint}>Tap to add a group photo</Text>
+          <Text style={styles.iconHint}>{image ? 'Tap to change photo' : 'Tap to add a group photo'}</Text>
         </View>
 
         {/* ── Campos del grupo ── */}

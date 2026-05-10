@@ -9,8 +9,15 @@ import {
   Image,
   Switch,
   StatusBar,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../navigation/AppNavigator';
+import * as ImagePicker from 'expo-image-picker';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TopNavBar from '../../components/TopNavBar';
@@ -19,33 +26,76 @@ import shared from '../../styles/shared/shared.styles';
 import styles from '../../styles/screens/bird/recordSightingScreen.styles';
 
 export default function RecordSightingScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [birdName, setBirdName] = useState('');
+  const [notes, setNotes] = useState('');
+  const [image, setImage] = useState<string | null>(null);
   const [isPrivate, setIsPrivate] = useState(false);
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'We need access to your gallery to upload photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setImage(result.assets[0].uri);
+    }
+  };
+
+  const handlePost = () => {
+    if (!birdName.trim()) {
+      Alert.alert('Missing info', 'Please enter a bird name.');
+      return;
+    }
+    
+    // Simulate successful post
+    Alert.alert('Sighting Posted!', 'Your sighting has been shared with the community.', [
+      { text: 'OK', onPress: () => navigation.navigate('MainTabs', { screen: 'Feed' }) }
+    ]);
+  };
 
   return (
     <SafeAreaView style={shared.safe}>
       <StatusBar barStyle="dark-content" />
       <TopNavBar />
 
-      <ScrollView 
-        style={styles.scroll} 
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
+        <ScrollView 
+          style={styles.scroll} 
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
         <Text style={styles.title}>Record Sighting</Text>
         <Text style={styles.subtitle}>Log your latest observation for your life list.</Text>
 
         {/* Photo Upload Area */}
-        <TouchableOpacity style={styles.photoContainer}>
-          <View style={styles.photoInner}>
-            <View style={styles.cameraIconBg}>
-                <Ionicons name="camera-outline" size={32} color={Colors.primary} />
-                <View style={styles.plusIconBadge}>
-                    <Ionicons name="add" size={12} color={Colors.primary} />
-                </View>
+        <TouchableOpacity style={styles.photoContainer} onPress={pickImage}>
+          {image ? (
+            <Image source={{ uri: image }} style={styles.uploadedImage} />
+          ) : (
+            <View style={styles.photoInner}>
+              <View style={styles.cameraIconBg}>
+                  <Ionicons name="camera-outline" size={32} color={Colors.primary} />
+                  <View style={styles.plusIconBadge}>
+                      <Ionicons name="add" size={12} color={Colors.primary} />
+                  </View>
+              </View>
+              <Text style={styles.photoTitle}>Tap to add photo</Text>
+              <Text style={styles.photoSubtitle}>High quality images help identification</Text>
             </View>
-            <Text style={styles.photoTitle}>Tap to add photo</Text>
-            <Text style={styles.photoSubtitle}>High quality images help identification</Text>
-          </View>
+          )}
         </TouchableOpacity>
 
         {/* Form Fields */}
@@ -57,6 +107,8 @@ export default function RecordSightingScreen() {
               style={styles.searchInput}
               placeholder="Search species or enter unknown..."
               placeholderTextColor={Colors.placeholder}
+              value={birdName}
+              onChangeText={setBirdName}
             />
           </View>
         </View>
@@ -71,6 +123,8 @@ export default function RecordSightingScreen() {
               multiline
               numberOfLines={4}
               textAlignVertical="top"
+              value={notes}
+              onChangeText={setNotes}
             />
           </View>
         </View>
@@ -117,11 +171,12 @@ export default function RecordSightingScreen() {
         </View>
 
         {/* Post Button */}
-        <TouchableOpacity style={styles.postButton}>
+        <TouchableOpacity style={styles.postButton} onPress={handlePost}>
           <Ionicons name="paper-plane" size={20} color={Colors.white} style={styles.postIcon} />
           <Text style={styles.postButtonText}>Post Sighting</Text>
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <BottomNavBar />
     </SafeAreaView>

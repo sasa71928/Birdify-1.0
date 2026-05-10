@@ -60,6 +60,11 @@ export default StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.sm,
+    overflow: 'hidden', // Added for image
+  },
+  groupIconImage: {
+    width: '100%',
+    height: '100%',
   },
   iconHint: {
     fontSize: Typography.fontSize.xs,
