@@ -18,7 +18,7 @@ const THEMES = [
   { id: 'light', name: 'Light Mode', icon: 'sunny-outline' },
   { id: 'dark', name: 'Dark Mode', icon: 'moon-outline' },
   { id: 'system', name: 'System Default', icon: 'settings-outline' },
-];
+] as const;
 
 
 export default function ThemeSettingsScreen() {
@@ -28,7 +28,7 @@ export default function ThemeSettingsScreen() {
   const [selectedTheme, setSelectedTheme] = useState(theme);
 
   const handleSave = () => {
-    setTheme(selectedTheme as any);
+    setTheme(selectedTheme);
     Alert.alert(
       'Theme Updated',
       `Birdify is now set to ${THEMES.find(t => t.id === selectedTheme)?.name}.`,

@@ -118,7 +118,7 @@ export const createStyles = (colors: any) => StyleSheet.create({
     overflow: 'hidden',
   },
   bubbleTheirs: {
-    backgroundColor: colors.componentBase,
+    backgroundColor: colors.textSecondary + '20',
     borderTopLeftRadius: 4,
     borderBottomLeftRadius: Radius.lg,
   },

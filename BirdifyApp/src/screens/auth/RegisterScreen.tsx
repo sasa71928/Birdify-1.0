@@ -20,7 +20,7 @@ import AvatarIcon   from '../../components/AvatarIcon';
 import SocialButton from '../../components/SocialButton';
 
 // ── Estilos ───────────────────────────────────────────────────────────────────
-import shared  from '../../styles/shared/shared.styles';
+import {createSharedStyles}  from '../../styles/shared/shared.styles';
 import local   from '../../styles/screens/auth/registerScreen.styles';
 import { Colors } from '../../theme';
 
@@ -35,6 +35,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 
 export default function RegisterScreen() {
   const navigation = useNavigation<RegisterNavProp>();
+  const shared = createSharedStyles(Colors);
 
   return (
     <SafeAreaView style={shared.safe}>
