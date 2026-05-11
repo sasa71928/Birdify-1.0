@@ -63,6 +63,11 @@ export const createStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: Radius.full,
+
+    zIndex: 999,
+    elevation: 999,
+
+     pointerEvents: 'auto',
   },
   tagText: {
     fontSize: Typography.fontSize.sm,
