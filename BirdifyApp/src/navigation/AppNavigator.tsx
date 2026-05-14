@@ -105,35 +105,55 @@ function MainTabs() {
   );
 }
 
+import { useAuth } from '../context/AuthContext';
+import { View, ActivityIndicator } from 'react-native';
+import { Colors } from '../theme';
+
 export default function AppNavigator() {
+  const { session, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface }}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
   return (
     // @ts-ignore - React 19 type mismatch with React Navigation 7
     <Stack.Navigator
-      initialRouteName={"Welcome" as any}
       screenOptions={{ headerShown: false } as any}
     >
-      <Stack.Screen name="Welcome"  component={WelcomeScreen} />
-      <Stack.Screen name="Register" component={RegisterScreen} />
-      <Stack.Screen name="Login"    component={LoginScreen}    />
-      <Stack.Screen name="MainTabs" component={MainTabs} />
-      
-      {/* ── Modal/Fullscreen screens ── */}
-      <Stack.Screen name="RecordSighting" component={RecordSightingScreen} />
-      <Stack.Screen name="Profile"        component={ProfileScreen} />
-      <Stack.Screen name="Search"         component={SearchScreen} />
-      <Stack.Screen name="BirdDetail"      component={BirdDetailScreen} />
-      <Stack.Screen name="Chat"            component={ChatScreen} />
-      <Stack.Screen name="CreateGroup"      component={CreateGroupScreen} />
-      <Stack.Screen name="SearchMessages"   component={SearchMessagesScreen} />
-      <Stack.Screen name="Settings"         component={SettingsScreen} />
-      <Stack.Screen name="OfflineStorage"   component={OfflineStorageScreen} />
-      <Stack.Screen name="LanguageSettings" component={LanguageSettingsScreen} />
-      <Stack.Screen name="PrivacySettings"  component={PrivacySettingsScreen} />
-      <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
-      <Stack.Screen name="EditProfile"      component={EditProfileScreen} />
-      <Stack.Screen name="ThemeSettings"    component={ThemeSettingsScreen} />
-      <Stack.Screen name="HelpSupport"      component={HelpSupportScreen} />
-      <Stack.Screen name="AboutBirdify"      component={AboutBirdifyScreen} />
+      {!session ? (
+        <>
+          <Stack.Screen name="Welcome"  component={WelcomeScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="Login"    component={LoginScreen}    />
+        </>
+      ) : (
+        <>
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+          
+          {/* ── Modal/Fullscreen screens ── */}
+          <Stack.Screen name="RecordSighting" component={RecordSightingScreen} />
+          <Stack.Screen name="Profile"        component={ProfileScreen} />
+          <Stack.Screen name="Search"         component={SearchScreen} />
+          <Stack.Screen name="BirdDetail"      component={BirdDetailScreen} />
+          <Stack.Screen name="Chat"            component={ChatScreen} />
+          <Stack.Screen name="CreateGroup"      component={CreateGroupScreen} />
+          <Stack.Screen name="SearchMessages"   component={SearchMessagesScreen} />
+          <Stack.Screen name="Settings"         component={SettingsScreen} />
+          <Stack.Screen name="OfflineStorage"   component={OfflineStorageScreen} />
+          <Stack.Screen name="LanguageSettings" component={LanguageSettingsScreen} />
+          <Stack.Screen name="PrivacySettings"  component={PrivacySettingsScreen} />
+          <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+          <Stack.Screen name="EditProfile"      component={EditProfileScreen} />
+          <Stack.Screen name="ThemeSettings"    component={ThemeSettingsScreen} />
+          <Stack.Screen name="HelpSupport"      component={HelpSupportScreen} />
+          <Stack.Screen name="AboutBirdify"      component={AboutBirdifyScreen} />
+        </>
+      )}
     </Stack.Navigator>
   );
 }

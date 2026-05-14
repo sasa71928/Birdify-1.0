@@ -25,10 +25,35 @@ type LoginNavProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 
+import { Alert } from 'react-native';
+import { AuthService } from '../../services/auth.service';
+
 export default function LoginScreen() {
   const navigation = useNavigation<LoginNavProp>();
   const { shared, screen: local, colors, isDark } = useDynamicStyles(createStyles);
+  
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [remember, setRemember] = useState(false);
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Faltan datos', 'Por favor ingresa tu correo y contraseña.');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      await AuthService.signIn(email, password);
+      // No necesitamos hacer navigation.navigate aquí porque el AuthProvider 
+      // automáticamente cambiará las pantallas al detectar la sesión.
+    } catch (error: any) {
+      Alert.alert('Error al iniciar sesión', error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Link "¿Olvidaste?" que se pasa como labelRight al InputField
   const ForgotLink = (
@@ -63,6 +88,8 @@ export default function LoginScreen() {
             placeholder="nombre@ejemplo.com"
             iconSymbol={<Ionicons name="person-outline" size={20} color={colors.textSecondary} />}
             keyboardType="email-address"
+            value={email}
+            onChangeText={setEmail}
           />
 
           {/* Contraseña con link "¿Olvidaste?" inline en el label */}
@@ -73,6 +100,8 @@ export default function LoginScreen() {
             iconSymbol={<Ionicons name="lock-closed-outline" size={20} color={colors.textSecondary} />}
             secureTextEntry
             showToggle
+            value={password}
+            onChangeText={setPassword}
           />
 
           {/* Recordarme en este dispositivo */}
@@ -88,10 +117,11 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           <AppButton
-            label="Iniciar Sesión →"
+            label={isLoading ? "Iniciando..." : "Iniciar Sesión →"}
             color={colors.primary}
             style={{ marginBottom: 16 }}
-            onPress={() => navigation.navigate('MainTabs', { screen: 'Feed' })}
+            onPress={handleLogin}
+            disabled={isLoading}
           />
 
           <View style={shared.dividerRow}>
