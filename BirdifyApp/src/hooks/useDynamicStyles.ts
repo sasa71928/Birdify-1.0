@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { createSharedStyles } from '../styles/shared/shared.styles';
+import { Colors } from '../theme';
 
 export const useDynamicStyles = <T extends Record<string, any>>(createStyles?: (colors: any) => T) => {
   const theme = useTheme();

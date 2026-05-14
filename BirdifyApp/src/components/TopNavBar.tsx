@@ -92,7 +92,7 @@ export default function TopNavBar() {
           style={styles.profileButton}
           onPress={() => {
             if (!isProfile) {
-              navigation.navigate('Profile');
+              navigation.navigate('Profile', {});
             } else {
               navigation.navigate('Settings');
             }
