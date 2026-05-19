@@ -1,0 +1,96 @@
+import { supabase } from '../lib/supabase';
+
+export const FollowRepository = {
+  async isFollowing(followerId: string, followingId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('follows')
+      .select('*')
+      .eq('follower_id', followerId)
+      .eq('following_id', followingId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error in isFollowing:', error);
+      return false;
+    }
+    return !!data;
+  },
+
+  async follow(followerId: string, followingId: string): Promise<void> {
+    const { error } = await supabase
+      .from('follows')
+      .insert({ follower_id: followerId, following_id: followingId });
+
+    if (error) {
+      console.error('Error in follow:', error);
+      throw error;
+    }
+  },
+
+  async unfollow(followerId: string, followingId: string): Promise<void> {
+    const { error } = await supabase
+      .from('follows')
+      .delete()
+      .eq('follower_id', followerId)
+      .eq('following_id', followingId);
+
+    if (error) {
+      console.error('Error in unfollow:', error);
+      throw error;
+    }
+  },
+
+  async getFollowers(userId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('follows')
+      .select(`
+        follower:users!follows_follower_id_fkey (id, username, fullname, profile_pic_url)
+      `)
+      .eq('following_id', userId);
+
+    if (error) {
+      // Si la FK no se llama follows_follower_id_fkey, intentamos con la relación por columna
+      const { data: dataFallback, error: errorFallback } = await supabase
+        .from('follows')
+        .select(`
+          follower:users!follower_id (id, username, fullname, profile_pic_url)
+        `)
+        .eq('following_id', userId);
+
+      if (errorFallback) {
+        console.error('Error in getFollowers fallback:', errorFallback);
+        throw errorFallback;
+      }
+      return dataFallback?.map((item: any) => item.follower).filter(Boolean) || [];
+    }
+
+    return data?.map((item: any) => item.follower).filter(Boolean) || [];
+  },
+
+  async getFollowing(userId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('follows')
+      .select(`
+        following:users!follows_following_id_fkey (id, username, fullname, profile_pic_url)
+      `)
+      .eq('follower_id', userId);
+
+    if (error) {
+      // Si la FK no se llama follows_following_id_fkey, intentamos con la relación por columna
+      const { data: dataFallback, error: errorFallback } = await supabase
+        .from('follows')
+        .select(`
+          following:users!following_id (id, username, fullname, profile_pic_url)
+        `)
+        .eq('follower_id', userId);
+
+      if (errorFallback) {
+        console.error('Error in getFollowing fallback:', errorFallback);
+        throw errorFallback;
+      }
+      return dataFallback?.map((item: any) => item.following).filter(Boolean) || [];
+    }
+
+    return data?.map((item: any) => item.following).filter(Boolean) || [];
+  }
+};

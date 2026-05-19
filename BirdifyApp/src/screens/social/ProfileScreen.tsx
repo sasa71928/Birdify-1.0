@@ -26,27 +26,9 @@ import { useAuth } from '../../context/AuthContext';
 import { ProfileRepository } from '../../repositories/profile.repository';
 import { User } from '../../types/models';
 import { supabase } from '../../lib/supabase';
+import { FollowRepository } from '../../repositories/follow.repository';
 
 type ProfileRouteProp = RouteProp<RootStackParamList, 'Profile'>;
-
-// ── Datos de ejemplo ──────────────────────────────────────────────────────────
-const OTHER_USERS_MOCK: Record<string, any> = {
-  '1': { name: 'Carlos Mendez', username: 'carlos_m', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300', isPrivate: true, bio: 'Nature lover & bird photographer.', followers: '2.1k', following: '120', sightings: '0' },
-  '2': { name: 'Elena Rios', username: 'elena_bird', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=300', isPrivate: false, bio: 'Finding peace in the forest.', followers: '1.2k', following: '842', sightings: '82' },
-};
-
-const FOLLOWERS_MOCK = [
-  { id: '1', name: 'Carlos Mendez', username: 'carlos_m', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100', isFollowing: true },
-  { id: '2', name: 'Elena Rios',    username: 'elena_bird', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=100', isFollowing: false },
-  { id: '3', name: 'Mike Thompson', username: 'mike_th', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=100', isFollowing: true },
-  { id: '4', name: 'Sarah Jenkins', username: 'sarah_j', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=100', isFollowing: false },
-];
-
-const FOLLOWING_MOCK = [
-  { id: '1', name: 'David Park',    username: 'david_p', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=100', isFollowing: true },
-  { id: '2', name: 'Anna K.',       username: 'anna_k', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=100', isFollowing: true },
-  { id: '3', name: 'John Doe',      username: 'johndoe', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=100', isFollowing: true },
-];
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 type Tab = 'Sightings' | 'Logbook' | 'Likes';
@@ -63,12 +45,17 @@ export default function ProfileScreen() {
   const isFocused = useIsFocused();
 
   const [profile, setProfile] = useState<User | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState(isMe);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [sightings, setSightings] = useState<any[]>([]);
   const [likes, setLikes] = useState<any[]>([]);
   const [species, setSpecies] = useState<any[]>([]);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  const [isFollowingUser, setIsFollowingUser] = useState(false);
+
+  // States for dynamic followers/following list inside modal
+  const [modalUsersList, setModalUsersList] = useState<any[]>([]);
+  const [loadingModalUsers, setLoadingModalUsers] = useState(false);
 
   useEffect(() => {
     async function loadProfileAndActivity() {
@@ -160,6 +147,12 @@ export default function ProfileScreen() {
         setFollowersCount(fersCount || 0);
         setFollowingCount(fingCount || 0);
 
+        // 6. Verificar si el usuario actual sigue a este perfil
+        if (authUser && displayUserId && !isMe) {
+          const isFollowing = await FollowRepository.isFollowing(authUser.id, displayUserId);
+          setIsFollowingUser(isFollowing);
+        }
+
       } catch (error) {
         console.error('Error cargando perfil y actividad:', error);
       } finally {
@@ -169,7 +162,58 @@ export default function ProfileScreen() {
     if (isFocused) {
       loadProfileAndActivity();
     }
-  }, [displayUserId, isFocused]);
+  }, [displayUserId, isFocused, authUser, isMe]);
+
+  const handleFollowToggle = async () => {
+    if (!authUser || !displayUserId) return;
+    try {
+      if (isFollowingUser) {
+        await FollowRepository.unfollow(authUser.id, displayUserId);
+        setIsFollowingUser(false);
+        setFollowersCount(prev => Math.max(0, prev - 1));
+      } else {
+        await FollowRepository.follow(authUser.id, displayUserId);
+        setIsFollowingUser(true);
+        setFollowersCount(prev => prev + 1);
+      }
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+    }
+  };
+
+  const handleModalFollowToggle = async (targetUser: any) => {
+    if (!authUser) return;
+    try {
+      // Toggle localmente en la lista del modal
+      setModalUsersList(prev => prev.map(u => {
+        if (u.id === targetUser.id) {
+          return { ...u, isFollowing: !u.isFollowing };
+        }
+        return u;
+      }));
+
+      if (targetUser.isFollowing) {
+        await FollowRepository.unfollow(authUser.id, targetUser.id);
+        if (isMe && followModalType === 'Following') {
+          setFollowingCount(prev => Math.max(0, prev - 1));
+        }
+      } else {
+        await FollowRepository.follow(authUser.id, targetUser.id);
+        if (isMe && followModalType === 'Following') {
+          setFollowingCount(prev => prev + 1);
+        }
+      }
+    } catch (err) {
+      console.error('Error toggling follow in modal:', err);
+      // Revertir cambio local
+      setModalUsersList(prev => prev.map(u => {
+        if (u.id === targetUser.id) {
+          return { ...u, isFollowing: targetUser.isFollowing };
+        }
+        return u;
+      }));
+    }
+  };
 
   // Get user data
   const userData = profile ? {
@@ -182,7 +226,7 @@ export default function ProfileScreen() {
     following: followingCount.toString(),
     sightings: sightings.length.toString(),
     profession: profile.user_level === 'admin' ? 'Administrador' : 'Bird Watcher'
-  } : (isMe ? {
+  } : {
     name: 'Cargando...',
     username: '...',
     avatar: 'https://gravatar.com/avatar/?d=mp',
@@ -192,16 +236,58 @@ export default function ProfileScreen() {
     following: '0',
     sightings: '0',
     profession: '...'
-  } : (OTHER_USERS_MOCK[userId!] || OTHER_USERS_MOCK['1']));
+  };
 
   const [activeTab, setActiveTab] = useState<Tab>('Sightings');
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalType, setFollowModalType] = useState<'Followers' | 'Following'>('Followers');
 
-  const openFollowModal = (type: 'Followers' | 'Following') => {
+  const openFollowModal = async (type: 'Followers' | 'Following') => {
     setFollowModalType(type);
     setFollowModalVisible(true);
+    if (!displayUserId) return;
+    try {
+      setLoadingModalUsers(true);
+      setModalUsersList([]);
+      let list: any[] = [];
+      if (type === 'Followers') {
+        list = await FollowRepository.getFollowers(displayUserId);
+      } else {
+        list = await FollowRepository.getFollowing(displayUserId);
+      }
+      
+      const mappedList = await Promise.all(list.map(async (u) => {
+        let isFollowing = false;
+        if (authUser && u.id !== authUser.id) {
+          isFollowing = await FollowRepository.isFollowing(authUser.id, u.id);
+        }
+        return {
+          id: u.id,
+          name: u.fullname || u.username || 'Usuario',
+          username: u.username || 'user',
+          avatar: u.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
+          isFollowing
+        };
+      }));
+      setModalUsersList(mappedList);
+    } catch (err) {
+      console.error('Error loading modal users:', err);
+    } finally {
+      setLoadingModalUsers(false);
+    }
   };
+
+  if (loadingProfile && !profile) {
+    return (
+      <SafeAreaView style={shared.safe}>
+        <TopNavBar />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+        <BottomNavBar />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={shared.safe}>
@@ -265,10 +351,15 @@ export default function ProfileScreen() {
 
         {!isMe && (
           <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.followMainBtn}>
-              <Text style={styles.followMainBtnText}>Follow</Text>
+            <TouchableOpacity 
+              style={[styles.followMainBtn, isFollowingUser && { backgroundColor: colors.border + '30' }]}
+              onPress={handleFollowToggle}
+            >
+              <Text style={[styles.followMainBtnText, isFollowingUser && { color: colors.textSecondary }]}>
+                {isFollowingUser ? 'Following' : 'Follow'}
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.messageMainBtn} onPress={() => navigation.navigate('Chat', { thread: { id: userId, name: userData.name, avatar: userData.avatar, lastMessage: '', time: '' } })}>
+            <TouchableOpacity style={styles.messageMainBtn} onPress={() => navigation.navigate('Chat', { thread: { id: displayUserId!, name: userData.name, avatar: userData.avatar, lastMessage: '', time: '' } })}>
               <Ionicons name="chatbubble-outline" size={20} color={colors.primary} />
             </TouchableOpacity>
           </View>
@@ -276,6 +367,7 @@ export default function ProfileScreen() {
 
         <Text style={styles.bio}>{userData.bio}</Text>
       </View>
+
 
       {userData.isPrivate && !isMe ? (
         <View style={styles.privateContainer}>
@@ -329,37 +421,53 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
             
-            <FlatList
-              data={followModalType === 'Followers' ? FOLLOWERS_MOCK : FOLLOWING_MOCK}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingBottom: 20 }}
-              renderItem={({ item }) => (
-                <TouchableOpacity 
-                  style={styles.followItem}
-                  onPress={() => {
-                    setFollowModalVisible(false);
-                    navigation.navigate('Profile', { userId: item.id });
-                  }}
-                >
-                  <Image source={{ uri: item.avatar }} style={styles.followAvatar} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.followName}>{item.name}</Text>
-                    <Text style={styles.followUsername}>@{item.username}</Text>
+            {loadingModalUsers ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : (
+              <FlatList
+                data={modalUsersList}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={{ paddingBottom: 20 }}
+                ListEmptyComponent={
+                  <View style={{ padding: 40, alignItems: 'center' }}>
+                    <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
+                      No hay usuarios para mostrar.
+                    </Text>
                   </View>
+                }
+                renderItem={({ item }) => (
                   <TouchableOpacity 
-                    style={[styles.followBtn, item.isFollowing && styles.followingBtn]}
-                    onPress={(e) => {
-                      e.stopPropagation(); // Don't trigger the profile navigation
-                      // Handle follow toggle
+                    style={styles.followItem}
+                    onPress={() => {
+                      setFollowModalVisible(false);
+                      navigation.navigate('Profile', { userId: item.id });
                     }}
                   >
-                    <Text style={[styles.followBtnText, item.isFollowing && styles.followingBtnText]}>
-                      {item.isFollowing ? 'Following' : 'Follow'}
-                    </Text>
+                    <Image source={{ uri: item.avatar }} style={styles.followAvatar} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.followName}>{item.name}</Text>
+                      <Text style={styles.followUsername}>@{item.username}</Text>
+                    </View>
+                    
+                    {authUser && item.id !== authUser.id && (
+                      <TouchableOpacity 
+                        style={[styles.followBtn, item.isFollowing && styles.followingBtn]}
+                        onPress={(e) => {
+                          e.stopPropagation(); // Evitar navegación de perfil
+                          handleModalFollowToggle(item);
+                        }}
+                      >
+                        <Text style={[styles.followBtnText, item.isFollowing && styles.followingBtnText]}>
+                          {item.isFollowing ? 'Following' : 'Follow'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </TouchableOpacity>
-                </TouchableOpacity>
-              )}
-            />
+                )}
+              />
+            )}
           </View>
         </View>
       </Modal>

@@ -13,6 +13,7 @@ import { useDynamicStyles } from '../hooks/useDynamicStyles';
 
 export interface Comment {
   id: string;
+  userId?: string;
   username: string;
   text: string;
   replies?: Comment[];
@@ -20,6 +21,7 @@ export interface Comment {
 
 export interface Post {
   id: string;
+  userId?: string;
   username: string;
   userAvatar: string;
   location: string;
@@ -379,7 +381,7 @@ export default function FeedItem({ post }: FeedItemProps) {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.userInfo}
-          onPress={() => navigation.navigate('Profile', { userId: post.username === 'ElenaRios' ? '2' : '1' })}
+          onPress={() => navigation.navigate('Profile', { userId: post.userId })}
         >
           <Image source={{ uri: post.userAvatar }} style={styles.avatar} />
           <View style={styles.userText}>
@@ -540,7 +542,14 @@ export default function FeedItem({ post }: FeedItemProps) {
                 commentsList.slice(0, visibleCommentsCount).map((comment) => (
                   <View key={comment.id} style={styles.commentItem}>
                     <View style={styles.commentHeader}>
-                      <Text style={styles.commentUsername}>{comment.username}</Text>
+                      <TouchableOpacity onPress={() => {
+                        if (comment.userId) {
+                          setShowComments(false);
+                          navigation.navigate('Profile', { userId: comment.userId });
+                        }
+                      }}>
+                        <Text style={styles.commentUsername}>{comment.username}</Text>
+                      </TouchableOpacity>
                       <Text style={styles.commentText}>{comment.text}</Text>
                     </View>
                     
@@ -569,7 +578,14 @@ export default function FeedItem({ post }: FeedItemProps) {
                             {comment.replies.map((reply) => (
                               <View key={reply.id} style={{ marginBottom: Spacing.sm }}>
                                 <View style={styles.replyItem}>
-                                  <Text style={styles.commentUsername}>{reply.username}</Text>
+                                  <TouchableOpacity onPress={() => {
+                                    if (reply.userId) {
+                                      setShowComments(false);
+                                      navigation.navigate('Profile', { userId: reply.userId });
+                                    }
+                                  }}>
+                                    <Text style={styles.commentUsername}>{reply.username}</Text>
+                                  </TouchableOpacity>
                                   <Text style={styles.commentText}>{reply.text}</Text>
                                 </View>
                                 <TouchableOpacity 

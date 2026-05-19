@@ -52,12 +52,14 @@ export const CommentRepository = {
         .filter(sub => sub.parent_comment_id === main.id)
         .map(sub => ({
           id: sub.id,
+          userId: sub.user_id,
           username: sub.users?.username || 'Usuario',
           text: sub.content
         }));
 
       return {
         id: main.id,
+        userId: main.user_id,
         username: main.users?.username || 'Usuario',
         text: main.content,
         replies

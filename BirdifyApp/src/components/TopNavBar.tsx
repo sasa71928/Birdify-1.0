@@ -71,6 +71,10 @@ export default function TopNavBar() {
   const isProfile = route.name === 'Profile';
   const { user } = useAuth();
 
+  const routeParams = route.params as any;
+  const isOtherUserProfile = isProfile && routeParams?.userId && routeParams?.userId !== 'me' && routeParams?.userId !== user?.id;
+  const isMyProfile = isProfile && !isOtherUserProfile;
+
   const avatarUrl = user?.user_metadata?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp';
 
   return (
@@ -95,14 +99,14 @@ export default function TopNavBar() {
         <TouchableOpacity 
           style={styles.profileButton}
           onPress={() => {
-            if (!isProfile) {
-              navigation.navigate('Profile', {});
-            } else {
+            if (isMyProfile) {
               navigation.navigate('Settings');
+            } else {
+              navigation.navigate('Profile', { userId: 'me' });
             }
           }}
         >
-          {isProfile ? (
+          {isMyProfile ? (
             <Ionicons name="settings-outline" size={26} color={colors.primary} />
           ) : (
             <Image 

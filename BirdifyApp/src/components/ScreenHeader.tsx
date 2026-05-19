@@ -1,13 +1,6 @@
-/**
- * ScreenHeader — Header reutilizable con logo de Birdify y línea divisora
- *
- * Props:
- *  icon     — emoji/texto del logo (default: '🐦')
- *  title    — nombre de la app (default: 'Birdify')
- */
 import React from 'react';
 import { View, Text } from 'react-native';
-import shared from '../styles/shared/shared.styles';
+import { useDynamicStyles } from '../hooks/useDynamicStyles';
 
 type ScreenHeaderProps = {
   icon?: string;
@@ -18,6 +11,7 @@ export default function ScreenHeader({
   icon = '🐦',
   title = 'Birdify',
 }: ScreenHeaderProps) {
+  const { shared } = useDynamicStyles();
   return (
     <>
       <View style={shared.header}>

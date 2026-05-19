@@ -23,6 +23,7 @@ function mapSightingToPost(sighting: any, currentUserId?: string): Post {
 
   return {
     id: sighting.id,
+    userId: sighting.user_id,
     username: sighting.user?.username || 'Usuario',
     userAvatar: sighting.user?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
     location: sighting.is_location_private ? 'Ubicación Privada' : 'En la Naturaleza',

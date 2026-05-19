@@ -10,6 +10,7 @@ import {
   ScrollView,
   StatusBar,
   SectionList,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -21,6 +22,7 @@ import { RootStackParamList, BirdSpeciesData } from '../../navigation/AppNavigat
 import { createStyles } from '../../styles/screens/main/dictionaryScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useRoute, RouteProp } from '@react-navigation/native';
+import { BirdRepository } from '../../repositories/bird.repository';
 
 type DictionaryNavProp = NativeStackNavigationProp<RootStackParamList, 'Dictionary'>;
 
@@ -97,31 +99,81 @@ const FILTERS = ['All', 'A-Z', 'Season', 'Habitat', 'Family'];
 
 export default function DictionaryScreen() {
   const navigation = useNavigation<DictionaryNavProp>();
-  const { shared, screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const { shared } = useDynamicStyles(createStyles);
   const route = useRoute<RouteProp<RootStackParamList, 'Dictionary'>>();
   const [searchQuery, setSearchQuery] = React.useState('');
   const [activeFilter, setActiveFilter] = React.useState('All');
-  const [filteredBirds, setFilteredBirds] = React.useState(MOCK_BIRDS);
+  const [allBirds, setAllBirds] = React.useState<BirdSpeciesData[]>([]);
+  const [filteredBirds, setFilteredBirds] = React.useState<BirdSpeciesData[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  const loadBirds = async () => {
+    try {
+      setLoading(true);
+      const dbBirds = await BirdRepository.getAll();
+      const mapped = dbBirds.map(dbBird => {
+        const mockMatch = MOCK_BIRDS.find(
+          m => m.name.toLowerCase() === dbBird.common_name?.toLowerCase() ||
+               m.scientificName.toLowerCase() === dbBird.scientific_name?.toLowerCase()
+        );
+        return {
+          id: dbBird.id,
+          name: dbBird.common_name || 'Desconocido',
+          scientificName: dbBird.scientific_name || 'Desconocido',
+          image: mockMatch?.image || 'https://images.unsplash.com/photo-1444464666168-49d633b867ad?auto=format&fit=crop&q=80&w=600',
+          status: (dbBird.season && dbBird.season.toUpperCase() === 'MIGRATORIA') ? 'MIGRATORIA' as const : 'RESIDENTE' as const,
+          overview: dbBird.description || 'Sin descripción disponible en este momento.',
+          habitat: dbBird.habitat_info || 'Hábitat no especificado.',
+          conservationStatus: dbBird.ideal_zones || 'Estado de conservación no especificado.',
+          classification: mockMatch?.classification || {
+            kingdom: 'Animalia',
+            phylum: 'Chordata',
+            class: 'Aves',
+            order: 'Passeriformes',
+            family: 'Unknown',
+            genus: dbBird.scientific_name?.split(' ')[0] || 'Unknown'
+          }
+        };
+      });
+      setAllBirds(mapped);
+      setFilteredBirds(mapped);
+
+      // Si hay una búsqueda inicial desde la ruta, la aplicamos
+      if (route.params?.searchQuery) {
+        setSearchQuery(route.params.searchQuery);
+        applyFilterAndSearch(route.params.searchQuery, activeFilter, mapped);
+      }
+    } catch (error) {
+      console.error('Error al cargar aves:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   React.useEffect(() => {
-    if (route.params?.searchQuery) {
+    loadBirds();
+  }, []);
+
+  React.useEffect(() => {
+    if (route.params?.searchQuery && allBirds.length > 0) {
       setSearchQuery(route.params.searchQuery);
-      handleSearch(route.params.searchQuery);
+      applyFilterAndSearch(route.params.searchQuery, activeFilter, allBirds);
     }
-  }, [route.params?.searchQuery]);
+  }, [route.params?.searchQuery, allBirds]);
 
   const handleSearch = (text: string) => {
     setSearchQuery(text);
-    applyFilterAndSearch(text, activeFilter);
+    applyFilterAndSearch(text, activeFilter, allBirds);
   };
 
   const handleFilterSelect = (filter: string) => {
     setActiveFilter(filter);
-    applyFilterAndSearch(searchQuery, filter);
+    applyFilterAndSearch(searchQuery, filter, allBirds);
   };
 
-  const applyFilterAndSearch = (query: string, filter: string) => {
-    let result = [...MOCK_BIRDS];
+  const applyFilterAndSearch = (query: string, filter: string, sourceList = allBirds) => {
+    let result = [...sourceList];
 
     // Search query filter
     if (query) {
@@ -262,15 +314,21 @@ export default function DictionaryScreen() {
           </ScrollView>
         </View>
 
-        <SectionList
-          sections={getSections()}
-          renderItem={renderBird}
-          renderSectionHeader={renderSectionHeader}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          stickySectionHeadersEnabled={false}
-        />
+        {loading ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <SectionList
+            sections={getSections()}
+            renderItem={renderBird}
+            renderSectionHeader={renderSectionHeader}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            stickySectionHeadersEnabled={false}
+          />
+        )}
       </View>
     </SafeAreaView>
   );
