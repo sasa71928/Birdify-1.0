@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,8 @@ import {
   Modal,
   Animated,
   PanResponder,
-  ActivityIndicator
+  ActivityIndicator,
+  Dimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -105,27 +106,59 @@ export default function RecordSightingScreen() {
 
   // Selector de foto (Bottom Sheet Modal)
   const [modalVisible, setModalVisible] = useState(false);
-  const pan = useRef(new Animated.ValueXY()).current;
+  const screenHeight = Dimensions.get('window').height;
+  const panY = useRef(new Animated.Value(screenHeight)).current;
+
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 10,
-      onPanResponderGrant: () => {
-        pan.setOffset({ x: 0, y: (pan.y as any)._value || 0 });
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dy) > 5;
       },
-      onPanResponderMove: Animated.event([null, { dy: pan.y }], { useNativeDriver: false }),
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          panY.setValue(gestureState.dy);
+        }
+      },
       onPanResponderRelease: (_, gestureState) => {
-        pan.flattenOffset();
-        if (gestureState.dy > 100 || gestureState.vy > 0.5) {
-          Animated.timing(pan.y, { toValue: 600, duration: 250, useNativeDriver: true }).start(() => {
+        if (gestureState.dy > 150 || gestureState.vy > 0.5) {
+          Animated.timing(panY, {
+            toValue: screenHeight,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
             setModalVisible(false);
-            pan.setValue({ x: 0, y: 0 });
           });
         } else {
-          Animated.spring(pan.y, { toValue: 0, useNativeDriver: true }).start();
+          Animated.spring(panY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 8
+          }).start();
         }
       },
     })
   ).current;
+
+  const backdropOpacity = panY.interpolate({
+    inputRange: [0, screenHeight],
+    outputRange: [0.5, 0],
+    extrapolate: 'clamp',
+  });
+
+  useEffect(() => {
+    if (modalVisible) {
+      Animated.spring(panY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 8
+      }).start();
+    } else {
+      panY.setValue(screenHeight);
+    }
+  }, [modalVisible, screenHeight]);
 
   // Estilos del modal integrados con el tema
   const modalStyles = StyleSheet.create({
@@ -333,7 +366,7 @@ export default function RecordSightingScreen() {
           {/* Photo Upload Area */}
           <TouchableOpacity 
             style={[styles.photoContainer, { borderColor: imageUri ? colors.primary : colors.border + '40', borderWidth: imageUri ? 2 : 1 }]} 
-            onPress={() => setModalVisible(true)}
+            onPress={() => { setModalVisible(true); }}
           >
             {imageUri ? (
               <Image source={{ uri: imageUri }} style={styles.uploadedImage} />
@@ -531,14 +564,44 @@ export default function RecordSightingScreen() {
       <Modal
         visible={modalVisible}
         transparent
-        animationType="slide"
+        animationType="none"
         statusBarTranslucent
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => {
+          Animated.timing(panY, {
+            toValue: screenHeight,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
+            setModalVisible(false);
+          });
+        }}
       >
         <View style={modalStyles.modalOverlay}>
-          <TouchableOpacity style={modalStyles.dismissArea} activeOpacity={1} onPress={() => setModalVisible(false)} />
-          <Animated.View style={[modalStyles.sheetContainer, { transform: [{ translateY: pan.y }] }]} {...panResponder.panHandlers}>
-            <View style={modalStyles.dragIndicator} />
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: '#000', opacity: backdropOpacity }
+            ]}
+          >
+            <TouchableOpacity 
+              style={{ flex: 1 }} 
+              activeOpacity={1} 
+              onPress={() => {
+                Animated.timing(panY, {
+                  toValue: screenHeight,
+                  duration: 300,
+                  useNativeDriver: true,
+                }).start(() => {
+                  setModalVisible(false);
+                });
+              }} 
+            />
+          </Animated.View>
+          
+          <Animated.View style={[modalStyles.sheetContainer, { transform: [{ translateY: panY }] }]}>
+            <View {...panResponder.panHandlers} style={{ width: '100%', alignItems: 'center', paddingVertical: 15, marginTop: -10 }}>
+              <View style={modalStyles.dragIndicator} />
+            </View>
             <Text style={modalStyles.sheetTitle}>Añadir Foto</Text>
             <Text style={modalStyles.sheetSubtitle}>Selecciona de dónde quieres obtener la imagen:</Text>
 

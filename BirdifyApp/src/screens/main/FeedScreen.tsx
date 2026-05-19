@@ -8,32 +8,39 @@ import { createStyles } from '../../styles/screens/main/feedScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { SightingRepository } from '../../repositories/sighting.repository';
 import { Sighting } from '../../types/models';
+import { useAuth } from '../../context/AuthContext';
 
-function mapSightingToPost(sighting: Sighting): Post {
+function mapSightingToPost(sighting: any, currentUserId?: string): Post {
   const timeDiff = Date.now() - new Date(sighting.created_at).getTime();
   const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60));
   const timeAgoStr = hoursAgo < 24 
     ? (hoursAgo === 0 ? 'Hace un momento' : `Hace ${hoursAgo} hora${hoursAgo === 1 ? '' : 's'}`) 
     : `Hace ${Math.floor(hoursAgo/24)} día${Math.floor(hoursAgo/24) === 1 ? '' : 's'}`;
 
+  const reactionsList = sighting.reactions || [];
+  const likesCount = reactionsList.length;
+  const hasLiked = currentUserId ? reactionsList.some((r: any) => r.user_id === currentUserId) : false;
+
   return {
     id: sighting.id,
     username: sighting.user?.username || 'Usuario',
     userAvatar: sighting.user?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
-    location: sighting.is_location_private ? 'Ubicación Privada' : 'En la Naturaleza', // Idealmente usar Reverse-Geocoding en el futuro
+    location: sighting.is_location_private ? 'Ubicación Privada' : 'En la Naturaleza',
     image: sighting.photo_url || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=600',
     tag: sighting.bird?.common_name || 'Ave Sin Identificar',
-    likes: 0, // Pendiente de sistema de reacciones
-    comments: 0, // Pendiente de sistema de comentarios
+    likes: likesCount,
+    comments: sighting.comments ? sighting.comments.length : 0,
     caption: sighting.description || '',
     timeAgo: timeAgoStr,
     isVerified: sighting.user?.is_verified || false,
-    commentsList: [] // Pendiente de sistema de subcomentarios
+    commentsList: [],
+    hasLiked
   };
 }
 
 export default function FeedScreen() {
   const { shared, screen, isDark, colors } = useDynamicStyles(createStyles);
+  const { user } = useAuth();
   
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,7 +49,7 @@ export default function FeedScreen() {
   const loadFeed = async () => {
     try {
       const sightings = await SightingRepository.getFeed();
-      const mappedPosts = sightings.map(mapSightingToPost);
+      const mappedPosts = sightings.map(item => mapSightingToPost(item, user?.id));
       setPosts(mappedPosts);
     } catch (error) {
       console.error('Error cargando el feed:', error);

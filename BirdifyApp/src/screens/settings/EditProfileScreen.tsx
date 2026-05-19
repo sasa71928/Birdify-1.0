@@ -13,6 +13,7 @@ import {
   StyleSheet,
   Animated,
   PanResponder,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -75,42 +76,59 @@ export default function EditProfileScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
 
-  const pan = useRef(new Animated.ValueXY()).current;
+  const screenHeight = Dimensions.get('window').height;
+  const panY = useRef(new Animated.Value(screenHeight)).current;
 
   const panResponder = useRef(
     PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Solo responder si el usuario desliza hacia abajo (dy > 10)
-        return gestureState.dy > 10;
+        return Math.abs(gestureState.dy) > 5;
       },
-      onPanResponderGrant: () => {
-        pan.setOffset({ x: 0, y: (pan.y as any)._value || 0 });
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          panY.setValue(gestureState.dy);
+        }
       },
-      onPanResponderMove: Animated.event([null, { dy: pan.y }], {
-        useNativeDriver: false,
-      }),
       onPanResponderRelease: (_, gestureState) => {
-        pan.flattenOffset();
-        if (gestureState.dy > 100 || gestureState.vy > 0.5) {
-          // Deslizado exitosamente hacia abajo: cerrar con animación
-          Animated.timing(pan.y, {
-            toValue: 600,
-            duration: 250,
+        if (gestureState.dy > 150 || gestureState.vy > 0.5) {
+          Animated.timing(panY, {
+            toValue: screenHeight,
+            duration: 300,
             useNativeDriver: true,
           }).start(() => {
             setModalVisible(false);
-            pan.setValue({ x: 0, y: 0 }); // Restablecer posición
           });
         } else {
-          // Volver a la posición original
-          Animated.spring(pan.y, {
+          Animated.spring(panY, {
             toValue: 0,
             useNativeDriver: true,
+            tension: 50,
+            friction: 8
           }).start();
         }
       },
     })
   ).current;
+
+  const backdropOpacity = panY.interpolate({
+    inputRange: [0, screenHeight],
+    outputRange: [0.5, 0],
+    extrapolate: 'clamp',
+  });
+
+  useEffect(() => {
+    if (modalVisible) {
+      Animated.spring(panY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 8
+      }).start();
+    } else {
+      panY.setValue(screenHeight);
+    }
+  }, [modalVisible, screenHeight]);
 
   const handleSelectAvatarSource = () => {
     setModalVisible(true);
@@ -466,22 +484,47 @@ export default function EditProfileScreen() {
       <Modal
         visible={modalVisible}
         transparent
-        animationType="slide"
+        animationType="none"
         statusBarTranslucent
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => {
+          Animated.timing(panY, {
+            toValue: screenHeight,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
+            setModalVisible(false);
+          });
+        }}
       >
         <View style={modalStyles.modalOverlay}>
-          <TouchableOpacity 
-            style={modalStyles.dismissArea} 
-            activeOpacity={1} 
-            onPress={() => setModalVisible(false)} 
-          />
-          <Animated.View 
-            style={[modalStyles.sheetContainer, { transform: [{ translateY: pan.y }] }]}
-            {...panResponder.panHandlers}
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: '#000', opacity: backdropOpacity }
+            ]}
           >
-            {/* Indicador de barra de arrastre */}
-            <View style={modalStyles.dragIndicator} />
+            <TouchableOpacity 
+              style={{ flex: 1 }} 
+              activeOpacity={1} 
+              onPress={() => {
+                Animated.timing(panY, {
+                  toValue: screenHeight,
+                  duration: 300,
+                  useNativeDriver: true,
+                }).start(() => {
+                  setModalVisible(false);
+                });
+              }} 
+            />
+          </Animated.View>
+          
+          <Animated.View 
+            style={[modalStyles.sheetContainer, { transform: [{ translateY: panY }] }]}
+          >
+            {/* Indicador de barra de arrastre enfocado para capturar el toque */}
+            <View {...panResponder.panHandlers} style={{ width: '100%', alignItems: 'center', paddingVertical: 15, marginTop: -10 }}>
+              <View style={modalStyles.dragIndicator} />
+            </View>
             
             <Text style={modalStyles.sheetTitle}>Cambiar foto de perfil</Text>
             <Text style={modalStyles.sheetSubtitle}>Selecciona cómo quieres actualizar tu foto:</Text>

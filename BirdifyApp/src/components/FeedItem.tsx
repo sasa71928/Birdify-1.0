@@ -1,5 +1,8 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput, ScrollView, Modal, KeyboardAvoidingView, Platform, PanResponder, Animated, Dimensions, TouchableWithoutFeedback, Share } from 'react-native';
+import { useAuth } from '../context/AuthContext';
+import { ReactionRepository } from '../repositories/reaction.repository';
+import { CommentRepository } from '../repositories/comment.repository';
+import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput, ScrollView, Modal, KeyboardAvoidingView, Platform, PanResponder, Animated, Dimensions, TouchableWithoutFeedback, Share, Alert, ActivityIndicator, Keyboard } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -28,6 +31,7 @@ export interface Post {
   timeAgo: string;
   isVerified?: boolean;
   commentsList?: Comment[];
+  hasLiked?: boolean;
 }
 
 interface FeedItemProps {
@@ -40,12 +44,17 @@ const INITIAL_COMMENTS_DISPLAY = 5;
 export default function FeedItem({ post }: FeedItemProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const { user } = useAuth();
+  
   const [isCaptionExpanded, setIsCaptionExpanded] = React.useState(false);
   const [showComments, setShowComments] = React.useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = React.useState(false);
   const [visibleCommentsCount, setVisibleCommentsCount] = React.useState(INITIAL_COMMENTS_DISPLAY);
-  const [liked, setLiked] = React.useState(false);
+  const [liked, setLiked] = React.useState(post.hasLiked || false);
   const [likesCount, setLikesCount] = React.useState(post.likes);
+  const [commentsCount, setCommentsCount] = React.useState(post.comments);
+  const [commentsList, setCommentsList] = React.useState<Comment[]>([]);
+  const [loadingComments, setLoadingComments] = React.useState(false);
   const [showHeartAnimation, setShowHeartAnimation] = React.useState(false);
   const heartScale = React.useRef(new Animated.Value(0)).current;
   const heartOpacity = React.useRef(new Animated.Value(0)).current;
@@ -54,6 +63,42 @@ export default function FeedItem({ post }: FeedItemProps) {
   const [commentText, setCommentText] = React.useState('');
   const [replyingTo, setReplyingTo] = React.useState<{ id: string, username: string } | null>(null);
 
+  const loadComments = React.useCallback(async () => {
+    try {
+      setLoadingComments(true);
+      const data = await CommentRepository.getBySightingId(post.id);
+      setCommentsList(data);
+    } catch (error) {
+      console.error('Error cargando comentarios:', error);
+    } finally {
+      setLoadingComments(false);
+    }
+  }, [post.id]);
+
+  const [keyboardHeight, setKeyboardHeight] = React.useState(0);
+
+  React.useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const showSubscription = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (showComments) {
+      loadComments();
+    }
+  }, [showComments, loadComments]);
+
   const toggleCommentExpansion = (commentId: string) => {
     setExpandedComments(prev => ({
       ...prev,
@@ -61,20 +106,54 @@ export default function FeedItem({ post }: FeedItemProps) {
     }));
   };
 
-  const handleCommentSubmit = () => {
+  const handleCommentSubmit = async () => {
     if (!commentText.trim()) return;
-    console.log(replyingTo ? `Replying to ${replyingTo.username}:` : 'New comment:', commentText);
-    setCommentText('');
-    setReplyingTo(null);
+    if (!user) {
+      Alert.alert('Inicia Sesión', 'Debes iniciar sesión para comentar.');
+      return;
+    }
+
+    try {
+      const parentId = replyingTo ? replyingTo.id : null;
+      await CommentRepository.create(post.id, user.id, commentText.trim(), parentId);
+      
+      // Limpiar input y estado
+      setCommentText('');
+      setReplyingTo(null);
+
+      // Recargar comentarios
+      await loadComments();
+      
+      // Incrementar contador local
+      setCommentsCount(prev => prev + 1);
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo publicar tu comentario. Inténtalo de nuevo.');
+    }
   };
 
-  const handleLike = () => {
-    if (liked) {
-      setLikesCount(prev => prev - 1);
-    } else {
-      setLikesCount(prev => prev + 1);
+  const handleLike = async () => {
+    if (!user) {
+      Alert.alert('Inicia Sesión', 'Debes iniciar sesión para reaccionar a las publicaciones.');
+      return;
     }
-    setLiked(!liked);
+
+    const wasLiked = liked;
+    // Actualización de UI Optimista
+    setLiked(!wasLiked);
+    setLikesCount(prev => wasLiked ? prev - 1 : prev + 1);
+
+    try {
+      if (wasLiked) {
+        await ReactionRepository.unreact(post.id, user.id);
+      } else {
+        await ReactionRepository.react(post.id, user.id);
+      }
+    } catch (error) {
+      // Revertir si el servidor de Supabase arroja error
+      setLiked(wasLiked);
+      setLikesCount(prev => wasLiked ? prev + 1 : prev - 1);
+      Alert.alert('Reacción no registrada', 'Hubo un error de conexión con la base de datos.');
+    }
   };
 
   const triggerHeartAnimation = () => {
@@ -215,6 +294,68 @@ export default function FeedItem({ post }: FeedItemProps) {
     });
   };
 
+  // ----- Animación para el Options Menu -----
+  const optionsPanY = React.useRef(new Animated.Value(screenHeight)).current;
+
+  const optionsPanResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 5,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          optionsPanY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 150 || gestureState.vy > 0.5) {
+          Animated.timing(optionsPanY, {
+            toValue: screenHeight,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
+            setShowOptionsMenu(false);
+          });
+        } else {
+          Animated.spring(optionsPanY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 8
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  const optionsBackdropOpacity = optionsPanY.interpolate({
+    inputRange: [0, screenHeight],
+    outputRange: [0.5, 0],
+    extrapolate: 'clamp',
+  });
+
+  React.useEffect(() => {
+    if (showOptionsMenu) {
+      Animated.spring(optionsPanY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 8
+      }).start();
+    } else {
+      optionsPanY.setValue(screenHeight);
+    }
+  }, [showOptionsMenu, screenHeight]);
+
+  const resetOptionsModal = () => {
+    Animated.timing(optionsPanY, {
+      toValue: screenHeight,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowOptionsMenu(false);
+    });
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -295,7 +436,7 @@ export default function FeedItem({ post }: FeedItemProps) {
               color={Colors.textPrimary} 
             />
             <Text style={styles.actionText}>
-              {post.comments}
+              {commentsCount}
             </Text>
           </TouchableOpacity>
         </View>
@@ -349,6 +490,11 @@ export default function FeedItem({ post }: FeedItemProps) {
               { transform: [{ translateY: panY }] }
             ]}
           >
+            <KeyboardAvoidingView
+              style={{ flex: 1 }}
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+            >
             {/* Draggable Header */}
             <View {...panResponder.panHandlers} style={styles.modalDragArea}>
               <View style={styles.modalHandle} />
@@ -361,49 +507,63 @@ export default function FeedItem({ post }: FeedItemProps) {
               style={styles.modalScrollView} 
               showsVerticalScrollIndicator={false}
             >
-              {post.commentsList?.slice(0, visibleCommentsCount).map((comment) => (
-                <View key={comment.id} style={styles.commentItem}>
-                  <View style={styles.commentHeader}>
-                    <Text style={styles.commentUsername}>{comment.username}</Text>
-                    <Text style={styles.commentText}>{comment.text}</Text>
-                  </View>
-                  
-                  <TouchableOpacity 
-                    onPress={() => setReplyingTo({ id: comment.id, username: comment.username })}
-                    style={styles.replyButton}
-                  >
-                    <Text style={styles.replyButtonText}>Responder</Text>
-                  </TouchableOpacity>
-                  
-                  {comment.replies && comment.replies.length > 0 && (
-                    <View style={styles.repliesContainer}>
-                      <TouchableOpacity 
-                        onPress={() => toggleCommentExpansion(comment.id)}
-                        style={styles.viewRepliesButton}
-                      >
-                        <Text style={styles.viewRepliesText}>
-                          {expandedComments[comment.id] 
-                            ? 'Ocultar subcomentarios' 
-                            : `Ver ${comment.replies.length} subcomentarios`}
-                        </Text>
-                      </TouchableOpacity>
-                      
-                      {expandedComments[comment.id] && (
-                        <View style={styles.repliesList}>
-                          {comment.replies.map((reply) => (
-                            <View key={reply.id} style={styles.replyItem}>
-                              <Text style={styles.commentUsername}>{reply.username}</Text>
-                              <Text style={styles.commentText}>{reply.text}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-                    </View>
-                  )}
+              {loadingComments ? (
+                <View style={{ paddingVertical: 40, justifyContent: 'center', alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={{ marginTop: 10, color: Colors.textSecondary, fontSize: 13 }}>Cargando comentarios...</Text>
                 </View>
-              ))}
+              ) : commentsList.length === 0 ? (
+                <View style={{ paddingVertical: 40, justifyContent: 'center', alignItems: 'center' }}>
+                  <Ionicons name="chatbubbles-outline" size={32} color={colors.primary + '80'} />
+                  <Text style={{ marginTop: 10, color: Colors.textSecondary, fontSize: 14, textAlign: 'center' }}>
+                    Aún no hay comentarios.{"\n"}¡Sé el primero en compartir tu opinión!
+                  </Text>
+                </View>
+              ) : (
+                commentsList.slice(0, visibleCommentsCount).map((comment) => (
+                  <View key={comment.id} style={styles.commentItem}>
+                    <View style={styles.commentHeader}>
+                      <Text style={styles.commentUsername}>{comment.username}</Text>
+                      <Text style={styles.commentText}>{comment.text}</Text>
+                    </View>
+                    
+                    <TouchableOpacity 
+                      onPress={() => setReplyingTo({ id: comment.id, username: comment.username })}
+                      style={styles.replyButton}
+                    >
+                      <Text style={styles.replyButtonText}>Responder</Text>
+                    </TouchableOpacity>
+                    
+                    {comment.replies && comment.replies.length > 0 && (
+                      <View style={styles.repliesContainer}>
+                        <TouchableOpacity 
+                          onPress={() => toggleCommentExpansion(comment.id)}
+                          style={styles.viewRepliesButton}
+                        >
+                          <Text style={styles.viewRepliesText}>
+                            {expandedComments[comment.id] 
+                              ? 'Ocultar subcomentarios' 
+                              : `Ver ${comment.replies.length} subcomentarios`}
+                          </Text>
+                        </TouchableOpacity>
+                        
+                        {expandedComments[comment.id] && (
+                          <View style={styles.repliesList}>
+                            {comment.replies.map((reply) => (
+                              <View key={reply.id} style={styles.replyItem}>
+                                <Text style={styles.commentUsername}>{reply.username}</Text>
+                                <Text style={styles.commentText}>{reply.text}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                ))
+              )}
 
-              {post.commentsList && post.commentsList.length > visibleCommentsCount && (
+              {!loadingComments && commentsList.length > visibleCommentsCount && (
                 <TouchableOpacity 
                   style={styles.loadMoreButton}
                   onPress={() => setVisibleCommentsCount(prev => prev + 5)}
@@ -414,40 +574,39 @@ export default function FeedItem({ post }: FeedItemProps) {
             </ScrollView>
 
             {/* Input Area */}
-            <KeyboardAvoidingView 
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-            >
-              <View style={styles.modalInputContainer}>
-                {replyingTo && (
-                  <View style={styles.replyingToBadge}>
-                    <Text style={styles.replyingToText}>Respondiendo a @{replyingTo.username}</Text>
-                    <TouchableOpacity onPress={() => setReplyingTo(null)}>
-                      <Ionicons name="close-circle" size={16} color={Colors.textSecondary} />
-                    </TouchableOpacity>
-                  </View>
-                )}
-                <View style={styles.inputRow}>
-                  <TextInput
-                    style={styles.commentInput}
-                    placeholder={replyingTo ? "Escribe una respuesta..." : "Añade un comentario..."}
-                    value={commentText}
-                    onChangeText={setCommentText}
-                    multiline
-                  />
-                  <TouchableOpacity 
-                    style={[styles.sendButton, !commentText.trim() && styles.sendButtonDisabled]}
-                    onPress={handleCommentSubmit}
-                    disabled={!commentText.trim()}
-                  >
-                    <Ionicons 
-                      name="send" 
-                      size={20} 
-                      color={commentText.trim() ? Colors.primary : Colors.textSecondary} 
-                    />
+            <View style={[
+              styles.modalInputContainer,
+              Platform.OS === 'android' && keyboardHeight > 0 && { paddingBottom: keyboardHeight }
+            ]}>
+              {replyingTo && (
+                <View style={styles.replyingToBadge}>
+                  <Text style={styles.replyingToText}>Respondiendo a @{replyingTo.username}</Text>
+                  <TouchableOpacity onPress={() => setReplyingTo(null)}>
+                    <Ionicons name="close-circle" size={16} color={Colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
+              )}
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.commentInput}
+                  placeholder={replyingTo ? "Escribe una respuesta..." : "Añade un comentario..."}
+                  value={commentText}
+                  onChangeText={setCommentText}
+                  multiline
+                />
+                <TouchableOpacity 
+                  style={[styles.sendButton, !commentText.trim() && styles.sendButtonDisabled]}
+                  onPress={handleCommentSubmit}
+                  disabled={!commentText.trim()}
+                >
+                  <Ionicons 
+                    name="send" 
+                    size={20} 
+                    color={commentText.trim() ? Colors.primary : Colors.textSecondary} 
+                  />
+                </TouchableOpacity>
               </View>
+            </View>
             </KeyboardAvoidingView>
           </Animated.View>
         </View>
@@ -456,43 +615,60 @@ export default function FeedItem({ post }: FeedItemProps) {
       {/* Options Menu Modal */}
       <Modal
         visible={showOptionsMenu}
-        animationType="fade"
+        animationType="none"
         transparent={true}
         statusBarTranslucent={true}
-        onRequestClose={() => setShowOptionsMenu(false)}
+        onRequestClose={resetOptionsModal}
       >
-        <TouchableWithoutFeedback onPress={() => setShowOptionsMenu(false)}>
-          <View style={styles.optionsOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.optionsContent}>
-                <View style={styles.modalHandle} />
-                <View style={styles.optionsList}>
-                  <TouchableOpacity style={styles.optionItem}>
-                    <Ionicons name="bookmark-outline" size={22} color={Colors.textPrimary} />
-                    <Text style={styles.optionText}>Guardar publicación</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity style={styles.optionItem}>
-                    <Ionicons name="link-outline" size={22} color={Colors.textPrimary} />
-                    <Text style={styles.optionText}>Copiar enlace</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity style={styles.optionItem}>
-                    <Ionicons name="eye-off-outline" size={22} color={Colors.textPrimary} />
-                    <Text style={styles.optionText}>No me interesa</Text>
-                  </TouchableOpacity>
-                  
-                  <View style={styles.optionDivider} />
-                  
-                  <TouchableOpacity style={styles.optionItem}>
-                    <Ionicons name="alert-circle-outline" size={22} color="#FF5252" />
-                    <Text style={[styles.optionText, { color: '#FF5252' }]}>Reportar</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
+        <View style={styles.optionsOverlay}>
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: '#000', opacity: optionsBackdropOpacity }
+            ]}
+          >
+            <TouchableOpacity 
+              style={{ flex: 1 }} 
+              activeOpacity={1} 
+              onPress={resetOptionsModal} 
+            />
+          </Animated.View>
+          
+          <Animated.View 
+            style={[
+              styles.optionsContent, 
+              { transform: [{ translateY: optionsPanY }] }
+            ]}
+          >
+            <View {...optionsPanResponder.panHandlers} style={{ width: '100%', alignItems: 'center', paddingVertical: 10 }}>
+              <View style={styles.modalHandle} />
+            </View>
+            
+            <View style={styles.optionsList}>
+              <TouchableOpacity style={styles.optionItem}>
+                <Ionicons name="bookmark-outline" size={22} color={Colors.textPrimary} />
+                <Text style={styles.optionText}>Guardar publicación</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.optionItem}>
+                <Ionicons name="link-outline" size={22} color={Colors.textPrimary} />
+                <Text style={styles.optionText}>Copiar enlace</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.optionItem}>
+                <Ionicons name="eye-off-outline" size={22} color={Colors.textPrimary} />
+                <Text style={styles.optionText}>No me interesa</Text>
+              </TouchableOpacity>
+              
+              <View style={styles.optionDivider} />
+              
+              <TouchableOpacity style={styles.optionItem}>
+                <Ionicons name="alert-circle-outline" size={22} color="#FF5252" />
+                <Text style={[styles.optionText, { color: '#FF5252' }]}>Reportar</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
       </Modal>
     </View>
   );

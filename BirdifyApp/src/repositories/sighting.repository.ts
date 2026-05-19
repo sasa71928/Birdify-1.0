@@ -13,13 +13,15 @@ export const SightingRepository = {
     return data;
   },
 
-  async getFeed(): Promise<Sighting[]> {
+  async getFeed(): Promise<any[]> {
     const { data, error } = await supabase
       .from('sightings')
       .select(`
         *,
         users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
-        birds (id, common_name, scientific_name)
+        birds (id, common_name, scientific_name),
+        reactions (user_id),
+        comments (id)
       `)
       .order('created_at', { ascending: false });
 
@@ -32,19 +34,23 @@ export const SightingRepository = {
     const formattedData = data?.map(item => ({
       ...item,
       user: item.users,
-      bird: item.birds
+      bird: item.birds,
+      reactions: item.reactions || [],
+      comments: item.comments || []
     }));
 
-    return (formattedData || []) as Sighting[];
+    return formattedData || [];
   },
 
-  async getByUserId(userId: string): Promise<Sighting[]> {
+  async getByUserId(userId: string): Promise<any[]> {
     const { data, error } = await supabase
       .from('sightings')
       .select(`
         *,
         users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
-        birds (id, common_name, scientific_name)
+        birds (id, common_name, scientific_name),
+        reactions (user_id),
+        comments (id)
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
@@ -57,9 +63,11 @@ export const SightingRepository = {
     const formattedData = data?.map(item => ({
       ...item,
       user: item.users,
-      bird: item.birds
+      bird: item.birds,
+      reactions: item.reactions || [],
+      comments: item.comments || []
     }));
 
-    return (formattedData || []) as Sighting[];
+    return formattedData || [];
   }
 };
