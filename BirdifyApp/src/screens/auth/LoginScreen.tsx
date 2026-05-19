@@ -39,7 +39,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Faltan datos', 'Por favor ingresa tu correo y contraseña.');
+      Alert.alert('Faltan datos', 'Por favor ingresa tu usuario o correo y contraseña.');
       return;
     }
     
@@ -85,7 +85,7 @@ export default function LoginScreen() {
         <View style={shared.card}>
           <InputField
             label="Usuario o Correo"
-            placeholder="nombre@ejemplo.com"
+            placeholder="Usuario o correo electrónico"
             iconSymbol={<Ionicons name="person-outline" size={20} color={colors.textSecondary} />}
             keyboardType="email-address"
             value={email}

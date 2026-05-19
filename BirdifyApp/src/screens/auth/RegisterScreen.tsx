@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,8 @@ import {
   StatusBar,
   TouchableOpacity,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -29,19 +30,49 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 type RegisterNavProp = NativeStackNavigationProp<RootStackParamList, 'Register'>;
 
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
-
-// Cuando exista el asset real, descomenta y pasa al prop imageSource:
-// const birdAsset = require('../../assets/icon.png');
+import { AuthService } from '../../services/auth.service';
 
 export default function RegisterScreen() {
   const navigation = useNavigation<RegisterNavProp>();
   const shared = createSharedStyles(Colors);
 
+  const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleRegister = async () => {
+    if (!fullName.trim() || !username.trim() || !email.trim() || !password || !confirmPassword) {
+      Alert.alert('Faltan datos', 'Por favor ingresa todos los campos.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Contraseñas no coinciden', 'La contraseña y su confirmación deben ser idénticas.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await AuthService.signUp(email, password, username, fullName);
+      Alert.alert(
+        '¡Registro exitoso!', 
+        'Tu cuenta ha sido creada. Verifica tu correo electrónico si es requerido.'
+      );
+      // No necesitamos hacer navigation.navigate aquí porque el AuthProvider 
+      // detectará el cambio de sesión automáticamente y cambiará a las pantallas principales.
+    } catch (error: any) {
+      Alert.alert('Error al registrarse', error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={shared.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
-
-      {/*<ScreenHeader />*/}
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -67,17 +98,23 @@ export default function RegisterScreen() {
               label="Nombre completo"
               placeholder="Tu nombre"
               iconSymbol={<Ionicons name="person-outline" size={20} color={Colors.textSecondary} />}
+              value={fullName}
+              onChangeText={setFullName}
             />
             <InputField
               label="Nombre de usuario"
               placeholder="birdwatcher_99"
               iconSymbol={<Ionicons name="at-outline" size={20} color={Colors.textSecondary} />}
+              value={username}
+              onChangeText={setUsername}
             />
             <InputField
               label="Correo electrónico"
               placeholder="ejemplo@birdify.com"
               iconSymbol={<Ionicons name="mail-outline" size={20} color={Colors.textSecondary} />}
               keyboardType="email-address"
+              value={email}
+              onChangeText={setEmail}
             />
             <InputField
               label="Contraseña"
@@ -85,6 +122,8 @@ export default function RegisterScreen() {
               iconSymbol={<Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} />}
               secureTextEntry
               showToggle
+              value={password}
+              onChangeText={setPassword}
             />
 
             <InputField
@@ -93,13 +132,16 @@ export default function RegisterScreen() {
               iconSymbol={<Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} />}
               secureTextEntry
               showToggle
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
             />
 
             <AppButton
-              label="Crear Cuenta"
+              label={isLoading ? "Registrando..." : "Crear Cuenta"}
               color={Colors.primary}
               style={{ marginTop: 8, marginBottom: 16 }}
-              onPress={() => navigation.navigate('MainTabs', { screen: 'Feed' })}
+              onPress={handleRegister}
+              disabled={isLoading}
             />
 
             <View style={shared.dividerRow}>
@@ -125,7 +167,7 @@ export default function RegisterScreen() {
             <Text style={shared.navArrow}>→</Text>
           </TouchableOpacity>
         </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

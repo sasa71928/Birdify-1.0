@@ -1,21 +1,24 @@
 import { supabase } from '../lib/supabase';
-import { UserProfile, UpdateProfileDTO } from '../types/models';
+import { User, UpdateProfileDTO } from '../types/models';
 
 export const ProfileRepository = {
-  async getById(userId: string): Promise<UserProfile | null> {
+  async getById(userId: string): Promise<User | null> {
     const { data, error } = await supabase
-      .from('profiles')
+      .from('users')
       .select('*')
       .eq('id', userId)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST116') return null; // No encontrado
+      throw error;
+    }
     return data;
   },
 
-  async update(userId: string, payload: UpdateProfileDTO): Promise<UserProfile> {
+  async update(userId: string, payload: UpdateProfileDTO): Promise<User> {
     const { data, error } = await supabase
-      .from('profiles')
+      .from('users')
       .update(payload)
       .eq('id', userId)
       .select()

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,10 @@ import {
   StatusBar,
   FlatList,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { Typography, Spacing, Radius, Shadows } from '../../theme';
@@ -21,6 +22,10 @@ import TopNavBar from '../../components/TopNavBar';
 import BottomNavBar from '../../components/BottomNavBar';
 import { createStyles } from '../../styles/screens/social/profileScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { useAuth } from '../../context/AuthContext';
+import { ProfileRepository } from '../../repositories/profile.repository';
+import { User } from '../../types/models';
+import { supabase } from '../../lib/supabase';
 
 type ProfileRouteProp = RouteProp<RootStackParamList, 'Profile'>;
 
@@ -29,31 +34,6 @@ const OTHER_USERS_MOCK: Record<string, any> = {
   '1': { name: 'Carlos Mendez', username: 'carlos_m', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=300', isPrivate: true, bio: 'Nature lover & bird photographer.', followers: '2.1k', following: '120', sightings: '0' },
   '2': { name: 'Elena Rios', username: 'elena_bird', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=300', isPrivate: false, bio: 'Finding peace in the forest.', followers: '1.2k', following: '842', sightings: '82' },
 };
-
-const SIGHTING_PHOTOS = [
-  { uri: 'https://images.unsplash.com/photo-1555169062-013468b47731?auto=format&fit=crop&q=80&w=300', location: 'La Paz' },
-  { uri: 'https://images.unsplash.com/photo-1520638029751-c947dd098db5?auto=format&fit=crop&q=80&w=300', location: 'Ensenada' },
-  { uri: 'https://images.unsplash.com/photo-1444464666168-49d633b867ad?auto=format&fit=crop&q=80&w=300', location: 'CDMX' },
-  { uri: 'https://images.unsplash.com/photo-1550853024-fae8cd4be47f?auto=format&fit=crop&q=80&w=300', location: 'Oaxaca' },
-  { uri: 'https://images.unsplash.com/photo-1612170153139-6f881ff0675c?auto=format&fit=crop&q=80&w=300', location: 'Mérida' },
-  { uri: 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?auto=format&fit=crop&q=80&w=300', location: 'Loreto' },
-];
-
-const LOGBOOK_ENTRIES = [
-  { id: '1', name: 'Northern Cardinal', scientificName: 'Cardinalis cardinalis', image: 'https://images.unsplash.com/photo-1555169062-013468b47731?auto=format&fit=crop&q=80&w=200', count: 12, date: 'Apr 28, 2024', rare: false },
-  { id: '2', name: 'Blue Jay',          scientificName: 'Cyanocitta cristata',     image: 'https://images.unsplash.com/photo-1520638029751-c947dd098db5?auto=format&fit=crop&q=80&w=200', count: 8,  date: 'Apr 20, 2024', rare: false },
-  { id: '3', name: 'Bald Eagle',        scientificName: 'Haliaeetus leucocephalus', image: 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?auto=format&fit=crop&q=80&w=200', count: 2,  date: 'Mar 15, 2024', rare: true },
-  { id: '4', name: 'Ruby-throated Hummingbird', scientificName: 'Archilochus colubris', image: 'https://images.unsplash.com/photo-1550853024-fae8cd4be47f?auto=format&fit=crop&q=80&w=200', count: 5, date: 'Mar 02, 2024', rare: false },
-  { id: '5', name: 'American Robin',    scientificName: 'Turdus migratorius',      image: 'https://images.unsplash.com/photo-1444464666168-49d633b867ad?auto=format&fit=crop&q=80&w=200', count: 21, date: 'Feb 14, 2024', rare: false },
-  { id: '6', name: 'Mourning Dove',     scientificName: 'Zenaida macroura',        image: 'https://images.unsplash.com/photo-1612170153139-6f881ff0675c?auto=format&fit=crop&q=80&w=200', count: 34, date: 'Jan 30, 2024', rare: false },
-];
-
-const LIKED_POSTS = [
-  { id: '1', user: 'ElenaRios',    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=100', image: 'https://images.unsplash.com/photo-1555169062-013468b47731?auto=format&fit=crop&q=80&w=300', bird: 'Northern Cardinal', likes: 245 },
-  { id: '2', user: 'CarlosMendez', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100', image: 'https://images.unsplash.com/photo-1520638029751-c947dd098db5?auto=format&fit=crop&q=80&w=300', bird: 'Blue Jay',           likes: 89 },
-  { id: '3', user: 'MikeTh',       avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=100', image: 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?auto=format&fit=crop&q=80&w=300', bird: 'Bald Eagle',        likes: 312 },
-  { id: '4', user: 'SarahJ',       avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=100', image: 'https://images.unsplash.com/photo-1550853024-fae8cd4be47f?auto=format&fit=crop&q=80&w=300', bird: 'Hummingbird',       likes: 178 },
-];
 
 const FOLLOWERS_MOCK = [
   { id: '1', name: 'Carlos Mendez', username: 'carlos_m', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100', isFollowing: true },
@@ -75,21 +55,144 @@ export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<ProfileRouteProp>();
   const { shared, screen: styles, colors, isDark } = useDynamicStyles(createStyles);
-  const userId = route.params?.userId;
-  const isMe = !userId || userId === 'me';
   
+  const { user: authUser } = useAuth();
+  const userId = route.params?.userId;
+  const isMe = !userId || userId === 'me' || userId === authUser?.id;
+  const displayUserId = isMe ? authUser?.id : userId;
+  const isFocused = useIsFocused();
+
+  const [profile, setProfile] = useState<User | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(isMe);
+  const [sightings, setSightings] = useState<any[]>([]);
+  const [likes, setLikes] = useState<any[]>([]);
+  const [species, setSpecies] = useState<any[]>([]);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+
+  useEffect(() => {
+    async function loadProfileAndActivity() {
+      if (!displayUserId) return;
+      try {
+        setLoadingProfile(true);
+        
+        // 1. Cargar Perfil
+        const data = await ProfileRepository.getById(displayUserId);
+        if (data) {
+          setProfile(data);
+        }
+
+        // 2. Cargar Avistamientos Reales
+        const { data: sightingsData, error: sightingsError } = await supabase
+          .from('sightings')
+          .select(`
+            id,
+            description,
+            photo_url,
+            sighting_date,
+            is_location_private,
+            bird:birds (id, common_name, scientific_name)
+          `)
+          .eq('user_id', displayUserId)
+          .order('created_at', { ascending: false });
+
+        if (sightingsError) throw sightingsError;
+        setSightings(sightingsData || []);
+
+        // 3. Procesar Especies (Logbook) a partir de los avistamientos reales
+        const speciesMap = new Map<string, any>();
+        (sightingsData || []).forEach((item: any) => {
+          if (item.bird) {
+            const birdId = item.bird.id;
+            const existing = speciesMap.get(birdId);
+            if (existing) {
+              existing.count += 1;
+            } else {
+              speciesMap.set(birdId, {
+                id: birdId,
+                name: item.bird.common_name,
+                scientificName: item.bird.scientific_name,
+                image: item.photo_url || 'https://images.unsplash.com/photo-1444464666168-49d633b867ad?auto=format&fit=crop&q=80&w=200',
+                count: 1,
+                date: new Date(item.sighting_date).toLocaleDateString(),
+                rare: false
+              });
+            }
+          }
+        });
+        setSpecies(Array.from(speciesMap.values()));
+
+        // 4. Cargar Likes (Reacciones)
+        const { data: reactionsData, error: reactionsError } = await supabase
+          .from('reactions')
+          .select(`
+            sighting:sightings (
+              id,
+              photo_url,
+              user:users!sightings_user_id_fkey (username)
+            )
+          `)
+          .eq('user_id', displayUserId);
+
+        if (reactionsError) throw reactionsError;
+        
+        const mappedLikes = (reactionsData || [])
+          .filter((r: any) => r.sighting)
+          .map((r: any) => ({
+            id: r.sighting.id,
+            image: r.sighting.photo_url,
+            user: r.sighting.user?.username || 'user',
+            likes: 1
+          }));
+        setLikes(mappedLikes);
+
+        // 5. Cargar Seguidores/Seguidos
+        const { count: fersCount } = await supabase
+          .from('follows')
+          .select('*', { count: 'exact', head: true })
+          .eq('following_id', displayUserId);
+
+        const { count: fingCount } = await supabase
+          .from('follows')
+          .select('*', { count: 'exact', head: true })
+          .eq('follower_id', displayUserId);
+
+        setFollowersCount(fersCount || 0);
+        setFollowingCount(fingCount || 0);
+
+      } catch (error) {
+        console.error('Error cargando perfil y actividad:', error);
+      } finally {
+        setLoadingProfile(false);
+      }
+    }
+    if (isFocused) {
+      loadProfileAndActivity();
+    }
+  }, [displayUserId, isFocused]);
+
   // Get user data
-  const userData = isMe ? {
-    name: 'Ana Ruiz',
-    username: 'anaruiz_bird',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=300',
-    bio: 'Passionate ornithologist exploring the Baja peninsula. Focused on coastal species and conservation. 🌿📸',
+  const userData = profile ? {
+    name: profile.fullname ||  'Usuario',
+    username: profile.username || 'user',
+    avatar: profile.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
+    bio: profile.bio || 'Sin biografía.',
+    isPrivate: profile.is_private,
+    followers: followersCount.toString(),
+    following: followingCount.toString(),
+    sightings: sightings.length.toString(),
+    profession: profile.user_level === 'admin' ? 'Administrador' : 'Bird Watcher'
+  } : (isMe ? {
+    name: 'Cargando...',
+    username: '...',
+    avatar: 'https://gravatar.com/avatar/?d=mp',
+    bio: '',
     isPrivate: false,
-    followers: '1.2k',
-    following: '842',
-    sightings: '82',
-    profession: 'Professional Birder'
-  } : (OTHER_USERS_MOCK[userId] || OTHER_USERS_MOCK['1']);
+    followers: '0',
+    following: '0',
+    sightings: '0',
+    profession: '...'
+  } : (OTHER_USERS_MOCK[userId!] || OTHER_USERS_MOCK['1']));
 
   const [activeTab, setActiveTab] = useState<Tab>('Sightings');
   const [followModalVisible, setFollowModalVisible] = useState(false);
@@ -131,6 +234,8 @@ export default function ProfileScreen() {
           )}
         </View>
 
+        <Text style={styles.usernameText}>@{userData.username}</Text>
+
         <View style={styles.professionBadge}>
           <MaterialCommunityIcons name="leaf" size={14} color={colors.primary} />
           <Text style={styles.professionText}>{userData.profession || 'Bird Watcher'}</Text>
@@ -148,12 +253,12 @@ export default function ProfileScreen() {
           </TouchableOpacity>
           <View style={styles.statDivider} />
           <TouchableOpacity style={styles.statItem} onPress={() => !userData.isPrivate && setActiveTab('Logbook')}>
-            <Text style={styles.statValue}>{isMe ? LOGBOOK_ENTRIES.length : '0'}</Text>
+            <Text style={styles.statValue}>{species.length}</Text>
             <Text style={styles.statLabel}>Species</Text>
           </TouchableOpacity>
           <View style={styles.statDivider} />
           <TouchableOpacity style={styles.statItem} onPress={() => !userData.isPrivate && setActiveTab('Sightings')}>
-            <Text style={styles.statValue}>{userData.sightings}</Text>
+            <Text style={styles.statValue}>{sightings.length}</Text>
             <Text style={styles.statLabel}>Sightings</Text>
           </TouchableOpacity>
         </View>
@@ -201,9 +306,9 @@ export default function ProfileScreen() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {activeTab === 'Sightings' && <SightingsGrid />}
-            {activeTab === 'Logbook'   && <LogbookView />}
-            {activeTab === 'Likes'     && <LikesView />}
+            {activeTab === 'Sightings' && <SightingsGrid sightings={sightings} />}
+            {activeTab === 'Logbook'   && <LogbookView species={species} />}
+            {activeTab === 'Likes'     && <LikesView likes={likes} />}
           </ScrollView>
         </>
       )}
@@ -265,13 +370,25 @@ export default function ProfileScreen() {
 }
 
 // ── Sightings grid ────────────────────────────────────────────────────────────
-function SightingsGrid() {
+function SightingsGrid({ sightings }: { sightings: any[] }) {
   const { screen: styles, colors } = useDynamicStyles(createStyles);
+  
+  if (sightings.length === 0) {
+    return (
+      <View style={{ padding: 40, alignItems: 'center' }}>
+        <Ionicons name="camera-outline" size={48} color={colors.textSecondary} style={{ marginBottom: 12 }} />
+        <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', fontFamily: 'PlusJakartaSans-Medium' }}>
+          No has publicado ningún avistamiento aún.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.grid}>
-      {SIGHTING_PHOTOS.map((item, i) => (
-        <TouchableOpacity key={i} style={styles.gridItem} activeOpacity={0.85}>
-          <Image source={{ uri: item.uri }} style={styles.gridImage} />
+      {sightings.map((item) => (
+        <TouchableOpacity key={item.id} style={styles.gridItem} activeOpacity={0.85}>
+          <Image source={{ uri: item.photo_url || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300' }} style={styles.gridImage} />
           <View style={styles.locationBadge}>
             <Ionicons name="location" size={11} color={colors.white} />
           </View>
@@ -282,11 +399,22 @@ function SightingsGrid() {
 }
 
 // ── Logbook ───────────────────────────────────────────────────────────────────
-function LogbookView() {
+function LogbookView({ species }: { species: any[] }) {
   const { screen: styles, colors } = useDynamicStyles(createStyles);
-  const totalSpecies = LOGBOOK_ENTRIES.length;
-  const rareCount    = LOGBOOK_ENTRIES.filter((e) => e.rare).length;
-  const totalSightings = LOGBOOK_ENTRIES.reduce((sum, e) => sum + e.count, 0);
+  const totalSpecies = species.length;
+  const rareCount    = species.filter((e) => e.rare).length;
+  const totalSightings = species.reduce((sum, e) => sum + e.count, 0);
+
+  if (species.length === 0) {
+    return (
+      <View style={{ padding: 40, alignItems: 'center' }}>
+        <MaterialCommunityIcons name="bird" size={48} color={colors.textSecondary} style={{ marginBottom: 12 }} />
+        <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', fontFamily: 'PlusJakartaSans-Medium' }}>
+          No has catalogado ninguna especie aún.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.logbookContainer}>
@@ -296,26 +424,26 @@ function LogbookView() {
         <View style={styles.logbookStat}>
           <MaterialCommunityIcons name="bird" size={22} color={colors.primary} />
           <Text style={styles.logbookStatValue}>{totalSpecies}</Text>
-          <Text style={styles.logbookStatLabel}>Species</Text>
+          <Text style={styles.logbookStatLabel}>Especies</Text>
         </View>
         <View style={styles.logbookStatDivider} />
         <View style={styles.logbookStat}>
           <MaterialCommunityIcons name="star-outline" size={22} color={colors.tertiaryBrown} />
           <Text style={styles.logbookStatValue}>{rareCount}</Text>
-          <Text style={styles.logbookStatLabel}>Rare</Text>
+          <Text style={styles.logbookStatLabel}>Raras</Text>
         </View>
         <View style={styles.logbookStatDivider} />
         <View style={styles.logbookStat}>
           <Ionicons name="eye-outline" size={22} color={colors.secondaryBlue} />
           <Text style={styles.logbookStatValue}>{totalSightings}</Text>
-          <Text style={styles.logbookStatLabel}>Sightings</Text>
+          <Text style={styles.logbookStatLabel}>Avistamientos</Text>
         </View>
       </View>
 
       {/* Bird stamps */}
-      <Text style={styles.logbookSectionTitle}>Bird Stamps</Text>
+      <Text style={styles.logbookSectionTitle}>Estampas de Aves</Text>
       <View style={styles.stampsGrid}>
-        {LOGBOOK_ENTRIES.map((entry) => (
+        {species.map((entry) => (
           <TouchableOpacity key={entry.id} style={styles.stampCard} activeOpacity={0.82}>
             {/* Stamp image */}
             <View style={[styles.stampImageWrap, entry.rare && styles.stampImageRare]}>
@@ -356,13 +484,25 @@ function LogbookView() {
 }
 
 // ── Likes ─────────────────────────────────────────────────────────────────────
-function LikesView() {
+function LikesView({ likes }: { likes: any[] }) {
   const { screen: styles, colors } = useDynamicStyles(createStyles);
+
+  if (likes.length === 0) {
+    return (
+      <View style={{ padding: 40, alignItems: 'center' }}>
+        <Ionicons name="heart-outline" size={48} color={colors.textSecondary} style={{ marginBottom: 12 }} />
+        <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', fontFamily: 'PlusJakartaSans-Medium' }}>
+          No has reaccionado a ningún avistamiento aún.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.grid}>
-      {LIKED_POSTS.map((post) => (
+      {likes.map((post) => (
         <TouchableOpacity key={post.id} style={styles.gridItem} activeOpacity={0.85}>
-          <Image source={{ uri: post.image }} style={styles.gridImage} />
+          <Image source={{ uri: post.image || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300' }} style={styles.gridImage} />
           <View style={styles.likeHeartBadge}>
             <Ionicons name="heart" size={11} color={colors.errorRed} />
             <Text style={styles.likeGridCount}>{post.likes}</Text>
@@ -373,5 +513,5 @@ function LikesView() {
   );
 }
 
-// ── Estilos ───────────────────────────────────────────────────────────────────
+
 

@@ -9,6 +9,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 import { useDynamicStyles } from '../hooks/useDynamicStyles';
+import { useAuth } from '../context/AuthContext';
 
 export const createStyles = (colors: any) => StyleSheet.create({
   container: {
@@ -68,6 +69,9 @@ export default function TopNavBar() {
   const { screen: styles, colors } = useDynamicStyles(createStyles);
   const route = useRoute();
   const isProfile = route.name === 'Profile';
+  const { user } = useAuth();
+
+  const avatarUrl = user?.user_metadata?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp';
 
   return (
     <View style={styles.container}>
@@ -102,7 +106,7 @@ export default function TopNavBar() {
             <Ionicons name="settings-outline" size={26} color={colors.primary} />
           ) : (
             <Image 
-              source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=100' }} 
+              source={{ uri: avatarUrl }} 
               style={styles.profileImage} 
             />
           )}
@@ -111,3 +115,4 @@ export default function TopNavBar() {
     </View>
   );
 }
+

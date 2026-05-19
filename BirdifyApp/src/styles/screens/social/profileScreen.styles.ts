@@ -46,6 +46,13 @@ export const createStyles = (colors: any) => StyleSheet.create({
   editIconBtn: {
     padding: 4,
   },
+  usernameText: {
+    fontSize: Typography.fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+    marginBottom: Spacing.xs,
+    fontWeight: Typography.fontWeight.medium,
+  },
   professionBadge: {
     flexDirection: 'row',
     alignItems: 'center',

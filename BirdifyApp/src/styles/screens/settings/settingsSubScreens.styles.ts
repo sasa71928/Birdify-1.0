@@ -281,7 +281,7 @@ export const createStyles = (colors: any) => StyleSheet.create({
     marginTop: Spacing.md,
   },
   inputGroup: {
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   inputLabel: {
     fontSize: Typography.fontSize.sm,
@@ -308,6 +308,20 @@ export const createStyles = (colors: any) => StyleSheet.create({
   },
   saveBtnText: {
     color: colors.canvasPure,
+    fontWeight: Typography.fontWeight.bold,
+    fontSize: Typography.fontSize.md,
+  },
+  cancelBtn: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: colors.border + '80',
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    marginTop: Spacing.md,
+  },
+  cancelBtnText: {
+    color: colors.textSecondary,
     fontWeight: Typography.fontWeight.bold,
     fontSize: Typography.fontSize.md,
   },
