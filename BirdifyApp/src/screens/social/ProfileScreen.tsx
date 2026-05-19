@@ -52,6 +52,8 @@ export default function ProfileScreen() {
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [isFollowingUser, setIsFollowingUser] = useState(false);
+  const [togglingFollow, setTogglingFollow] = useState(false);
+  const [togglingModalUserId, setTogglingModalUserId] = useState<string | null>(null);
 
   // States for dynamic followers/following list inside modal
   const [modalUsersList, setModalUsersList] = useState<any[]>([]);
@@ -61,6 +63,13 @@ export default function ProfileScreen() {
     async function loadProfileAndActivity() {
       if (!displayUserId) return;
       try {
+        setProfile(null);
+        setSightings([]);
+        setLikes([]);
+        setSpecies([]);
+        setFollowersCount(0);
+        setFollowingCount(0);
+        setIsFollowingUser(false);
         setLoadingProfile(true);
         
         // 1. Cargar Perfil
@@ -165,8 +174,9 @@ export default function ProfileScreen() {
   }, [displayUserId, isFocused, authUser, isMe]);
 
   const handleFollowToggle = async () => {
-    if (!authUser || !displayUserId) return;
+    if (!authUser || !displayUserId || togglingFollow) return;
     try {
+      setTogglingFollow(true);
       if (isFollowingUser) {
         await FollowRepository.unfollow(authUser.id, displayUserId);
         setIsFollowingUser(false);
@@ -178,40 +188,42 @@ export default function ProfileScreen() {
       }
     } catch (error) {
       console.error('Error toggling follow:', error);
+    } finally {
+      setTogglingFollow(false);
     }
   };
 
   const handleModalFollowToggle = async (targetUser: any) => {
-    if (!authUser) return;
+    if (!authUser || togglingModalUserId) return;
     try {
-      // Toggle localmente en la lista del modal
-      setModalUsersList(prev => prev.map(u => {
-        if (u.id === targetUser.id) {
-          return { ...u, isFollowing: !u.isFollowing };
-        }
-        return u;
-      }));
-
+      setTogglingModalUserId(targetUser.id);
       if (targetUser.isFollowing) {
         await FollowRepository.unfollow(authUser.id, targetUser.id);
+        setModalUsersList(prev => prev.map(u => {
+          if (u.id === targetUser.id) {
+            return { ...u, isFollowing: false };
+          }
+          return u;
+        }));
         if (isMe && followModalType === 'Following') {
           setFollowingCount(prev => Math.max(0, prev - 1));
         }
       } else {
         await FollowRepository.follow(authUser.id, targetUser.id);
+        setModalUsersList(prev => prev.map(u => {
+          if (u.id === targetUser.id) {
+            return { ...u, isFollowing: true };
+          }
+          return u;
+        }));
         if (isMe && followModalType === 'Following') {
           setFollowingCount(prev => prev + 1);
         }
       }
     } catch (err) {
       console.error('Error toggling follow in modal:', err);
-      // Revertir cambio local
-      setModalUsersList(prev => prev.map(u => {
-        if (u.id === targetUser.id) {
-          return { ...u, isFollowing: targetUser.isFollowing };
-        }
-        return u;
-      }));
+    } finally {
+      setTogglingModalUserId(null);
     }
   };
 
@@ -277,7 +289,7 @@ export default function ProfileScreen() {
     }
   };
 
-  if (loadingProfile && !profile) {
+  if (loadingProfile) {
     return (
       <SafeAreaView style={shared.safe}>
         <TopNavBar />
@@ -354,10 +366,15 @@ export default function ProfileScreen() {
             <TouchableOpacity 
               style={[styles.followMainBtn, isFollowingUser && { backgroundColor: colors.border + '30' }]}
               onPress={handleFollowToggle}
+              disabled={togglingFollow}
             >
-              <Text style={[styles.followMainBtnText, isFollowingUser && { color: colors.textSecondary }]}>
-                {isFollowingUser ? 'Following' : 'Follow'}
-              </Text>
+              {togglingFollow ? (
+                <ActivityIndicator size="small" color={isFollowingUser ? colors.textSecondary : colors.white} />
+              ) : (
+                <Text style={[styles.followMainBtnText, isFollowingUser && { color: colors.textSecondary }]}>
+                  {isFollowingUser ? 'Following' : 'Follow'}
+                </Text>
+              )}
             </TouchableOpacity>
             <TouchableOpacity style={styles.messageMainBtn} onPress={() => navigation.navigate('Chat', { thread: { id: displayUserId!, name: userData.name, avatar: userData.avatar, lastMessage: '', time: '' } })}>
               <Ionicons name="chatbubble-outline" size={20} color={colors.primary} />
@@ -458,10 +475,15 @@ export default function ProfileScreen() {
                           e.stopPropagation(); // Evitar navegación de perfil
                           handleModalFollowToggle(item);
                         }}
+                        disabled={togglingModalUserId === item.id}
                       >
-                        <Text style={[styles.followBtnText, item.isFollowing && styles.followingBtnText]}>
-                          {item.isFollowing ? 'Following' : 'Follow'}
-                        </Text>
+                        {togglingModalUserId === item.id ? (
+                          <ActivityIndicator size="small" color={item.isFollowing ? colors.textSecondary : colors.white} />
+                        ) : (
+                          <Text style={[styles.followBtnText, item.isFollowing && styles.followingBtnText]}>
+                            {item.isFollowing ? 'Following' : 'Follow'}
+                          </Text>
+                        )}
                       </TouchableOpacity>
                     )}
                   </TouchableOpacity>

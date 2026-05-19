@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   TextInput,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -59,6 +60,14 @@ const MOCK_THREADS: ChatThread[] = [
 export default function MessagesScreen() {
   const navigation = useNavigation<MessagesNavProp>();
   const { shared, screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 450);
+    return () => clearTimeout(timer);
+  }, []);
 
   const renderItem = ({ item }: { item: ChatThread }) => (
     <TouchableOpacity
@@ -118,13 +127,19 @@ export default function MessagesScreen() {
           <Text style={styles.searchPlaceholder}>Search messages...</Text>
         </TouchableOpacity>
 
-        <FlatList
-          data={MOCK_THREADS}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
+        {loading ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <FlatList
+            data={MOCK_THREADS}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
       </View>
     </SafeAreaView>
   );

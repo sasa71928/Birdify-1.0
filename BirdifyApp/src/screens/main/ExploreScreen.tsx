@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StatusBar,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Spacing, Radius, Shadows } from '../../theme';
@@ -73,9 +74,27 @@ const MOCK_SIGHTINGS = [
 
 export default function ExploreScreen() {
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 450);
+    return () => clearTimeout(timer);
+  }, []);
+
   const mapboxToken = process.env.EXPO_PUBLIC_MAPBOX_API_KEY;
   const mapStyle = isDark ? 'dark-v11' : 'outdoors-v12';
   const mapUri = `https://api.mapbox.com/styles/v1/mapbox/${mapStyle}/static/-99.1332,19.4326,13,0/800x1600?access_token=${mapboxToken}`;
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface }]}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
