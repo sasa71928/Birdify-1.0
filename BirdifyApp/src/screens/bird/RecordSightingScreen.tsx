@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,62 +12,308 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Modal,
+  Animated,
+  PanResponder,
+  ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { Typography, Spacing, Radius, Shadows } from '../../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TopNavBar from '../../components/TopNavBar';
 import BottomNavBar from '../../components/BottomNavBar';
 import { createStyles } from '../../styles/screens/bird/recordSightingScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
+import { BirdRepository } from '../../repositories/bird.repository';
+import { SightingRepository } from '../../repositories/sighting.repository';
+
+// Decodificador nativo
+function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const lookup = new Uint8Array(256);
+  for (let i = 0; i < chars.length; i++) {
+    lookup[chars.charCodeAt(i)] = i;
+  }
+  let bufferLength = base64.length * 0.75;
+  if (base64[base64.length - 1] === '=') {
+    bufferLength--;
+    if (base64[base64.length - 2] === '=') bufferLength--;
+  }
+  const arrayBuffer = new ArrayBuffer(bufferLength);
+  const bytes = new Uint8Array(arrayBuffer);
+  let p = 0;
+  for (let i = 0; i < base64.length; i += 4) {
+    const base641 = lookup[base64.charCodeAt(i)];
+    const base642 = lookup[base64.charCodeAt(i + 1)];
+    const base643 = lookup[base64.charCodeAt(i + 2)];
+    const base644 = lookup[base64.charCodeAt(i + 3)];
+    bytes[p++] = (base641 << 2) | (base642 >> 4);
+    if (p < bufferLength) bytes[p++] = ((base642 & 15) << 4) | (base643 >> 2);
+    if (p < bufferLength) bytes[p++] = ((base643 & 3) << 6) | (base644 & 63);
+  }
+  return arrayBuffer;
+}
+
+const MOCK_BIRDS_CATALOG = [
+  { id: '1', common_name: 'Cardenal Rojo', scientific_name: 'Cardinalis cardinalis' },
+  { id: '2', common_name: 'Azulejo', scientific_name: 'Cyanocitta cristata' },
+  { id: '3', common_name: 'Petirrojo Americano', scientific_name: 'Turdus migratorius' },
+  { id: '4', common_name: 'Colibrí Garganta Rubí', scientific_name: 'Archilochus colubris' },
+  { id: '5', common_name: 'Paloma Huilota', scientific_name: 'Zenaida macroura' },
+  { id: '6', common_name: 'Águila Calva', scientific_name: 'Haliaeetus leucocephalus' },
+  { id: '7', common_name: 'Zenzontle', scientific_name: 'Mimus polyglottos' },
+];
 
 export default function RecordSightingScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { shared, screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const { user } = useAuth();
+  
   const [birdName, setBirdName] = useState('');
+  const [selectedBird, setSelectedBird] = useState<any>(null);
+  const [showDropdown, setShowDropdown] = useState(false);
   const [notes, setNotes] = useState('');
-  const [image, setImage] = useState<string | null>(null);
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isPrivate, setIsPrivate] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
+  
+  const [toast, setToast] = useState<{ visible: boolean, message: string, type: 'success' | 'error' }>({ visible: false, message: '', type: 'success' });
 
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'We need access to your gallery to upload photos.');
-      return;
-    }
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    }, 3500);
+  };
+  
+  // Mapa y Ubicación
+  const [region, setRegion] = useState({
+    latitude: 19.4326,
+    longitude: -99.1332,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  });
+  const [isLocating, setIsLocating] = useState(false);
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-    });
+  // Selector de foto (Bottom Sheet Modal)
+  const [modalVisible, setModalVisible] = useState(false);
+  const pan = useRef(new Animated.ValueXY()).current;
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 10,
+      onPanResponderGrant: () => {
+        pan.setOffset({ x: 0, y: (pan.y as any)._value || 0 });
+      },
+      onPanResponderMove: Animated.event([null, { dy: pan.y }], { useNativeDriver: false }),
+      onPanResponderRelease: (_, gestureState) => {
+        pan.flattenOffset();
+        if (gestureState.dy > 100 || gestureState.vy > 0.5) {
+          Animated.timing(pan.y, { toValue: 600, duration: 250, useNativeDriver: true }).start(() => {
+            setModalVisible(false);
+            pan.setValue({ x: 0, y: 0 });
+          });
+        } else {
+          Animated.spring(pan.y, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
 
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
+  // Estilos del modal integrados con el tema
+  const modalStyles = StyleSheet.create({
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    dismissArea: { flex: 1 },
+    sheetContainer: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 24, borderTopRightRadius: 24,
+      padding: 24, paddingBottom: 36, alignItems: 'center'
+    },
+    dragIndicator: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border + '40', marginBottom: 16 },
+    sheetTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 6 },
+    sheetSubtitle: { fontSize: 14, color: colors.textSecondary, marginBottom: 20 },
+    optionsContainer: { width: '100%', gap: 12 },
+    optionBtn: { width: '100%', height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+    optionIcon: { marginRight: 10 },
+    optionText: { color: colors.canvasPure, fontSize: 15, fontWeight: '600' }
+  });
+
+  const handlePickImage = async (source: 'gallery' | 'camera') => {
+    try {
+      if (source === 'gallery') {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') return Alert.alert('Permiso denegado', 'Se requiere acceso a tu galería.');
+      } else {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') return Alert.alert('Permiso denegado', 'Se requiere acceso a la cámara.');
+      }
+
+      let result;
+      const options: ImagePicker.ImagePickerOptions = {
+        mediaTypes: 'images',
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+        base64: true,
+      };
+
+      if (source === 'gallery') {
+        result = await ImagePicker.launchImageLibraryAsync(options);
+      } else {
+        result = await ImagePicker.launchCameraAsync(options);
+      }
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImageUri(result.assets[0].uri);
+        setImageBase64(result.assets[0].base64 || null);
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
     }
   };
 
-  const handlePost = () => {
-    if (!birdName.trim()) {
-      Alert.alert('Missing info', 'Please enter a bird name.');
-      return;
+  const handleUseCurrentLocation = async () => {
+    setIsLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso denegado', 'No se puede acceder a tu ubicación actual.');
+        setIsLocating(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setRegion({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Hubo un problema al obtener tu ubicación.');
+    } finally {
+      setIsLocating(false);
     }
-    
-    // Simulate successful post
-    Alert.alert('Sighting Posted!', 'Your sighting has been shared with the community.', [
-      { text: 'OK', onPress: () => navigation.navigate('MainTabs', { screen: 'Feed' }) }
-    ]);
   };
 
-  const mapStyle = isDark ? 'dark-v11' : 'streets-v11';
-  const mapUri = `https://api.mapbox.com/styles/v1/mapbox/${mapStyle}/static/-73.9653,40.7829,14,0/600x300?access_token=pk.eyJ1IjoiY2hpdHUiLCJhIjoiY2tobnVnZzJvMGNxZzJzbXowam1vM3Z1ciJ9.9_n6rFv_Y0Z_X_1_1_1_1`;
+  const handlePost = async () => {
+    if (!user) return Alert.alert('Sesión Inválida', 'Inicia sesión para compartir un avistamiento.');
+    if (!birdName.trim()) return Alert.alert('Información incompleta', 'Debes nombrar o describir al ave.');
+    if (!imageBase64) return Alert.alert('Información incompleta', '¡Una buena foto es esencial para registrar un avistamiento!');
+
+    setIsPosting(true);
+    try {
+      // 1. Buscar ave en base de datos.
+      let finalBirdId = null;
+      const searchName = selectedBird ? selectedBird.common_name : birdName;
+      const birds = await BirdRepository.search(searchName);
+      
+      if (birds && birds.length > 0) {
+        finalBirdId = birds[0].id;
+      } else {
+        // Registrar el ave automáticamente en el catálogo si no existe
+        const { data: newBird, error: birdError } = await supabase
+          .from('birds')
+          .insert({
+            common_name: searchName,
+            scientific_name: selectedBird?.scientific_name || (searchName + ' sp.'),
+            description: 'Registrado dinámicamente durante un avistamiento.',
+            season: 'Desconocido',
+            habitat_info: 'Desconocido',
+            ideal_zones: 'Desconocido'
+          })
+          .select()
+          .single();
+
+        if (birdError) {
+          throw new Error('Error al registrar especie en el catálogo: ' + birdError.message);
+        }
+        finalBirdId = newBird.id;
+      }
+
+      // --- FLUJO DE SUBIDA A SUPABASE ---
+      const fileExt = imageUri?.split('.').pop() || 'jpg';
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      const arrayBuffer = decodeBase64ToArrayBuffer(imageBase64);
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('Sightings')
+        .upload(fileName, arrayBuffer, {
+          contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        throw new Error('Error al subir imagen: ' + uploadError.message);
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('Sightings')
+        .getPublicUrl(fileName);
+
+      // Crear el registro de avistamiento
+      await SightingRepository.create({
+        user_id: user.id,
+        bird_id: finalBirdId,
+        description: notes,
+        latitude: region.latitude,
+        longitude: region.longitude,
+        is_location_private: isPrivate,
+        photo_url: publicUrl,
+        sighting_date: new Date().toISOString()
+      });
+
+      // Éxito: Mostrar Toast discreto arriba
+      showToast('¡Avistamiento publicado con éxito!', 'success');
+
+      // Navegar al Feed después de una breve pausa
+      setTimeout(() => {
+        navigation.navigate('MainTabs', { screen: 'Feed' });
+      }, 1500);
+
+    } catch (error: any) {
+      showToast(error.message || 'No se pudo publicar el avistamiento.', 'error');
+    } finally {
+      setIsPosting(false);
+    }
+  };
 
   return (
     <SafeAreaView style={shared.safe}>
+      {toast.visible && (
+        <View style={{
+          position: 'absolute',
+          top: Platform.OS === 'ios' ? 50 : 20,
+          left: 20,
+          right: 20,
+          backgroundColor: toast.type === 'success' ? '#2E7D32' : '#C62828',
+          padding: 16,
+          borderRadius: 12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+          zIndex: 9999,
+          elevation: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.15,
+          shadowRadius: 8
+        }}>
+          <Ionicons 
+            name={toast.type === 'success' ? "checkmark-circle" : "alert-circle"} 
+            size={22} 
+            color="#fff" 
+          />
+          <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600', flex: 1 }}>{toast.message}</Text>
+        </View>
+      )}
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <TopNavBar />
 
@@ -81,108 +327,243 @@ export default function RecordSightingScreen() {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
-        <Text style={styles.title}>Record Sighting</Text>
-        <Text style={styles.subtitle}>Log your latest observation for your life list.</Text>
+          <Text style={styles.title}>Registrar Avistamiento</Text>
+          <Text style={styles.subtitle}>Documenta una nueva observación para tu bitácora y la comunidad.</Text>
 
-        {/* Photo Upload Area */}
-        <TouchableOpacity style={styles.photoContainer} onPress={pickImage}>
-          {image ? (
-            <Image source={{ uri: image }} style={styles.uploadedImage} />
-          ) : (
-            <View style={styles.photoInner}>
-              <View style={styles.cameraIconBg}>
-                  <Ionicons name="camera-outline" size={32} color={colors.primary} />
-                  <View style={styles.plusIconBadge}>
-                      <Ionicons name="add" size={12} color={colors.primary} />
-                  </View>
+          {/* Photo Upload Area */}
+          <TouchableOpacity 
+            style={[styles.photoContainer, { borderColor: imageUri ? colors.primary : colors.border + '40', borderWidth: imageUri ? 2 : 1 }]} 
+            onPress={() => setModalVisible(true)}
+          >
+            {imageUri ? (
+              <Image source={{ uri: imageUri }} style={styles.uploadedImage} />
+            ) : (
+              <View style={styles.photoInner}>
+                <View style={styles.cameraIconBg}>
+                    <Ionicons name="camera-outline" size={32} color={colors.primary} />
+                    <View style={styles.plusIconBadge}>
+                        <Ionicons name="add" size={12} color={colors.primary} />
+                    </View>
+                </View>
+                <Text style={styles.photoTitle}>Toca para añadir foto</Text>
+                <Text style={styles.photoSubtitle}>Las fotos de alta calidad ayudan a la identificación</Text>
               </View>
-              <Text style={styles.photoTitle}>Tap to add photo</Text>
-              <Text style={styles.photoSubtitle}>High quality images help identification</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Form Fields - Ajustando Contrastes */}
+          <View style={[styles.section, { zIndex: 10 }]}>
+            <Text style={styles.label}>¿Qué ave observaste?</Text>
+            <View style={{ position: 'relative' }}>
+              <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border + '80' }]}>
+                <Ionicons name="search-outline" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+                <TextInput 
+                  style={[styles.searchInput, { color: colors.textPrimary }]}
+                  placeholder="Busca una especie (Ej: Cardenal Rojo)..."
+                  placeholderTextColor={colors.placeholder}
+                  value={birdName}
+                  onFocus={() => {
+                    if (birdName.length > 0) setShowDropdown(true);
+                  }}
+                  onChangeText={(text) => {
+                    setBirdName(text);
+                    setSelectedBird(null);
+                    setShowDropdown(text.length > 0);
+                  }}
+                />
+                {birdName.length > 0 && (
+                  <TouchableOpacity onPress={() => { setBirdName(''); setSelectedBird(null); setShowDropdown(false); }}>
+                    <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Lista Desplegable (Dropdown) */}
+              {showDropdown && (
+                <View style={{
+                  position: 'absolute',
+                  top: 55,
+                  left: 0,
+                  right: 0,
+                  backgroundColor: colors.surface,
+                  borderWidth: 1,
+                  borderColor: colors.border + '40',
+                  borderRadius: 12,
+                  maxHeight: 180,
+                  zIndex: 20,
+                  elevation: 5,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 8
+                }}>
+                  <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                    {MOCK_BIRDS_CATALOG.filter(b => b.common_name.toLowerCase().includes(birdName.toLowerCase()) || b.scientific_name.toLowerCase().includes(birdName.toLowerCase())).map((bird) => (
+                      <TouchableOpacity
+                        key={bird.id}
+                        style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border + '20' }}
+                        onPress={() => {
+                          setBirdName(bird.common_name);
+                          setSelectedBird(bird);
+                          setShowDropdown(false);
+                        }}
+                      >
+                        <Text style={{ fontSize: 15, fontWeight: '500', color: colors.textPrimary }}>{bird.common_name}</Text>
+                        <Text style={{ fontSize: 13, color: colors.textSecondary, fontStyle: 'italic' }}>{bird.scientific_name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                    {MOCK_BIRDS_CATALOG.filter(b => b.common_name.toLowerCase().includes(birdName.toLowerCase()) || b.scientific_name.toLowerCase().includes(birdName.toLowerCase())).length === 0 && (
+                      <View style={{ padding: 12 }}>
+                        <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>No se encontraron especies.</Text>
+                      </View>
+                    )}
+                  </ScrollView>
+                </View>
+              )}
             </View>
-          )}
-        </TouchableOpacity>
-
-        {/* Form Fields */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Identify Bird</Text>
-          <View style={styles.searchContainer}>
-            <Ionicons name="search-outline" size={20} color={colors.textSecondary} style={styles.searchIcon} />
-            <TextInput 
-              style={styles.searchInput}
-              placeholder="Search species or enter unknown..."
-              placeholderTextColor={colors.placeholder}
-              value={birdName}
-              onChangeText={setBirdName}
-            />
           </View>
-        </View>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Observation Notes</Text>
-          <View style={styles.notesContainer}>
-            <TextInput 
-              style={styles.notesInput}
-              placeholder="What was it doing? Describe its behavior, song, or habitat..."
-              placeholderTextColor={colors.placeholder}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-              value={notes}
-              onChangeText={setNotes}
-            />
+          <View style={[styles.section, { zIndex: 1 }]}>
+            <Text style={styles.label}>Notas de Observación</Text>
+            <View style={[styles.notesContainer, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border + '80' }]}>
+              <TextInput 
+                style={[styles.notesInput, { color: colors.textPrimary }]}
+                placeholder="¿Qué estaba haciendo? Describe su comportamiento, canto o hábitat..."
+                placeholderTextColor={colors.placeholder}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                value={notes}
+                onChangeText={setNotes}
+              />
+            </View>
           </View>
-        </View>
 
-        {/* Location Section */}
-        <View style={styles.section}>
-          <View style={styles.locationHeader}>
-            <Text style={styles.label}>Location</Text>
-            <TouchableOpacity style={styles.useCurrentBtn}>
-              <MaterialCommunityIcons name="target" size={18} color={colors.primary} />
-              <Text style={styles.useCurrentText}>Use current</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.mapContainer}>
-            <Image 
-              source={{ uri: mapUri }} 
-              style={styles.mapImage} 
-            />
-            <View style={styles.mapPin}>
+          {/* Location Section - Por Coordenadas y Mapbox Estático */}
+          <View style={styles.section}>
+            <View style={styles.locationHeader}>
+              <Text style={styles.label}>Ubicación (Lat/Lng)</Text>
+              <TouchableOpacity style={styles.useCurrentBtn} onPress={handleUseCurrentLocation} disabled={isLocating}>
+                {isLocating ? (
+                   <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 4 }} />
+                ) : (
+                   <MaterialCommunityIcons name="target" size={18} color={colors.primary} />
+                )}
+                <Text style={styles.useCurrentText}>Mi Ubicación</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Inputs de Coordenadas */}
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+              <View style={[styles.searchContainer, { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border + '80' }]}>
+                <TextInput 
+                  style={[styles.searchInput, { color: colors.textPrimary }]}
+                  placeholder="Latitud"
+                  placeholderTextColor={colors.placeholder}
+                  keyboardType="numeric"
+                  value={region.latitude.toString()}
+                  onChangeText={(val) => setRegion(prev => ({ ...prev, latitude: parseFloat(val) || 0 }))}
+                />
+              </View>
+              <View style={[styles.searchContainer, { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border + '80' }]}>
+                <TextInput 
+                  style={[styles.searchInput, { color: colors.textPrimary }]}
+                  placeholder="Longitud"
+                  placeholderTextColor={colors.placeholder}
+                  keyboardType="numeric"
+                  value={region.longitude.toString()}
+                  onChangeText={(val) => setRegion(prev => ({ ...prev, longitude: parseFloat(val) || 0 }))}
+                />
+              </View>
+            </View>
+
+            <View style={[styles.mapContainer, { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: colors.border + '40', height: 200, backgroundColor: colors.surface, position: 'relative' }]}>
+              <Image 
+                source={{ uri: `https://api.mapbox.com/styles/v1/mapbox/${isDark ? 'dark-v11' : 'outdoors-v12'}/static/${region.longitude},${region.latitude},14,0/800x400?access_token=${process.env.EXPO_PUBLIC_MAPBOX_API_KEY || 'pk.eyJ1IjoiY2hpdHUiLCJhIjoiY2tobnVnZzJvMGNxZzJzbXowam1vM3Z1ciJ9.9_n6rFv_Y0Z_X_1_1_1_1'}` }} 
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+              />
+              {/* Pin central */}
+              <View style={{ position: 'absolute', top: '50%', left: '50%', marginLeft: -15, marginTop: -30 }}>
                 <Ionicons name="location" size={30} color={colors.primary} />
-            </View>
-            <TouchableOpacity style={styles.adjustPinBtn}>
-              <Ionicons name="location-outline" size={16} color={colors.textPrimary} />
-              <Text style={styles.adjustPinText}>Adjust Pin</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Private Location Toggle */}
-        <View style={styles.toggleCard}>
-          <View style={styles.toggleLeft}>
-            <MaterialCommunityIcons name="eye-off-outline" size={22} color={colors.textSecondary} />
-            <View style={styles.toggleTextContainer}>
-              <Text style={styles.toggleTitle}>Private Location</Text>
-              <Text style={styles.toggleSubtitle}>Hide exact coordinates from public feed</Text>
+              </View>
             </View>
           </View>
-          <Switch 
-            value={isPrivate}
-            onValueChange={setIsPrivate}
-            trackColor={{ false: colors.componentBase, true: colors.primary }}
-            thumbColor={colors.canvasPure}
-          />
-        </View>
 
-        {/* Post Button */}
-        <TouchableOpacity style={styles.postButton} onPress={handlePost}>
-          <Ionicons name="paper-plane" size={20} color={colors.canvasPure} style={styles.postIcon} />
-          <Text style={styles.postButtonText}>Post Sighting</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          {/* Private Location Toggle */}
+          <View style={[styles.toggleCard, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border + '40' }]}>
+            <View style={styles.toggleLeft}>
+              <MaterialCommunityIcons name="eye-off-outline" size={22} color={colors.textSecondary} />
+              <View style={styles.toggleTextContainer}>
+                <Text style={styles.toggleTitle}>Ubicación Privada</Text>
+                <Text style={styles.toggleSubtitle}>Oculta las coordenadas exactas de la comunidad</Text>
+              </View>
+            </View>
+            <Switch 
+              value={isPrivate}
+              onValueChange={setIsPrivate}
+              trackColor={{ false: colors.componentBase, true: colors.primary + '80' }}
+              thumbColor={isPrivate ? colors.primary : colors.canvasPure}
+            />
+          </View>
+
+          {/* Post Button */}
+          <TouchableOpacity 
+            style={[styles.postButton, isPosting && { opacity: 0.7 }]} 
+            onPress={handlePost} 
+            disabled={isPosting}
+          >
+            {isPosting ? (
+              <ActivityIndicator size="small" color={colors.canvasPure} />
+            ) : (
+              <>
+                <Ionicons name="paper-plane" size={20} color={colors.canvasPure} style={styles.postIcon} />
+                <Text style={styles.postButtonText}>Publicar Avistamiento</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </ScrollView>
       </KeyboardAvoidingView>
 
       <BottomNavBar />
+
+      {/* Selector de Foto Custom Modal */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={modalStyles.modalOverlay}>
+          <TouchableOpacity style={modalStyles.dismissArea} activeOpacity={1} onPress={() => setModalVisible(false)} />
+          <Animated.View style={[modalStyles.sheetContainer, { transform: [{ translateY: pan.y }] }]} {...panResponder.panHandlers}>
+            <View style={modalStyles.dragIndicator} />
+            <Text style={modalStyles.sheetTitle}>Añadir Foto</Text>
+            <Text style={modalStyles.sheetSubtitle}>Selecciona de dónde quieres obtener la imagen:</Text>
+
+            <View style={modalStyles.optionsContainer}>
+              <TouchableOpacity 
+                style={[modalStyles.optionBtn, { backgroundColor: colors.primary }]} 
+                activeOpacity={0.85}
+                onPress={() => { setModalVisible(false); handlePickImage('camera'); }}
+              >
+                <Ionicons name="camera" size={20} color={colors.canvasPure} style={modalStyles.optionIcon} />
+                <Text style={modalStyles.optionText}>Tomar Foto con Cámara</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[modalStyles.optionBtn, { backgroundColor: colors.primary }]} 
+                activeOpacity={0.85}
+                onPress={() => { setModalVisible(false); handlePickImage('gallery'); }}
+              >
+                <Ionicons name="images" size={20} color={colors.canvasPure} style={modalStyles.optionIcon} />
+                <Text style={modalStyles.optionText}>Seleccionar de Galería</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
