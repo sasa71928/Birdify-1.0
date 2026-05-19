@@ -61,7 +61,7 @@ export default function FeedItem({ post }: FeedItemProps) {
   const lastTap = React.useRef(0);
   const [expandedComments, setExpandedComments] = React.useState<Record<string, boolean>>({});
   const [commentText, setCommentText] = React.useState('');
-  const [replyingTo, setReplyingTo] = React.useState<{ id: string, username: string } | null>(null);
+  const [replyingTo, setReplyingTo] = React.useState<{ id: string, username: string, parentId?: string | null } | null>(null);
 
   const loadComments = React.useCallback(async () => {
     try {
@@ -114,12 +114,29 @@ export default function FeedItem({ post }: FeedItemProps) {
     }
 
     try {
-      const parentId = replyingTo ? replyingTo.id : null;
-      await CommentRepository.create(post.id, user.id, commentText.trim(), parentId);
+      const parentId = replyingTo ? (replyingTo.parentId || replyingTo.id) : null;
+      let finalContent = commentText.trim();
+
+      if (replyingTo && replyingTo.parentId && replyingTo.parentId !== replyingTo.id) {
+        const mention = `@${replyingTo.username} `;
+        if (!finalContent.startsWith(mention)) {
+          finalContent = mention + finalContent;
+        }
+      }
+
+      await CommentRepository.create(post.id, user.id, finalContent, parentId);
       
       // Limpiar input y estado
       setCommentText('');
       setReplyingTo(null);
+
+      // Si es una respuesta a un comentario, lo expandimos automáticamente
+      if (parentId) {
+        setExpandedComments(prev => ({
+          ...prev,
+          [parentId]: true
+        }));
+      }
 
       // Recargar comentarios
       await loadComments();
@@ -550,9 +567,17 @@ export default function FeedItem({ post }: FeedItemProps) {
                         {expandedComments[comment.id] && (
                           <View style={styles.repliesList}>
                             {comment.replies.map((reply) => (
-                              <View key={reply.id} style={styles.replyItem}>
-                                <Text style={styles.commentUsername}>{reply.username}</Text>
-                                <Text style={styles.commentText}>{reply.text}</Text>
+                              <View key={reply.id} style={{ marginBottom: Spacing.sm }}>
+                                <View style={styles.replyItem}>
+                                  <Text style={styles.commentUsername}>{reply.username}</Text>
+                                  <Text style={styles.commentText}>{reply.text}</Text>
+                                </View>
+                                <TouchableOpacity 
+                                  onPress={() => setReplyingTo({ id: reply.id, username: reply.username, parentId: comment.id })}
+                                  style={styles.replyButton}
+                                >
+                                  <Text style={styles.replyButtonText}>Responder</Text>
+                                </TouchableOpacity>
                               </View>
                             ))}
                           </View>
