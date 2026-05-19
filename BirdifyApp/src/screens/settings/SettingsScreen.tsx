@@ -14,6 +14,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radius } from '../../theme';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { useAuth } from '../../context/AuthContext';
 
 type SettingsNavProp = NativeStackNavigationProp<RootStackParamList, 'Settings'>;
 
@@ -160,13 +161,12 @@ export const createStyles = (colors: any) => StyleSheet.create({
 export default function SettingsScreen() {
   const navigation = useNavigation<SettingsNavProp>();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
-
+  const { signOut } = useAuth();
   const handlePress = (item: SettingItem) => {
     if (item.danger) {
-      // Temporary logic: navigate back to Login or Welcome
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Welcome' }],
+      // Sign out via AuthContext
+      signOut().catch(err => {
+        console.error('Logout failed', err);
       });
     } else if (item.id === '1') {
       navigation.navigate('EditProfile' as any);
