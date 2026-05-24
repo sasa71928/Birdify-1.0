@@ -1,8 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   FlatList,
   Image,
   TextInput,
@@ -12,21 +11,28 @@ import {
   Platform,
   PanResponder,
   Animated,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Typography, Spacing, Radius, Shadows } from '../../theme';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { createStyles } from '../../styles/screens/social/chatScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { useAuth } from '../../context/AuthContext';
+import {
+  getMessages,
+  sendMessage,
+  sendImageMessage,
+  subscribeToMessages,
+} from '../../services/chat.service';
+import { supabase } from '../../lib/supabase';
 
 type ChatNavProp = NativeStackNavigationProp<RootStackParamList, 'Chat'>;
 type ChatRouteProp = RouteProp<RootStackParamList, 'Chat'>;
 
-// ── Tipos ──────────────────────────────────────────────────────────────────────
 interface Message {
   id: string;
   text: string;
@@ -38,87 +44,97 @@ interface Message {
   replyToId?: string;
   replyToText?: string;
   replyToUser?: string;
-  isRead?: boolean;
 }
 
-// ── Mensajes de ejemplo ────────────────────────────────────────────────────────
-const MOCK_MESSAGES: Message[] = [
-  { id: '1', text: 'Hey! Did you manage to spot any cardinals this morning?', time: '9:12 AM', isMine: false, senderName: 'Elena Rios', senderAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100', isRead: true },
-  { id: '2', text: 'Yes! There was a beautiful male at the feeder around 7am 🐦', time: '9:14 AM', isMine: true, isRead: true },
-  { id: '3', text: 'No way! I\'ve been trying to photograph one for weeks.', time: '9:15 AM', isMine: false, senderName: 'Alex W.', senderAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=100', isRead: true },
-  { id: '4', text: 'I\'ll share the coordinates of the spot, the feeder is right by the old oak.', time: '9:17 AM', isMine: true, isRead: true },
-  {
-    id: '5',
-    text: 'Check this out — got a great shot!',
-    image: 'https://images.unsplash.com/photo-1555169062-013468b47731?auto=format&fit=crop&q=80&w=400',
-    time: '9:18 AM',
-    isMine: true,
-    isRead: true,
-  },
-  { id: '6', text: 'That\'s stunning!! The red is so vivid. What lens are you using?', time: '9:20 AM', isMine: false, senderName: 'Sofia G.', senderAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=100', isRead: false },
-  { id: '7', text: 'Did you see the Cardinal at the feeder today?', time: '9:22 AM', isMine: false, senderName: 'Elena Rios', senderAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100', isRead: false },
-];
-
-// ── Componente ────────────────────────────────────────────────────────────────
 export default function ChatScreen() {
   const navigation = useNavigation<ChatNavProp>();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const route = useRoute<ChatRouteProp>();
   const { thread } = route.params;
+  const { user } = useAuth();
 
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
   const listRef = useRef<FlatList>(null);
 
-  React.useEffect(() => {
-    const hasUnread = messages.some(m => !m.isMine && !m.isRead);
-    
-    if (hasUnread) {
-      // Animated scroll to the first unread
-      const firstUnreadIndex = messages.findIndex(m => !m.isMine && !m.isRead);
-      if (firstUnreadIndex !== -1) {
-        setTimeout(() => {
-          listRef.current?.scrollToIndex({ 
-            index: firstUnreadIndex, 
-            animated: true,
-            viewPosition: 0
-          });
-        }, 500);
-      }
-    } else {
-      // Immediate scroll to bottom if everything is read
-      // No timeout or animation for a "direct" appearance
-      listRef.current?.scrollToEnd({ animated: false });
-    }
-  }, []);
+  const mapRawMessage = useCallback(
+    (m: any): Message => ({
+      id: m.id,
+      text: m.content ?? '',
+      image: m.image_url ?? undefined,
+      time: new Date(m.created_at).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      isMine: m.sender_id === user?.id,
+      senderName: m.profiles?.username ?? undefined,
+      senderAvatar: m.profiles?.avatar_url ?? undefined,
+      replyToId: m.reply_to_id ?? undefined,
+    }),
+    [user?.id]
+  );
 
-  const sendMessage = () => {
-    const text = input.trim();
-    if (!text) return;
-    const newMsg: Message = {
-      id: Date.now().toString(),
-      text,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isMine: true,
-      replyToId: replyingTo?.id,
-      replyToText: replyingTo?.text,
-      replyToUser: replyingTo?.senderName || (replyingTo?.isMine ? 'Tú' : thread.name),
+  useEffect(() => {
+    if (!user) return;
+
+    const init = async () => {
+      try {
+        const raw = await getMessages(thread.id);
+        setMessages(raw.map(mapRawMessage));
+        setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
+      } catch (e) {
+        console.error('Error cargando mensajes:', e);
+      } finally {
+        setLoading(false);
+      }
     };
-    setMessages((prev) => [...prev, newMsg]);
+
+    init();
+
+    const sub = subscribeToMessages(thread.id, (newMsg: any) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: newMsg.id,
+          text: newMsg.content ?? '',
+          image: newMsg.image_url ?? undefined,
+          time: new Date(newMsg.created_at).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          isMine: newMsg.sender_id === user.id,
+        },
+      ]);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+    });
+
+    return () => { supabase.removeChannel(sub); };
+  }, [thread.id, user, mapRawMessage]);
+
+  const handleSend = async () => {
+    const text = input.trim();
+    if (!text || !user || sending) return;
+    setSending(true);
     setInput('');
+    const replyId = replyingTo?.id;
     setReplyingTo(null);
-    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+    try {
+      await sendMessage(thread.id, user.id, text, replyId);
+    } catch (e) {
+      console.error('Error enviando mensaje:', e);
+      setInput(text);
+    } finally {
+      setSending(false);
+    }
   };
 
   const pickImage = async () => {
-    // Request permission
+    if (!user) return;
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (status !== 'granted') {
-      alert('Se necesita permiso para acceder a la galería.');
-      return;
-    }
+    if (status !== 'granted') { alert('Se necesita permiso para acceder a la galería.'); return; }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -127,54 +143,32 @@ export default function ChatScreen() {
     });
 
     if (!result.canceled) {
-      const imageUri = result.assets[0].uri;
-      const newMsg: Message = {
-        id: Date.now().toString(),
-        text: '',
-        image: imageUri,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isMine: true,
-        replyToId: replyingTo?.id,
-        replyToText: replyingTo?.text,
-        replyToUser: replyingTo?.senderName || (replyingTo?.isMine ? 'Tú' : thread.name),
-      };
-      setMessages((prev) => [...prev, newMsg]);
-      setReplyingTo(null);
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+      try {
+        await sendImageMessage(thread.id, user.id, result.assets[0].uri);
+        setReplyingTo(null);
+      } catch (e) {
+        alert('No se pudo enviar la imagen.');
+      }
     }
   };
 
-  const SwipeableMessage = ({ children, onSwipe, isMine }: { children: React.ReactNode, onSwipe: () => void, isMine: boolean }) => {
+  const SwipeableMessage = ({
+    children, onSwipe, isMine,
+  }: { children: React.ReactNode; onSwipe: () => void; isMine: boolean }) => {
     const translateX = useRef(new Animated.Value(0)).current;
-    
     const panResponder = useRef(
       PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) => {
-          // Only capture horizontal swipes moving right
-          return Math.abs(gestureState.dx) > 10 && gestureState.dx > 0 && !isMine;
-        },
-        onPanResponderMove: (_, gestureState) => {
-          if (gestureState.dx > 0 && gestureState.dx < 80) {
-            translateX.setValue(gestureState.dx);
-          }
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          if (gestureState.dx > 50) {
-            onSwipe();
-          }
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 10 && g.dx > 0 && !isMine,
+        onPanResponderMove: (_, g) => { if (g.dx > 0 && g.dx < 80) translateX.setValue(g.dx); },
+        onPanResponderRelease: (_, g) => {
+          if (g.dx > 50) onSwipe();
+          Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
         },
       })
     ).current;
 
     return (
-      <Animated.View 
-        style={{ transform: [{ translateX }] }} 
-        {...panResponder.panHandlers}
-      >
+      <Animated.View style={{ transform: [{ translateX }] }} {...panResponder.panHandlers}>
         {children}
       </Animated.View>
     );
@@ -184,26 +178,34 @@ export default function ChatScreen() {
     <View style={[styles.msgRow, item.isMine && styles.msgRowMine]}>
       {!item.isMine && thread.isGroup && (
         <View style={styles.senderContainer}>
-          <Image source={{ uri: item.senderAvatar || thread.avatar }} style={styles.msgAvatarTop} />
+          {item.senderAvatar ? (
+            <Image source={{ uri: item.senderAvatar }} style={styles.msgAvatarTop} />
+          ) : (
+            <View style={[styles.msgAvatarTop, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
+              <Ionicons name="person" size={14} color={colors.textSecondary} />
+            </View>
+          )}
           <Text style={styles.senderName}>{item.senderName}</Text>
         </View>
       )}
-      
+
       <View style={[styles.bubbleWrapper, item.isMine && styles.bubbleWrapperMine]}>
         {!item.isMine && !thread.isGroup && (
-          <Image source={{ uri: thread.avatar }} style={styles.msgAvatar} />
+          thread.avatar ? (
+            <Image source={{ uri: thread.avatar }} style={styles.msgAvatar} />
+          ) : (
+            <View style={[styles.msgAvatar, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
+              <Ionicons name="person" size={14} color={colors.textSecondary} />
+            </View>
+          )
         )}
-        
+
         <View style={[styles.bubbleFlexContainer, item.isMine && styles.bubbleFlexContainerMine]}>
           <SwipeableMessage isMine={item.isMine} onSwipe={() => setReplyingTo(item)}>
-            <TouchableOpacity 
+            <TouchableOpacity
               onLongPress={() => setReplyingTo(item)}
               activeOpacity={0.9}
-              style={[
-                styles.bubble, 
-                item.isMine ? styles.bubbleMine : styles.bubbleTheirs,
-                thread.isGroup && !item.isMine && styles.bubbleGroup
-              ]}
+              style={[styles.bubble, item.isMine ? styles.bubbleMine : styles.bubbleTheirs]}
             >
               {item.replyToId && (
                 <View style={[styles.replyQuote, item.isMine ? styles.replyQuoteMine : styles.replyQuoteTheirs]}>
@@ -211,10 +213,7 @@ export default function ChatScreen() {
                   <Text style={styles.replyQuoteText} numberOfLines={1}>{item.replyToText}</Text>
                 </View>
               )}
-
-              {item.image && (
-                <Image source={{ uri: item.image }} style={styles.bubbleImage} />
-              )}
+              {item.image && <Image source={{ uri: item.image }} style={styles.bubbleImage} />}
               {item.text ? (
                 <Text style={[styles.bubbleText, item.isMine && styles.bubbleTextMine]}>
                   {item.text}
@@ -239,47 +238,46 @@ export default function ChatScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
-
         <View style={styles.headerCenter}>
           {thread.isGroup ? (
             <View style={styles.headerGroupAvatar}>
               <Ionicons name="people" size={20} color={colors.secondaryBlue} />
             </View>
-          ) : (
+          ) : thread.avatar ? (
             <Image source={{ uri: thread.avatar }} style={styles.headerAvatar} />
+          ) : (
+            <View style={[styles.headerAvatar, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
+              <Ionicons name="person" size={18} color={colors.textSecondary} />
+            </View>
           )}
           <View>
             <Text style={styles.headerName}>{thread.name}</Text>
-            {thread.isOnline && (
-              <Text style={styles.headerStatus}>● Online</Text>
-            )}
+            {thread.isOnline && <Text style={styles.headerStatus}>● Online</Text>}
           </View>
         </View>
-
         <TouchableOpacity style={styles.headerAction}>
           <Ionicons name="ellipsis-vertical" size={20} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
-      {/* ── Messages ── */}
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
-        <FlatList
-          ref={listRef}
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.messageList}
-          showsVerticalScrollIndicator={false}
-          onScrollToIndexFailed={(info) => {
-            listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
-          }}
-        />
+      {/* ── Mensajes ── */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        {loading ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <FlatList
+            ref={listRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.messageList}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
 
-        {/* ── Input bar ── */}
+        {/* ── Input ── */}
         <View style={styles.inputContainer}>
           {replyingTo && (
             <View style={styles.replyPreviewBar}>
@@ -288,9 +286,7 @@ export default function ChatScreen() {
                 <Text style={styles.replyPreviewUser}>
                   Respondiendo a {replyingTo.senderName || (replyingTo.isMine ? 'ti mismo' : thread.name)}
                 </Text>
-                <Text style={styles.replyPreviewText} numberOfLines={1}>
-                  {replyingTo.text}
-                </Text>
+                <Text style={styles.replyPreviewText} numberOfLines={1}>{replyingTo.text}</Text>
               </View>
               <TouchableOpacity onPress={() => setReplyingTo(null)}>
                 <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
@@ -302,7 +298,6 @@ export default function ChatScreen() {
             <TouchableOpacity style={styles.attachBtn} onPress={pickImage}>
               <Ionicons name="image-outline" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
-
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.input}
@@ -312,16 +307,19 @@ export default function ChatScreen() {
                 placeholderTextColor={colors.placeholder}
                 multiline
                 returnKeyType="send"
-                onSubmitEditing={sendMessage}
+                onSubmitEditing={handleSend}
               />
             </View>
-
             <TouchableOpacity
-              style={[styles.sendBtn, !input.trim() && styles.sendBtnDisabled]}
-              onPress={sendMessage}
-              disabled={!input.trim()}
+              style={[styles.sendBtn, (!input.trim() || sending) && styles.sendBtnDisabled]}
+              onPress={handleSend}
+              disabled={!input.trim() || sending}
             >
-              <Ionicons name="send" size={20} color={colors.canvasPure} />
+              {sending ? (
+                <ActivityIndicator size="small" color={colors.canvasPure} />
+              ) : (
+                <Ionicons name="send" size={20} color={colors.canvasPure} />
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -329,6 +327,3 @@ export default function ChatScreen() {
     </SafeAreaView>
   );
 }
-
-// ── Estilos ───────────────────────────────────────────────────────────────────
-

@@ -28,10 +28,13 @@ import { User } from '../../types/models';
 import { supabase } from '../../lib/supabase';
 import { FollowRepository } from '../../repositories/follow.repository';
 
+
 type ProfileRouteProp = RouteProp<RootStackParamList, 'Profile'>;
+
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 type Tab = 'Sightings' | 'Logbook' | 'Likes';
+
 
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -44,6 +47,7 @@ export default function ProfileScreen() {
   const displayUserId = isMe ? authUser?.id : userId;
   const isFocused = useIsFocused();
 
+
   const [profile, setProfile] = useState<User | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [sightings, setSightings] = useState<any[]>([]);
@@ -54,10 +58,13 @@ export default function ProfileScreen() {
   const [isFollowingUser, setIsFollowingUser] = useState(false);
   const [togglingFollow, setTogglingFollow] = useState(false);
   const [togglingModalUserId, setTogglingModalUserId] = useState<string | null>(null);
+  const [openingChat, setOpeningChat] = useState(false); // ✅ NUEVO
+
 
   // States for dynamic followers/following list inside modal
   const [modalUsersList, setModalUsersList] = useState<any[]>([]);
   const [loadingModalUsers, setLoadingModalUsers] = useState(false);
+
 
   useEffect(() => {
     async function loadProfileAndActivity() {
@@ -78,6 +85,7 @@ export default function ProfileScreen() {
           setProfile(data);
         }
 
+
         // 2. Cargar Avistamientos Reales
         const { data: sightingsData, error: sightingsError } = await supabase
           .from('sightings')
@@ -92,8 +100,10 @@ export default function ProfileScreen() {
           .eq('user_id', displayUserId)
           .order('created_at', { ascending: false });
 
+
         if (sightingsError) throw sightingsError;
         setSightings(sightingsData || []);
+
 
         // 3. Procesar Especies (Logbook) a partir de los avistamientos reales
         const speciesMap = new Map<string, any>();
@@ -118,6 +128,7 @@ export default function ProfileScreen() {
         });
         setSpecies(Array.from(speciesMap.values()));
 
+
         // 4. Cargar Likes (Reacciones)
         const { data: reactionsData, error: reactionsError } = await supabase
           .from('reactions')
@@ -129,6 +140,7 @@ export default function ProfileScreen() {
             )
           `)
           .eq('user_id', displayUserId);
+
 
         if (reactionsError) throw reactionsError;
         
@@ -142,25 +154,30 @@ export default function ProfileScreen() {
           }));
         setLikes(mappedLikes);
 
+
         // 5. Cargar Seguidores/Seguidos
         const { count: fersCount } = await supabase
           .from('follows')
           .select('*', { count: 'exact', head: true })
           .eq('following_id', displayUserId);
 
+
         const { count: fingCount } = await supabase
           .from('follows')
           .select('*', { count: 'exact', head: true })
           .eq('follower_id', displayUserId);
 
+
         setFollowersCount(fersCount || 0);
         setFollowingCount(fingCount || 0);
+
 
         // 6. Verificar si el usuario actual sigue a este perfil
         if (authUser && displayUserId && !isMe) {
           const isFollowing = await FollowRepository.isFollowing(authUser.id, displayUserId);
           setIsFollowingUser(isFollowing);
         }
+
 
       } catch (error) {
         console.error('Error cargando perfil y actividad:', error);
@@ -172,6 +189,7 @@ export default function ProfileScreen() {
       loadProfileAndActivity();
     }
   }, [displayUserId, isFocused, authUser, isMe]);
+
 
   const handleFollowToggle = async () => {
     if (!authUser || !displayUserId || togglingFollow) return;
@@ -192,6 +210,7 @@ export default function ProfileScreen() {
       setTogglingFollow(false);
     }
   };
+
 
   const handleModalFollowToggle = async (targetUser: any) => {
     if (!authUser || togglingModalUserId) return;
@@ -227,6 +246,67 @@ export default function ProfileScreen() {
     }
   };
 
+
+  //Abrir chat buscando/creando la conversación real
+  const handleOpenChat = async () => {
+  if (!authUser || !displayUserId || openingChat) return;
+  try {
+    setOpeningChat(true);
+
+    // 1. Buscar conversaciones donde está el usuario actual
+    const { data: myConvos } = await supabase
+      .from('conversation_members') 
+      .select('conversation_id')
+      .eq('user_id', authUser.id);
+
+    const myConvoIds = (myConvos || []).map((r: any) => r.conversation_id);
+
+    // 2. Ver si el otro usuario comparte alguna de esas conversaciones
+    const { data: sharedConvo } = await supabase
+      .from('conversation_members')
+      .select('conversation_id')
+      .eq('user_id', displayUserId)
+      .in('conversation_id', myConvoIds.length ? myConvoIds : ['00000000-0000-0000-0000-000000000000']);
+
+    let conversationId: string;
+
+    if (sharedConvo && sharedConvo.length > 0) {
+      conversationId = sharedConvo[0].conversation_id;
+    } else {
+      // 3. Crear nueva conversación
+      const { data: created, error } = await supabase
+        .from('conversations')
+        .insert({ is_group: false })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+      conversationId = created.id;
+
+      // 4. Insertar los dos participantes
+      await supabase.from('conversation_members').insert([
+        { conversation_id: conversationId, user_id: authUser.id },
+        { conversation_id: conversationId, user_id: displayUserId },
+      ]);
+    }
+
+    navigation.navigate('Chat', {
+      thread: {
+        id: conversationId,
+        name: userData.name,
+        avatar: userData.avatar,
+        lastMessage: '',
+        time: '',
+      },
+    });
+  } catch (err) {
+    console.error('Error abriendo chat:', err);
+  } finally {
+    setOpeningChat(false);
+  }
+};
+
+
   // Get user data
   const userData = profile ? {
     name: profile.fullname ||  'Usuario',
@@ -250,9 +330,11 @@ export default function ProfileScreen() {
     profession: '...'
   };
 
+
   const [activeTab, setActiveTab] = useState<Tab>('Sightings');
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalType, setFollowModalType] = useState<'Followers' | 'Following'>('Followers');
+
 
   const openFollowModal = async (type: 'Followers' | 'Following') => {
     setFollowModalType(type);
@@ -289,6 +371,7 @@ export default function ProfileScreen() {
     }
   };
 
+
   if (loadingProfile) {
     return (
       <SafeAreaView style={shared.safe}>
@@ -301,10 +384,12 @@ export default function ProfileScreen() {
     );
   }
 
+
   return (
     <SafeAreaView style={shared.safe}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <TopNavBar />
+
 
       {/* ── Profile Header (fijo, no scroll) ── */}
       <View style={styles.profileHeader}>
@@ -320,6 +405,7 @@ export default function ProfileScreen() {
           )}
         </View>
 
+
         <View style={styles.nameRow}>
           <Text style={styles.name}>{userData.name}</Text>
           {isMe && (
@@ -332,12 +418,15 @@ export default function ProfileScreen() {
           )}
         </View>
 
+
         <Text style={styles.usernameText}>@{userData.username}</Text>
+
 
         <View style={styles.professionBadge}>
           <MaterialCommunityIcons name="leaf" size={14} color={colors.primary} />
           <Text style={styles.professionText}>{userData.profession || 'Bird Watcher'}</Text>
         </View>
+
 
         <View style={styles.statsRow}>
           <TouchableOpacity style={styles.statItem} onPress={() => openFollowModal('Followers')}>
@@ -361,6 +450,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+
         {!isMe && (
           <View style={styles.actionRow}>
             <TouchableOpacity 
@@ -376,11 +466,22 @@ export default function ProfileScreen() {
                 </Text>
               )}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.messageMainBtn} onPress={() => navigation.navigate('Chat', { thread: { id: displayUserId!, name: userData.name, avatar: userData.avatar, lastMessage: '', time: '' } })}>
-              <Ionicons name="chatbubble-outline" size={20} color={colors.primary} />
+
+            {/* ✅ BOTÓN CORREGIDO */}
+            <TouchableOpacity
+              style={[styles.messageMainBtn, openingChat && { opacity: 0.6 }]}
+              onPress={handleOpenChat}
+              disabled={openingChat}
+            >
+              {openingChat ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="chatbubble-outline" size={20} color={colors.primary} />
+              )}
             </TouchableOpacity>
           </View>
         )}
+
 
         <Text style={styles.bio}>{userData.bio}</Text>
       </View>
@@ -409,6 +510,7 @@ export default function ProfileScreen() {
             ))}
           </View>
 
+
           {/* ── Contenido scrollable del tab activo ── */}
           <ScrollView
             style={styles.scroll}
@@ -421,6 +523,7 @@ export default function ProfileScreen() {
           </ScrollView>
         </>
       )}
+
 
       {/* ── Follow Modal ── */}
       <Modal
@@ -472,7 +575,7 @@ export default function ProfileScreen() {
                       <TouchableOpacity 
                         style={[styles.followBtn, item.isFollowing && styles.followingBtn]}
                         onPress={(e) => {
-                          e.stopPropagation(); // Evitar navegación de perfil
+                          e.stopPropagation();
                           handleModalFollowToggle(item);
                         }}
                         disabled={togglingModalUserId === item.id}
@@ -494,10 +597,12 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
+
       <BottomNavBar />
     </SafeAreaView>
   );
 }
+
 
 // ── Sightings grid ────────────────────────────────────────────────────────────
 function SightingsGrid({ sightings }: { sightings: any[] }) {
@@ -514,6 +619,7 @@ function SightingsGrid({ sightings }: { sightings: any[] }) {
     );
   }
 
+
   return (
     <View style={styles.grid}>
       {sightings.map((item) => (
@@ -528,12 +634,14 @@ function SightingsGrid({ sightings }: { sightings: any[] }) {
   );
 }
 
+
 // ── Logbook ───────────────────────────────────────────────────────────────────
 function LogbookView({ species }: { species: any[] }) {
   const { screen: styles, colors } = useDynamicStyles(createStyles);
   const totalSpecies = species.length;
   const rareCount    = species.filter((e) => e.rare).length;
   const totalSightings = species.reduce((sum, e) => sum + e.count, 0);
+
 
   if (species.length === 0) {
     return (
@@ -546,8 +654,10 @@ function LogbookView({ species }: { species: any[] }) {
     );
   }
 
+
   return (
     <View style={styles.logbookContainer}>
+
 
       {/* Summary bar */}
       <View style={styles.logbookSummary}>
@@ -570,12 +680,12 @@ function LogbookView({ species }: { species: any[] }) {
         </View>
       </View>
 
+
       {/* Bird stamps */}
       <Text style={styles.logbookSectionTitle}>Estampas de Aves</Text>
       <View style={styles.stampsGrid}>
         {species.map((entry) => (
           <TouchableOpacity key={entry.id} style={styles.stampCard} activeOpacity={0.82}>
-            {/* Stamp image */}
             <View style={[styles.stampImageWrap, entry.rare && styles.stampImageRare]}>
               <Image source={{ uri: entry.image }} style={styles.stampImage} />
               {entry.rare && (
@@ -583,13 +693,11 @@ function LogbookView({ species }: { species: any[] }) {
                   <MaterialCommunityIcons name="star" size={10} color={colors.canvasPure} />
                 </View>
               )}
-              {/* Perforation dots top */}
               <View style={styles.perfTop}>
                 {Array.from({ length: 7 }).map((_, i) => (
                   <View key={i} style={styles.perfDot} />
                 ))}
               </View>
-              {/* Perforation dots bottom */}
               <View style={styles.perfBottom}>
                 {Array.from({ length: 7 }).map((_, i) => (
                   <View key={i} style={styles.perfDot} />
@@ -597,10 +705,11 @@ function LogbookView({ species }: { species: any[] }) {
               </View>
             </View>
 
+
             <Text style={styles.stampName} numberOfLines={1}>{entry.name}</Text>
             <Text style={styles.stampScientific} numberOfLines={1}>{entry.scientificName}</Text>
 
-            {/* Count badge */}
+
             <View style={styles.stampCountRow}>
               <Ionicons name="eye-outline" size={11} color={colors.textSecondary} />
               <Text style={styles.stampCount}>×{entry.count}</Text>
@@ -609,13 +718,16 @@ function LogbookView({ species }: { species: any[] }) {
         ))}
       </View>
 
+
     </View>
   );
 }
 
+
 // ── Likes ─────────────────────────────────────────────────────────────────────
 function LikesView({ likes }: { likes: any[] }) {
   const { screen: styles, colors } = useDynamicStyles(createStyles);
+
 
   if (likes.length === 0) {
     return (
@@ -627,6 +739,7 @@ function LikesView({ likes }: { likes: any[] }) {
       </View>
     );
   }
+
 
   return (
     <View style={styles.grid}>
@@ -642,6 +755,3 @@ function LikesView({ likes }: { likes: any[] }) {
     </View>
   );
 }
-
-
-
