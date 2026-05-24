@@ -1,69 +1,60 @@
 import { supabase } from '../lib/supabase';
+import db from '../lib/database';
+import { isOnline, addToQueue } from '../services/syncService';
 
-export const CommentRepository = {
-  // Crear un comentario o respuesta (subcomentario)
-  async create(sightingId: string, userId: string, content: string, parentCommentId: string | null = null): Promise<any> {
-    const { data, error } = await supabase
-      .from('comments')
-      .insert({
-        sighting_id: sightingId,
-        user_id: userId,
-        content: content,
-        parent_comment_id: parentCommentId,
-        is_subcomment: !!parentCommentId
-      })
-      .select(`
-        *,
-        users!comments_user_id_fkey (username)
-      `)
-      .single();
+export const ReactionRepository = {
 
-    if (error) {
-      console.error('Error creating comment:', error);
-      throw error;
+  async react(sightingId: string, userId: string): Promise<void> {
+    const now = new Date().toISOString();
+
+    // 1. Guarda local siempre
+    await db.runAsync(
+      `INSERT OR IGNORE INTO reactions (user_id, sighting_id, created_at) VALUES (?, ?, ?)`,
+      [userId, sightingId, now]
+    );
+
+    // 2. Sube a Supabase o encola
+    if (isOnline) {
+      const { error } = await supabase
+        .from('reactions')
+        .insert({ sighting_id: sightingId, user_id: userId });
+      if (error) {
+        console.warn('⚠️ Encolando reaction...', error);
+        await addToQueue('reactions', 'INSERT', { user_id: userId, sighting_id: sightingId, created_at: now });
+      }
+    } else {
+      await addToQueue('reactions', 'INSERT', { user_id: userId, sighting_id: sightingId, created_at: now });
     }
-    return data;
   },
 
-  // Obtener todos los comentarios de un avistamiento en un árbol jerárquico
-  async getBySightingId(sightingId: string): Promise<any[]> {
-    const { data, error } = await supabase
-      .from('comments')
-      .select(`
-        *,
-        users!comments_user_id_fkey (username)
-      `)
-      .eq('sighting_id', sightingId)
-      .order('created_at', { ascending: true });
+  async unreact(sightingId: string, userId: string): Promise<void> {
+    // 1. Borra local siempre
+    await db.runAsync(
+      `DELETE FROM reactions WHERE user_id = ? AND sighting_id = ?`,
+      [userId, sightingId]
+    );
 
-    if (error) {
-      console.error('Error fetching comments:', error);
-      throw error;
+    // 2. Borra en Supabase o encola
+    if (isOnline) {
+      const { error } = await supabase
+        .from('reactions')
+        .delete()
+        .match({ sighting_id: sightingId, user_id: userId });
+      if (error) {
+        console.warn('⚠️ Encolando unreact...', error);
+        await addToQueue('reactions', 'DELETE', { user_id: userId, sighting_id: sightingId });
+      }
+    } else {
+      await addToQueue('reactions', 'DELETE', { user_id: userId, sighting_id: sightingId });
     }
+  },
 
-    const comments = data || [];
-    
-    // Filtramos comentarios principales (sin padre) y respuestas
-    const mainComments = comments.filter(c => !c.parent_comment_id);
-    const subComments = comments.filter(c => c.parent_comment_id);
-
-    return mainComments.map(main => {
-      const replies = subComments
-        .filter(sub => sub.parent_comment_id === main.id)
-        .map(sub => ({
-          id: sub.id,
-          userId: sub.user_id,
-          username: sub.users?.username || 'Usuario',
-          text: sub.content
-        }));
-
-      return {
-        id: main.id,
-        userId: main.user_id,
-        username: main.users?.username || 'Usuario',
-        text: main.content,
-        replies
-      };
-    });
+  async hasReacted(sightingId: string, userId: string): Promise<boolean> {
+    // Siempre lee local — es instantáneo
+    const row = await db.getFirstAsync<{ user_id: string }>(
+      `SELECT user_id FROM reactions WHERE user_id = ? AND sighting_id = ?`,
+      [userId, sightingId]
+    );
+    return !!row;
   }
 };

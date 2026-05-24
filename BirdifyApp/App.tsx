@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -20,6 +20,9 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from './src/theme';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { AuthProvider } from './src/context/AuthContext';
+import { initDatabase } from './src/lib/database';
+import { initNetworkListener } from './src/services/syncService';
+
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -35,6 +38,15 @@ export default function App() {
     ...Ionicons.font,
     ...MaterialCommunityIcons.font,
   });
+
+useEffect(() => {
+  initDatabase()
+    .then(() => {
+      console.log('Base de datos local inicializada');
+      initNetworkListener();
+    })
+    .catch(err => console.error('Error al inicializar base de datos:', err));
+}, []);
 
   if (!fontsLoaded) {
     return (

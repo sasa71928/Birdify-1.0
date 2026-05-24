@@ -1,73 +1,58 @@
 import { supabase } from '../lib/supabase';
-import { Sighting } from '../types/models';
+import { Bird } from '../types/models';
+import db from '../lib/database';
+import { isOnline } from '../services/syncService';
 
-export const SightingRepository = {
-  async create(sighting: Omit<Sighting, 'id' | 'created_at' | 'updated_at'>): Promise<Sighting> {
-    const { data, error } = await supabase
-      .from('sightings')
-      .insert(sighting)
-      .select()
-      .single();
+export const BirdRepository = {
 
-    if (error) throw error;
-    return data;
+  async getAll(): Promise<Bird[]> {
+    if (isOnline) {
+      const { data, error } = await supabase
+        .from('birds')
+        .select('*')
+        .order('common_name', { ascending: true });
+
+      if (error) throw error;
+
+      // Cachea en local
+      for (const bird of data ?? []) {
+        await db.runAsync(
+          `INSERT OR REPLACE INTO birds (id, common_name, scientific_name, description, season, habitat_info, ideal_zones)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [bird.id, bird.common_name, bird.scientific_name, bird.description ?? null,
+           bird.season ?? null, bird.habitat_info ?? null, bird.ideal_zones ?? null]
+        );
+      }
+
+      return data || [];
+    } else {
+      // Sin red: lee del caché local
+      const rows = await db.getAllAsync<Bird>(
+        `SELECT * FROM birds ORDER BY common_name ASC`
+      );
+      return rows;
+    }
   },
 
-  async getFeed(): Promise<any[]> {
-    const { data, error } = await supabase
-      .from('sightings')
-      .select(`
-        *,
-        users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
-        birds (id, common_name, scientific_name),
-        reactions (user_id),
-        comments (id)
-      `)
-      .order('created_at', { ascending: false });
+  async search(query: string): Promise<Bird[]> {
+    if (isOnline) {
+      const { data, error } = await supabase
+        .from('birds')
+        .select('*')
+        .or(`common_name.ilike.%${query}%,scientific_name.ilike.%${query}%`)
+        .limit(10);
 
-    if (error) {
-      console.error('Error in getFeed:', error);
-      throw error;
+      if (error) throw error;
+      return data || [];
+    } else {
+      // Sin red: busca en local
+      const rows = await db.getAllAsync<Bird>(
+        `SELECT * FROM birds 
+         WHERE common_name LIKE ? OR scientific_name LIKE ?
+         LIMIT 10`,
+        [`%${query}%`, `%${query}%`]
+      );
+      return rows;
     }
-    
-    // Formateamos los resultados para que coincidan con la interfaz de Sighting (user y bird en vez de users y birds)
-    const formattedData = data?.map(item => ({
-      ...item,
-      user: item.users,
-      bird: item.birds,
-      reactions: item.reactions || [],
-      comments: item.comments || []
-    }));
-
-    return formattedData || [];
-  },
-
-  async getByUserId(userId: string): Promise<any[]> {
-    const { data, error } = await supabase
-      .from('sightings')
-      .select(`
-        *,
-        users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
-        birds (id, common_name, scientific_name),
-        reactions (user_id),
-        comments (id)
-      `)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error in getByUserId:', error);
-      throw error;
-    }
-
-    const formattedData = data?.map(item => ({
-      ...item,
-      user: item.users,
-      bird: item.birds,
-      reactions: item.reactions || [],
-      comments: item.comments || []
-    }));
-
-    return formattedData || [];
   }
 };
