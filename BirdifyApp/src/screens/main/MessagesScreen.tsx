@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -17,7 +18,11 @@ import { RootStackParamList, ChatThread } from '../../navigation/AppNavigator';
 import { createStyles } from '../../styles/screens/main/messagesScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useAuth } from '../../context/AuthContext';
-import { getThreads, getOrCreateDirectConversation } from '../../services/chat.service';
+import {
+  getThreads,
+  getOrCreateDirectConversation,
+  deleteGroup,
+} from '../../services/chat.service';
 
 type MessagesNavProp = NativeStackNavigationProp<RootStackParamList, 'Messages'>;
 
@@ -31,6 +36,7 @@ export default function MessagesScreen() {
   const [error, setError] = useState<string | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
 
+  // ── Cargar hilos ───────────────────────────────────────────────────────────
   const loadThreads = useCallback(async () => {
     if (!user) return;
     try {
@@ -38,30 +44,26 @@ export default function MessagesScreen() {
       const raw = await getThreads(user.id);
 
       const mapped: ChatThread[] = raw
-        .map((item: any) => {
-          const conv = item.conversations;
-          if (!conv) return null;
-          const msgs: any[] = Array.isArray(conv.messages) ? conv.messages : [];
-          const last = msgs.sort(
-            (a: any, b: any) =>
-              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          )[0];
+  .map((item: any) => {
+    if (!item?.conv) return null;
+    const conv = item.conv;
+    const last = item.lastMsg ?? null;   // ← usa lastMsg en lugar de conv.messages
 
-          return {
-            id: conv.id,
-            name: conv.name ?? 'Chat',
-            avatar: conv.avatar_url ?? '',
-            isGroup: conv.is_group ?? false,
-            lastMessage: last?.content ?? '',
-            time: last
-              ? new Date(last.created_at).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              : '',
-          } as ChatThread;
-        })
-        .filter(Boolean) as ChatThread[];
+    return {
+      id: conv.id,
+      name: item.displayName || (conv.is_group ? 'Grupo' : 'Chat'),
+      avatar: item.displayAvatar ?? '',
+      isGroup: conv.is_group ?? false,
+      lastMessage: last?.content ?? (last?.image_url ? '📷 Imagen' : ''),
+      time: last
+        ? new Date(last.created_at).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : '',
+    } as ChatThread;
+  })
+  .filter(Boolean) as ChatThread[];
 
       setThreads(mapped);
     } catch (e: any) {
@@ -79,18 +81,62 @@ export default function MessagesScreen() {
     }, [loadThreads])
   );
 
-  // Los hilos cargados desde Supabase ya tienen IDs válidos — navegación directa
+  // ── Abrir chat ────────────────────────────────────────────────────────────
   const openChat = (thread: ChatThread) => {
     if (openingId) return;
     navigation.navigate('Chat', { thread });
   };
 
+  // ── Borrar grupo (long press) — solo admin ────────────────────────────────
+  const handleLongPressThread = (thread: ChatThread) => {
+    if (!thread.isGroup) return;
+
+    Alert.alert(
+      'Opciones del grupo',
+      `"${thread.name}"`,
+      [
+        {
+          text: 'Borrar grupo',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Confirmar',
+              '¿Seguro que quieres borrar este grupo? Esta acción no se puede deshacer.',
+              [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                  text: 'Borrar',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await deleteGroup(thread.id, user!.id);
+                      setThreads((prev) => prev.filter((t) => t.id !== thread.id));
+                    } catch (e: any) {
+                      Alert.alert(
+                        'No disponible',
+                        e.message ?? 'Solo el administrador puede borrar el grupo.'
+                      );
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+        { text: 'Cancelar', style: 'cancel' },
+      ]
+    );
+  };
+
+  // ── Render de cada hilo ───────────────────────────────────────────────────
   const renderItem = ({ item }: { item: ChatThread }) => (
     <TouchableOpacity
       style={[styles.threadItem, item.unreadCount ? styles.unreadThread : null]}
       activeOpacity={0.75}
       disabled={openingId === item.id}
       onPress={() => openChat(item)}
+      onLongPress={() => handleLongPressThread(item)}
+      delayLongPress={400}
     >
       <View style={styles.avatarContainer}>
         {item.isGroup ? (
@@ -142,6 +188,7 @@ export default function MessagesScreen() {
     </View>
   );
 
+  // ── UI ────────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={shared.safe}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
@@ -203,11 +250,6 @@ export default function MessagesScreen() {
 }
 
 // ── Helper para iniciar chat directo desde cualquier pantalla ─────────────────
-// Importa y usa así desde ProfileScreen u otra:
-//
-//   import { openDirectChat } from '../main/MessagesScreen';
-//   await openDirectChat(navigation, currentUser.id, otherUser.id, otherUser.username, otherUser.avatar_url ?? '');
-//
 export async function openDirectChat(
   navigation: any,
   currentUserId: string,

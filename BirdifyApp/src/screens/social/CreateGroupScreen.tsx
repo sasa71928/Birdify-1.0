@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Image,
-  StatusBar,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
+  View, Text, TextInput, TouchableOpacity, Image,
+  StatusBar, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -19,6 +12,7 @@ import { supabase } from '../../lib/supabase';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { createStyles } from '../../styles/screens/social/createGroupScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { createGroup, uploadGroupAvatar } from '../../services/chat.service';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'CreateGroup'>;
 
@@ -49,16 +43,12 @@ export default function CreateGroupScreen() {
         const userId = sessionData.session?.user.id;
         if (!userId) return;
 
-        // Ajusta los nombres de columna si tu tabla tiene nombres diferentes
         const { data, error } = await supabase
           .from('follows')
           .select(`
             following_id,
             profiles!follows_following_id_fkey (
-              id,
-              username,
-              full_name,
-              avatar_url
+              id, username, full_name, avatar_url
             )
           `)
           .eq('follower_id', userId);
@@ -79,7 +69,7 @@ export default function CreateGroupScreen() {
     load();
   }, []);
 
-  // ── Seleccionar / deseleccionar contacto ─────────────────────────────────
+  // ── Toggle selección ─────────────────────────────────────────────────────
   const toggle = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -103,7 +93,7 @@ export default function CreateGroupScreen() {
     if (!result.canceled) setImage(result.assets[0].uri);
   };
 
-  // ── Crear grupo ───────────────────────────────────────────────────────────
+  // ── Crear grupo usando el service ─────────────────────────────────────────
   const handleCreate = async () => {
     if (!canCreate || creating) return;
     setCreating(true);
@@ -112,58 +102,24 @@ export default function CreateGroupScreen() {
       const userId = sessionData.session?.user.id;
       if (!userId) return;
 
-      // 1. Subir imagen si existe
-      let avatarUrl: string | null = null;
+      // 1. Subir avatar si existe (usando el service)
+      let avatarUrl: string | undefined;
       if (image) {
-        const ext = image.split('.').pop() ?? 'jpg';
-        const fileName = `groups/group_${Date.now()}.${ext}`;
-        const response = await fetch(image);
-        const blob = await response.blob();
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('chat-images')
-          .upload(fileName, blob, { contentType: `image/${ext}` });
-        if (!uploadError && uploadData) {
-          const { data: urlData } = supabase.storage
-            .from('chat-images')
-            .getPublicUrl(uploadData.path);
-          avatarUrl = urlData.publicUrl;
-        }
+        avatarUrl = await uploadGroupAvatar(image);
       }
 
-      // 2. Crear conversación
-      const { data: conversation, error: convError } = await supabase
-        .from('conversations')
-        .insert({
-          name: groupName.trim(),
-          description: description.trim() || null,
-          is_group: true,
-          created_by: userId,
-          avatar_url: avatarUrl,
-        })
-        .select()
-        .single();
+      // 2. Crear grupo con roles correctos (usando el service)
+      const conversation = await createGroup(
+        userId,
+        groupName.trim(),
+        description.trim(),
+        Array.from(selected),
+        avatarUrl,
+      );
 
-      if (convError) throw convError;
-
-      // 3. Insertar miembros
-      const members = [
-        { conversation_id: conversation.id, user_id: userId, role: 'admin' },
-        ...Array.from(selected).map((uid) => ({
-          conversation_id: conversation.id,
-          user_id: uid,
-          role: 'member',
-        })),
-      ];
-
-      const { error: membersError } = await supabase
-        .from('conversation_members')
-        .insert(members);
-
-      if (membersError) throw membersError;
-
-      // 4. Navegar al chat del grupo
+      // 3. Navegar al chat del grupo recién creado
       navigation.replace('Chat', {
-      thread: {
+        thread: {
           id: conversation.id,
           name: groupName.trim(),
           avatar: avatarUrl ?? '',
@@ -181,7 +137,6 @@ export default function CreateGroupScreen() {
   };
 
   const canCreate = groupName.trim().length > 0 && selected.size >= 1;
-
   const getDisplayName = (c: Contact) => c.full_name || c.username;
   const getAvatar = (c: Contact) =>
     c.avatar_url
@@ -272,7 +227,6 @@ export default function CreateGroupScreen() {
         {/* ── Lista de seguidos ── */}
         <View style={styles.contactsSection}>
           <Text style={styles.sectionLabel}>Add People</Text>
-
           {loading ? (
             <ActivityIndicator color={colors.primary} style={{ marginTop: 24 }} />
           ) : contacts.length === 0 ? (
