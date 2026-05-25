@@ -21,11 +21,16 @@ function mapSightingToPost(sighting: any, currentUserId?: string): Post {
   const likesCount = reactionsList.length;
   const hasLiked = currentUserId ? reactionsList.some((r: any) => r.user_id === currentUserId) : false;
 
+  // Handle case where Supabase join returns user as array or object
+  const userData = Array.isArray(sighting.user) ? sighting.user[0] : sighting.user;
+
+  console.log('[FeedScreen] user data for post:', JSON.stringify(userData));
+
   return {
     id: sighting.id,
     userId: sighting.user_id,
-    username: sighting.user?.username || 'Usuario',
-    userAvatar: sighting.user?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
+    username: userData?.username || 'Usuario',
+    userAvatar: userData?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
     location: sighting.is_location_private ? 'Ubicación Privada' : 'En la Naturaleza',
     image: sighting.photo_url || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=600',
     tag: sighting.bird?.common_name || 'Ave Sin Identificar',
@@ -33,7 +38,7 @@ function mapSightingToPost(sighting: any, currentUserId?: string): Post {
     comments: sighting.comments ? sighting.comments.length : 0,
     caption: sighting.description || '',
     timeAgo: timeAgoStr,
-    isVerified: sighting.user?.is_verified || false,
+    isVerified: userData?.is_verified === true,
     commentsList: [],
     hasLiked
   };

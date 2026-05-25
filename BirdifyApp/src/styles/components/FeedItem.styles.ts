@@ -38,7 +38,7 @@ export const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textPrimary,
   },
   verifiedIcon: {
-    marginLeft: 4,
+    marginLeft: 8,
   },
   location: {
     fontSize: Typography.fontSize.xs,

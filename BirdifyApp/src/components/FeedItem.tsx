@@ -388,7 +388,7 @@ export default function FeedItem({ post }: FeedItemProps) {
             <View style={styles.nameRow}>
               <Text style={styles.username}>{post.username}</Text>
               {post.isVerified && (
-                <Ionicons name="checkmark-circle" size={14} color="#458eff" style={styles.verifiedIcon} />
+                <Ionicons name="checkmark-circle" size={16} color={colors.primary} style={styles.verifiedIcon} />
               )}
             </View>
             <Text style={styles.location}>{post.location}</Text>
