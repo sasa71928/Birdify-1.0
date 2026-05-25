@@ -1,12 +1,5 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  StatusBar,
-} from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -15,10 +8,10 @@ import { Colors, Typography, Spacing, Radius } from '../../theme';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useAuth } from '../../context/AuthContext';
-
+import * as DocumentPicker from 'expo-document-picker';
+import * as MailComposer from 'expo-mail-composer';
 type SettingsNavProp = NativeStackNavigationProp<RootStackParamList, 'Settings'>;
 
-// ── Item Type ─────────────────────────────────────────────────────────────────
 interface SettingItem {
   id: string;
   icon: keyof typeof Ionicons.glyphMap;
@@ -38,6 +31,7 @@ const SETTING_SECTIONS: SettingSection[] = [
       { id: '1', icon: 'person-outline', label: 'Edit Profile' },
       { id: '2', icon: 'lock-closed-outline', label: 'Privacy & Security' },
       { id: '3', icon: 'notifications-outline', label: 'Notifications' },
+      { id: 'verify', icon: 'mail-outline', label: 'Solicitar verificación de observador de aves' },
     ],
   },
   {
@@ -49,9 +43,7 @@ const SETTING_SECTIONS: SettingSection[] = [
   },
   {
     title: 'Data & Storage',
-    data: [
-      { id: 'offline', icon: 'cloud-offline-outline', label: 'Offline Storage' },
-    ],
+    data: [{ id: 'offline', icon: 'cloud-offline-outline', label: 'Offline Storage' }],
   },
   {
     title: 'Support & About',
@@ -62,112 +54,57 @@ const SETTING_SECTIONS: SettingSection[] = [
   },
   {
     title: 'Actions',
-    data: [
-      { id: '8', icon: 'log-out-outline', label: 'Log Out', danger: true },
-    ],
+    data: [{ id: '8', icon: 'log-out-outline', label: 'Log Out', danger: true }],
   },
 ];
 
-export const createStyles = (colors: any) => StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.surface,
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border + '20',
-  },
-  backBtn: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-    color: colors.textPrimary,
-  },
-  placeholder: {
-    width: 32, // Matches backBtn width approx to center title
-  },
-
-  // Content
-  content: {
-    padding: Spacing.md,
-    paddingBottom: Spacing.xxl,
-  },
-  
-  // Section
-  section: {
-    marginBottom: Spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold,
-    color: colors.textSecondary,
-    marginBottom: Spacing.sm,
-    marginLeft: Spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  
-  // Card
-  card: {
-    backgroundColor: colors.canvasPure,
-    borderRadius: Radius.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border + '20',
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.md,
-  },
-  iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primary + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.md,
-  },
-  iconWrapDanger: {
-    backgroundColor: colors.errorRed + '15',
-  },
-  itemLabel: {
-    flex: 1,
-    fontSize: Typography.fontSize.md,
-    color: colors.textPrimary,
-    fontWeight: Typography.fontWeight.medium,
-  },
-  itemLabelDanger: {
-    color: colors.errorRed,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border + '20',
-    marginLeft: 52 + Spacing.md, // Aligns with text
-  },
-});
+export const createStyles = (colors: any) =>
+  StyleSheet.create({
+    safe: { flex: 1, backgroundColor: colors.surface },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.sm,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border + '20',
+    },
+    backBtn: { padding: 4 },
+    headerTitle: { fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.bold, color: colors.textPrimary },
+    placeholder: { width: 32 },
+    content: { padding: Spacing.md, paddingBottom: Spacing.xxl },
+    section: { marginBottom: Spacing.lg },
+    sectionTitle: {
+      fontSize: Typography.fontSize.sm,
+      fontWeight: Typography.fontWeight.bold,
+      color: colors.textSecondary,
+      marginBottom: Spacing.sm,
+      marginLeft: Spacing.sm,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    card: { backgroundColor: colors.canvasPure, borderRadius: Radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: colors.border + '20' },
+    itemRow: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md },
+    iconWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary + '20', justifyContent: 'center', alignItems: 'center', marginRight: Spacing.md },
+    iconWrapDanger: { backgroundColor: colors.errorRed + '15' },
+    itemLabel: { flex: 1, fontSize: Typography.fontSize.md, color: colors.textPrimary, fontWeight: Typography.fontWeight.medium },
+    itemLabelDanger: { color: colors.errorRed },
+    divider: { height: 1, backgroundColor: colors.border + '20', marginLeft: 52 + Spacing.md },
+  });
 
 export default function SettingsScreen() {
   const navigation = useNavigation<SettingsNavProp>();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
-  const { signOut } = useAuth();
+  const { signOut, session } = useAuth();
+
+  const [verificationModalVisible, setVerificationModalVisible] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<{ uri: string; name: string } | null>(null);
+
   const handlePress = (item: SettingItem) => {
     if (item.danger) {
-      // Sign out via AuthContext
-      signOut().catch(err => {
-        console.error('Logout failed', err);
-      });
+      signOut().catch(err => console.error('Logout failed', err));
     } else if (item.id === '1') {
       navigation.navigate('EditProfile' as any);
     } else if (item.id === '2') {
@@ -184,6 +121,8 @@ export default function SettingsScreen() {
       navigation.navigate('AboutBirdify' as any);
     } else if (item.id === 'offline') {
       navigation.navigate('OfflineStorage' as any);
+    } else if (item.id === 'verify') {
+      setVerificationModalVisible(true);
     } else {
       console.log(`Navigating to ${item.label}`);
     }
@@ -192,8 +131,6 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-
-      {/* ── Header ── */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
@@ -201,40 +138,24 @@ export default function SettingsScreen() {
         <Text style={styles.headerTitle}>Settings</Text>
         <View style={styles.placeholder} />
       </View>
-
-      {/* ── Content ── */}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         {SETTING_SECTIONS.map((section, index) => (
           <View key={index} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
-            
             <View style={styles.card}>
-              {section.data.map((item, i) => {
-                const isLast = i === section.data.length - 1;
+              {section.data.map(item => {
+                const isLast = item.id === section.data[section.data.length - 1].id;
                 return (
                   <View key={item.id}>
-                    <TouchableOpacity
-                      style={styles.itemRow}
-                      activeOpacity={0.7}
-                      onPress={() => handlePress(item)}
-                    >
+                    <TouchableOpacity style={styles.itemRow} activeOpacity={0.7} onPress={() => handlePress(item)}>
                       <View style={[styles.iconWrap, item.danger && styles.iconWrapDanger]}>
-                        <Ionicons
-                          name={item.icon as any}
-                          size={20}
-                          color={item.danger ? colors.errorRed : colors.primary}
-                        />
+                        <Ionicons name={item.icon as any} size={20} color={item.danger ? colors.errorRed : colors.primary} />
                       </View>
-                      
-                      <Text style={[styles.itemLabel, item.danger && styles.itemLabelDanger]}>
-                        {item.label}
-                      </Text>
-
+                      <Text style={[styles.itemLabel, item.danger && styles.itemLabelDanger]}>{item.label}</Text>
                       {!item.danger && (
                         <Ionicons name="chevron-forward" size={18} color={colors.outlineGrey} />
                       )}
                     </TouchableOpacity>
-
                     {!isLast && <View style={styles.divider} />}
                   </View>
                 );
@@ -243,8 +164,80 @@ export default function SettingsScreen() {
           </View>
         ))}
       </ScrollView>
+        <Modal
+          visible={verificationModalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setVerificationModalVisible(false)}
+        >
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <View style={{ margin: 20, backgroundColor: colors.canvasPure, padding: 35, borderRadius: 20, elevation: 5 }}>
+              <Text style={{ fontSize: 18, marginBottom: 15, fontWeight: 'bold', color: colors.textPrimary, textAlign: 'center' }}>Solicitar verificación</Text>
+              <Text style={{ marginBottom: 15, color: colors.textSecondary, textAlign: 'center' }}>Sube un PDF o imagen que acredite tu experiencia como ornitólogo o biólogo.</Text>
+
+              <TouchableOpacity
+                style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary + '20', borderRadius: 8, alignItems: 'center', marginBottom: 15 }}
+                onPress={async () => {
+                  try {
+                    const result = await DocumentPicker.getDocumentAsync({
+                      type: ['application/pdf', 'image/*'],
+                      copyToCacheDirectory: true,
+                    });
+                    if (!result.canceled) {
+                      setSelectedFile({ uri: result.assets[0].uri, name: result.assets[0].name });
+                    }
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }}
+              >
+                <Text style={{ color: colors.primary }}>{selectedFile ? selectedFile.name : 'Seleccionar archivo'}</Text>
+              </TouchableOpacity>
+
+              {selectedFile && (
+                <Text style={{ marginBottom: 15, color: colors.textPrimary, textAlign: 'center' }}>{selectedFile.name}</Text>
+              )}
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <TouchableOpacity
+                    style={{ backgroundColor: colors.errorRed, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8 }}
+                    onPress={() => {
+                      setVerificationModalVisible(false);
+                      setSelectedFile(null);
+                    }}>
+                    <Text style={{ color: colors.canvasPure, fontWeight: '600' }}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: selectedFile ? colors.primary : colors.outlineGrey,
+                      paddingVertical: 10,
+                      paddingHorizontal: 14,
+                      borderRadius: 8,
+                    }}
+                    disabled={!selectedFile}
+                    onPress={async () => {
+                      if (selectedFile) {
+                        try {
+                          const { status } = await MailComposer.composeAsync({
+                            recipients: ['authbirdify@gmail.com'],
+                            subject: 'Solicitud de verificación - ' + session?.user?.email,
+                            body: `Adjunto mi documento de verificación (${selectedFile.name}).`,
+                            attachments: [selectedFile.uri],
+                          });
+                          Alert.alert('Solicitud enviada', status === 'sent' ? 'Correo enviado correctamente.' : 'El correo no se pudo enviar.');
+                        } catch (e) {
+                          Alert.alert('Error', 'No se pudo enviar la solicitud.');
+                        }
+                        setVerificationModalVisible(false);
+                        setSelectedFile(null);
+                      }
+                    }}>
+                    <Text style={{ color: colors.canvasPure, fontWeight: '600' }}>Enviar solicitud</Text>
+                  </TouchableOpacity>
+                </View>
+            </View>
+          </View>
+        </Modal>
     </SafeAreaView>
   );
 }
-
-

@@ -228,27 +228,30 @@ export default function ProfileScreen() {
   };
 
   // Get user data
-  const userData = profile ? {
-    name: profile.fullname ||  'Usuario',
-    username: profile.username || 'user',
-    avatar: profile.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
-    bio: profile.bio || 'Sin biografía.',
-    isPrivate: profile.is_private,
-    followers: followersCount.toString(),
-    following: followingCount.toString(),
-    sightings: sightings.length.toString(),
-    profession: profile.user_level === 'admin' ? 'Administrador' : 'Bird Watcher'
-  } : {
-    name: 'Cargando...',
-    username: '...',
-    avatar: 'https://gravatar.com/avatar/?d=mp',
-    bio: '',
-    isPrivate: false,
-    followers: '0',
-    following: '0',
-    sightings: '0',
-    profession: '...'
-  };
+  // Updated userData with verification flag
+const userData = profile ? {
+  name: profile.fullname || 'Usuario',
+  username: profile.username || 'user',
+  avatar: profile.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
+  bio: profile.bio || 'Sin biografía.',
+  isPrivate: profile.is_private,
+  is_verified: profile.is_verified ?? false,
+  followers: followersCount.toString(),
+  following: followingCount.toString(),
+  sightings: sightings.length.toString(),
+  profession: profile.user_level === 'admin' ? 'Administrador' : 'Bird Watcher',
+} : {
+  name: 'Cargando...',
+  username: '...',
+  avatar: 'https://gravatar.com/avatar/?d=mp',
+  bio: '',
+  isPrivate: false,
+  is_verified: false,
+  followers: '0',
+  following: '0',
+  sightings: '0',
+  profession: '...'
+};
 
   const [activeTab, setActiveTab] = useState<Tab>('Sightings');
   const [followModalVisible, setFollowModalVisible] = useState(false);
@@ -338,6 +341,12 @@ export default function ProfileScreen() {
           <MaterialCommunityIcons name="leaf" size={14} color={colors.primary} />
           <Text style={styles.professionText}>{userData.profession || 'Bird Watcher'}</Text>
         </View>
+        {userData.is_verified === true && (
+          <View style={styles.verificationBadge}>
+            <MaterialCommunityIcons name="shield-check" size={14} color={colors.primary} />
+            <Text style={styles.verificationText}>Verificado</Text>
+          </View>
+        )}
 
         <View style={styles.statsRow}>
           <TouchableOpacity style={styles.statItem} onPress={() => openFollowModal('Followers')}>
@@ -395,7 +404,7 @@ export default function ProfileScreen() {
           <Text style={styles.privateSubtitle}>Follow this account to see their sightings and activity.</Text>
         </View>
       ) : (
-        <>
+        <View>
           {/* ── Tab bar horizontal ── */}
           <View style={styles.tabsContainer}>
             {(['Sightings', 'Logbook', 'Likes'] as Tab[]).map((tab) => (
@@ -419,7 +428,7 @@ export default function ProfileScreen() {
             {activeTab === 'Logbook'   && <LogbookView species={species} />}
             {activeTab === 'Likes'     && <LikesView likes={likes} />}
           </ScrollView>
-        </>
+        </View>
       )}
 
       {/* ── Follow Modal ── */}
@@ -496,8 +505,7 @@ export default function ProfileScreen() {
 
       <BottomNavBar />
     </SafeAreaView>
-  );
-}
+);
 
 // ── Sightings grid ────────────────────────────────────────────────────────────
 function SightingsGrid({ sightings }: { sightings: any[] }) {
@@ -641,7 +649,5 @@ function LikesView({ likes }: { likes: any[] }) {
       ))}
     </View>
   );
+  }
 }
-
-
-

@@ -8,6 +8,21 @@ const ITEM_WIDTH = (width - Spacing.md * 2 - GRID_SPACING * (COLUMN_COUNT - 1)) 
 
 export const createStyles = (colors: any) => StyleSheet.create({
   scroll: { flex: 1 },
+  verificationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.springMoss + '30',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    marginTop: Spacing.xs,
+    gap: 4,
+  },
+  verificationText: {
+    fontSize: Typography.fontSize.xs,
+    color: colors.primary,
+    fontWeight: Typography.fontWeight.semiBold,
+  },
   scrollContent: { paddingBottom: 120 },
 
   // Profile header
