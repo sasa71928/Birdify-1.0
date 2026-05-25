@@ -77,6 +77,11 @@ export async function initDatabase() {
       attempts INTEGER DEFAULT 0
     );
   `);
+
+  // ── Migraciones: columnas nuevas en tablas existentes ──────────
+  await db.execAsync(
+    `ALTER TABLE sightings ADD COLUMN sync_status TEXT DEFAULT 'synced'`
+  ).catch(() => {});
 }
 
 export default db;

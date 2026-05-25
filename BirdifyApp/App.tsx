@@ -1,3 +1,4 @@
+import 'react-native-get-random-values';
 import React, { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -22,7 +23,6 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import { AuthProvider } from './src/context/AuthContext';
 import { initDatabase } from './src/lib/database';
 import { initNetworkListener } from './src/services/syncService';
-
 
 export default function App() {
   const [fontsLoaded] = useFonts({

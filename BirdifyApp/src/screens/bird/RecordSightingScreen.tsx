@@ -34,6 +34,11 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { BirdRepository } from '../../repositories/bird.repository';
 import { SightingRepository } from '../../repositories/sighting.repository';
+import { isOnline, addToQueue } from '../../services/syncService';
+import db from '../../lib/database';
+import * as FileSystem from 'expo-file-system';
+import 'react-native-get-random-values';
+import { v4 as uuidv4 } from 'uuid';
 
 // Decodificador nativo
 function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
@@ -236,87 +241,134 @@ export default function RecordSightingScreen() {
     }
   };
 
-  const handlePost = async () => {
-    if (!user) return Alert.alert('Sesión Inválida', 'Inicia sesión para compartir un avistamiento.');
-    if (!birdName.trim()) return Alert.alert('Información incompleta', 'Debes nombrar o describir al ave.');
-    if (!imageBase64) return Alert.alert('Información incompleta', '¡Una buena foto es esencial para registrar un avistamiento!');
+    const handlePost = async () => {
+      if (!user) return Alert.alert('Sesión Inválida', 'Inicia sesión para compartir un avistamiento.');
+      if (!birdName.trim()) return Alert.alert('Información incompleta', 'Debes nombrar o describir al ave.');
+      if (!imageUri) return Alert.alert('Información incompleta', '¡Una buena foto es esencial para registrar un avistamiento!');
 
-    setIsPosting(true);
-    try {
-      // 1. Buscar ave en base de datos.
-      let finalBirdId = null;
-      const searchName = selectedBird ? selectedBird.common_name : birdName;
-      const birds = await BirdRepository.search(searchName);
-      
-      if (birds && birds.length > 0) {
-        finalBirdId = birds[0].id;
-      } else {
-        // Registrar el ave automáticamente en el catálogo si no existe
-        const { data: newBird, error: birdError } = await supabase
-          .from('birds')
-          .insert({
-            common_name: searchName,
-            scientific_name: selectedBird?.scientific_name || (searchName + ' sp.'),
-            description: 'Registrado dinámicamente durante un avistamiento.',
-            season: 'Desconocido',
-            habitat_info: 'Desconocido',
-            ideal_zones: 'Desconocido'
-          })
-          .select()
-          .single();
+      setIsPosting(true);
+      try {
+        if (isOnline) {
+          // ── lujo original ──────────────────────────────────
+          if (!imageBase64) throw new Error('No se pudo leer la imagen.');
 
-        if (birdError) {
-          throw new Error('Error al registrar especie en el catálogo: ' + birdError.message);
+          let finalBirdId = null;
+          const searchName = selectedBird ? selectedBird.common_name : birdName;
+          const birds = await BirdRepository.search(searchName);
+
+          if (birds && birds.length > 0) {
+            finalBirdId = birds[0].id;
+          } else {
+            const { data: newBird, error: birdError } = await supabase
+              .from('birds')
+              .insert({
+                common_name: searchName,
+                scientific_name: selectedBird?.scientific_name || (searchName + ' sp.'),
+                description: 'Registrado dinámicamente durante un avistamiento.',
+                season: 'Desconocido',
+                habitat_info: 'Desconocido',
+                ideal_zones: 'Desconocido'
+              })
+              .select()
+              .single();
+            if (birdError) throw new Error('Error al registrar especie: ' + birdError.message);
+            finalBirdId = newBird.id;
+          }
+
+          const fileExt = imageUri.split('.').pop() || 'jpg';
+          const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+          const arrayBuffer = decodeBase64ToArrayBuffer(imageBase64);
+
+          const { error: uploadError } = await supabase.storage
+            .from('Sightings')
+            .upload(fileName, arrayBuffer, {
+              contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+              upsert: true,
+            });
+          if (uploadError) throw new Error('Error al subir imagen: ' + uploadError.message);
+
+          const { data: { publicUrl } } = supabase.storage.from('Sightings').getPublicUrl(fileName);
+
+          await SightingRepository.create({
+            user_id: user.id,
+            bird_id: finalBirdId,
+            description: notes,
+            latitude: region.latitude,
+            longitude: region.longitude,
+            is_location_private: isPrivate,
+            photo_url: publicUrl,
+            sighting_date: new Date().toISOString()
+          });
+
+        } else {
+          // ── offline: guardar local + encolar ───────────────────────
+          const localId = uuidv4();
+          const searchName = selectedBird ? selectedBird.common_name : birdName;
+
+          // ✅ imageUri ya es persistente — no necesitas copiarla
+          const localImagePath = imageUri;
+
+          // Buscar o crear ave en SQLite local
+          let localBirdId: string | null = null;
+          const localBirds = await db.getAllAsync<any>(
+            `SELECT id FROM birds WHERE lower(common_name) = lower(?) LIMIT 1`,
+            [searchName]
+          );
+          if (localBirds.length > 0) {
+            localBirdId = localBirds[0].id;
+          } else {
+            localBirdId = uuidv4();
+            await db.runAsync(
+              `INSERT OR IGNORE INTO birds (id, common_name, scientific_name) VALUES (?, ?, ?)`,
+              [localBirdId, searchName, selectedBird?.scientific_name || searchName + ' sp.']
+            );
+          }
+
+          // Guardar sighting con sync_status = 'pending'
+          await db.runAsync(
+            `INSERT INTO sightings
+              (id, user_id, bird_id, description, latitude, longitude,
+              is_location_private, photo_url, sighting_date, sync_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+            [
+              localId, user.id, localBirdId, notes,
+              region.latitude, region.longitude,
+              isPrivate ? 1 : 0,
+              localImagePath,
+              new Date().toISOString()
+            ]
+          );
+
+          await addToQueue('sightings', 'INSERT', {
+            id: localId,
+            user_id: user.id,
+            bird_id: localBirdId,
+            description: notes,
+            latitude: region.latitude,
+            longitude: region.longitude,
+            is_location_private: isPrivate ? 1 : 0,
+            photo_url: null,           // se llenará cuando el sync suba la imagen
+            sighting_date: new Date().toISOString(),
+            _localImagePath: localImagePath,   // campo extra para que el sync sepa qué subir
+            _birdName: searchName,
+            _scientificName: selectedBird?.scientific_name || null
+          });
         }
-        finalBirdId = newBird.id;
+
+        showToast(
+          isOnline
+            ? '¡Avistamiento publicado con éxito!'
+            : '¡Guardado! Se sincronizará cuando haya conexión.',
+          'success'
+        );
+        setTimeout(() => navigation.navigate('MainTabs', { screen: 'Feed' }), 1500);
+
+      } catch (error: any) {
+        showToast(error.message || 'No se pudo publicar el avistamiento.', 'error');
+      } finally {
+        setIsPosting(false);
       }
-
-      // --- FLUJO DE SUBIDA A SUPABASE ---
-      const fileExt = imageUri?.split('.').pop() || 'jpg';
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      const arrayBuffer = decodeBase64ToArrayBuffer(imageBase64);
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('Sightings')
-        .upload(fileName, arrayBuffer, {
-          contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
-          upsert: true,
-        });
-
-      if (uploadError) {
-        throw new Error('Error al subir imagen: ' + uploadError.message);
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('Sightings')
-        .getPublicUrl(fileName);
-
-      // Crear el registro de avistamiento
-      await SightingRepository.create({
-        user_id: user.id,
-        bird_id: finalBirdId,
-        description: notes,
-        latitude: region.latitude,
-        longitude: region.longitude,
-        is_location_private: isPrivate,
-        photo_url: publicUrl,
-        sighting_date: new Date().toISOString()
-      });
-
-      // Éxito: Mostrar Toast discreto arriba
-      showToast('¡Avistamiento publicado con éxito!', 'success');
-
-      // Navegar al Feed después de una breve pausa
-      setTimeout(() => {
-        navigation.navigate('MainTabs', { screen: 'Feed' });
-      }, 1500);
-
-    } catch (error: any) {
-      showToast(error.message || 'No se pudo publicar el avistamiento.', 'error');
-    } finally {
-      setIsPosting(false);
-    }
-  };
+    };
 
   return (
     <SafeAreaView style={shared.safe}>
