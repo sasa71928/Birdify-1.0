@@ -31,8 +31,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const { data: existing, error } = await supabase
         .from('users')
-        .select('id')
-        .eq('id', authUser.id)
+        .select('id, email')
+        .or(`id.eq.${authUser.id},email.eq.${authUser.email}`)
         .maybeSingle();
 
       if (error) {
@@ -40,7 +40,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      if (!existing) {
+      // Si no existe el perfil bajo este ID ni este Email, o si el ID del perfil existente es diferente (usuario recreado)
+      if (!existing || existing.id !== authUser.id) {
         const rawUsername = authUser.user_metadata?.username || authUser.email?.split('@')[0] || `user_${authUser.id.substring(0, 8)}`;
         const fullname = authUser.user_metadata?.fullname || authUser.user_metadata?.full_name || null;
         const profilePicUrl = authUser.user_metadata?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp';
@@ -48,20 +49,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Sanitize username to match alphanumeric + underscores
         const sanitizedUsername = rawUsername.toLowerCase().replace(/[^a-z0-9_]/g, '');
 
-        const { error: insertError } = await supabase
+        const { error: upsertError } = await supabase
           .from('users')
-          .insert({
+          .upsert({
             id: authUser.id,
             email: authUser.email,
             username: sanitizedUsername,
             fullname: fullname,
             profile_pic_url: profilePicUrl,
-          });
+          }, { onConflict: 'email' });
 
-        if (insertError) {
-          console.error('Error creating public user profile:', insertError);
+        if (upsertError) {
+          console.error('Error ensuring public user profile:', upsertError);
         } else {
-          console.log('Public user profile successfully created.');
+          console.log('Public user profile successfully synchronized.');
         }
       }
     } catch (err) {
