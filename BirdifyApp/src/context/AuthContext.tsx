@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import db from '../lib/database';
 
@@ -16,6 +17,8 @@ const AuthContext = createContext<AuthContextProps>({
   isLoading: true,
   signOut: async () => {},
 });
+
+const LAST_USER_ID_KEY = 'birdify:lastUserId';
 
 async function cacheUserProfile(userId: string) {
   try {
@@ -38,9 +41,41 @@ async function cacheUserProfile(userId: string) {
       ]
     );
 
+    await AsyncStorage.setItem(LAST_USER_ID_KEY, data.id);
     console.log('✅ Perfil cacheado localmente');
   } catch (err) {
     console.warn('⚠️ No se pudo cachear el perfil:', err);
+  }
+}
+
+async function getOfflineUser(): Promise<User | null> {
+  try {
+    const lastUserId = await AsyncStorage.getItem(LAST_USER_ID_KEY);
+    if (!lastUserId) return null;
+
+    const localUser = await db.getFirstAsync<any>(
+      `SELECT * FROM users WHERE id = ? LIMIT 1`,
+      [lastUserId]
+    );
+
+    if (!localUser) return null;
+
+    return {
+      id: localUser.id,
+      email: localUser.email,
+      user_metadata: {
+        username: localUser.username,
+        fullname: localUser.fullname,
+        profile_pic_url: localUser.profile_pic_url,
+        is_verified: !!localUser.is_verified,
+      },
+      app_metadata: {},
+      aud: 'authenticated',
+      created_at: localUser.created_at || new Date().toISOString(),
+    } as User;
+  } catch (err) {
+    console.warn('⚠️ No se pudo recuperar usuario offline:', err);
+    return null;
   }
 }
 
@@ -51,29 +86,51 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    await AsyncStorage.removeItem(LAST_USER_ID_KEY);
     setUser(null);
     setSession(null);
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsLoading(false);
+    const bootstrapAuth = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
 
-      // Cachea perfil si hay sesión activa
-      if (session?.user) {
-        cacheUserProfile(session.user.id);
+        if (data?.session) {
+          setSession(data.session);
+          setUser(data.session.user);
+          await AsyncStorage.setItem(LAST_USER_ID_KEY, data.session.user.id);
+          await cacheUserProfile(data.session.user.id);
+        } else {
+          const fallbackUser = await getOfflineUser();
+          setSession(null);
+          setUser(fallbackUser);
+        }
+
+        if (error) {
+          console.warn('⚠️ getSession error:', error.message);
+        }
+      } catch (err) {
+        console.warn('⚠️ getSession falló, intentando modo offline...');
+        const fallbackUser = await getOfflineUser();
+        setSession(null);
+        setUser(fallbackUser);
+      } finally {
+        setIsLoading(false);
       }
-    });
+    };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    bootstrapAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
 
-      // Cachea perfil cada vez que cambia la sesión
       if (session?.user) {
-        cacheUserProfile(session.user.id);
+        await AsyncStorage.setItem(LAST_USER_ID_KEY, session.user.id);
+        await cacheUserProfile(session.user.id);
+      } else {
+        await AsyncStorage.removeItem(LAST_USER_ID_KEY);
       }
     });
 

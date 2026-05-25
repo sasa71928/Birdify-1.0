@@ -110,7 +110,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { Colors } from '../theme';
 
 export default function AppNavigator() {
-  const { session, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -125,7 +125,7 @@ export default function AppNavigator() {
     <Stack.Navigator
       screenOptions={{ headerShown: false } as any}
     >
-      {!session ? (
+      {!user ? (
         <>
           <Stack.Screen name="Welcome"  component={WelcomeScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
