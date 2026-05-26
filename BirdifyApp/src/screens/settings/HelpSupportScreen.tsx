@@ -13,6 +13,9 @@ import { createStyles } from '../../styles/screens/settings/settingsSubScreens.s
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { Spacing } from '../../theme';
 
+import { Linking, Alert } from 'react-native';
+import { useAuth } from '../../context/AuthContext';
+
 const FAQS = [
   {
     id: '1',
@@ -36,9 +39,29 @@ export default function HelpSupportScreen() {
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const [expanded, setExpanded] = useState<string | null>(null);
 
+  const { user } = useAuth();
+
   const toggleExpand = (id: string) => {
     setExpanded(expanded === id ? null : id);
   };
+
+  const handleContactSupport = async () => {
+  const email = 'birdifysupport@gmail.com';
+  const subject = `Birdify Support Request - ${user?.email || 'Unknown User'}`;
+
+  const url = `mailto:${email}?subject=${encodeURIComponent(subject)}`;
+
+  const supported = await Linking.canOpenURL(url);
+
+  if (supported) {
+    await Linking.openURL(url);
+  } else {
+    Alert.alert(
+      'Error',
+      'No se encontró una aplicación de correo disponible.'
+    );
+  }
+};
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -77,7 +100,7 @@ export default function HelpSupportScreen() {
           </TouchableOpacity>
         ))}
 
-        <TouchableOpacity style={styles.contactCard} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.contactCard} activeOpacity={0.8} onPress={handleContactSupport}>
           <View style={{ backgroundColor: colors.primary + '15', padding: Spacing.sm, borderRadius: 12 }}>
             <Ionicons name="mail" size={24} color={colors.primary} />
           </View>

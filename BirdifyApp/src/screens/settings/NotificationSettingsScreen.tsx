@@ -14,15 +14,15 @@ import { createStyles } from '../../styles/screens/settings/settingsSubScreens.s
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 const INITIAL_PUSH = [
-  { id: '1', title: 'New Sighting', desc: 'Alerts for rare birds in your area', icon: 'eye-outline', active: true },
+  { id: '1', title: 'New Sighting', desc: 'Alerts for rare birds in your area', icon: 'eye-outline', active: false },
   { id: '2', title: 'New Comment', desc: 'When someone replies to your journal', icon: 'chatbubble-outline', active: false },
   { id: '3', title: 'New Follower', desc: 'Stay updated on your community', icon: 'person-add-outline', active: false },
-  { id: '4', title: 'Direct Messages', desc: 'Private conversations', icon: 'mail-outline', active: true },
+  { id: '4', title: 'Direct Messages', desc: 'Private conversations', icon: 'mail-outline', active: false },
 ];
 
 const INITIAL_EMAIL = [
-  { id: '5', title: 'Weekly Digest', desc: 'Summary of activity and sightings', icon: 'book-outline', active: true },
-  { id: '6', title: 'Account Security', desc: 'Login alerts and password changes', icon: 'shield-checkmark-outline', active: true },
+  { id: '5', title: 'Weekly Digest', desc: 'Summary of activity and sightings', icon: 'book-outline', active: false },
+  { id: '6', title: 'Account Security', desc: 'Login alerts and password changes', icon: 'shield-checkmark-outline', active: false },
 ];
 
 export default function NotificationSettingsScreen() {
@@ -99,9 +99,6 @@ export default function NotificationSettingsScreen() {
             <View style={styles.notifTextContent}>
               <Text style={styles.notifTitle}>{item.title}</Text>
               <Text style={styles.notifDesc}>{item.desc}</Text>
-            </View>
-            <View style={[styles.radioOuter, item.active && { borderColor: colors.secondaryBlue }, { marginLeft: 'auto' }]}>
-              {item.active && <View style={[styles.radioInner, { backgroundColor: colors.secondaryBlue }]} />}
             </View>
           </TouchableOpacity>
         ))}

@@ -200,7 +200,7 @@ export const createStyles = (colors: any) => StyleSheet.create({
   notifSectionTitle: {
     fontSize: Typography.fontSize.md,
     fontWeight: Typography.fontWeight.bold,
-    color: colors.secondaryBlue, 
+    color: colors.primary, 
     marginLeft: Spacing.sm,
   },
   notifCard: {
