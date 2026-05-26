@@ -49,12 +49,22 @@ export default function HelpSupportScreen() {
   const email = 'birdifysupport@gmail.com';
   const subject = `Birdify Support Request - ${user?.email || 'Unknown User'}`;
 
-  const url = `mailto:${email}?subject=${encodeURIComponent(subject)}`;
+  const body = `
+    Describe your issue here.
 
-  const supported = await Linking.canOpenURL(url);
+    Device:
+    App Version:
+    `;
+
+  const emailUrl =
+    `mailto:birdifysupport@gmail.com` +
+    `?subject=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(body)}`;
+
+  const supported = await Linking.canOpenURL(emailUrl);
 
   if (supported) {
-    await Linking.openURL(url);
+    await Linking.openURL(emailUrl);
   } else {
     Alert.alert(
       'Error',
