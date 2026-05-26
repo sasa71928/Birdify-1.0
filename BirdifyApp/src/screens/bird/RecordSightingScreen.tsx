@@ -36,7 +36,7 @@ import { BirdRepository } from '../../repositories/bird.repository';
 import { SightingRepository } from '../../repositories/sighting.repository';
 import { isOnline, addToQueue } from '../../services/syncService';
 import db from '../../lib/database';
-import * as FileSystem from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -301,14 +301,27 @@ export default function RecordSightingScreen() {
           });
 
         } else {
-          // ── offline: guardar local + encolar ───────────────────────
-          const localId = uuidv4();
+          // ── offline ────────────────────────────────────────────────
+          const localId    = uuidv4();
           const searchName = selectedBird ? selectedBird.common_name : birdName;
 
-          // ✅ imageUri ya es persistente — no necesitas copiarla
-          const localImagePath = imageUri;
+          // Copiar imagen a directorio persistente
+          const fileName = `sighting_${localId}.jpg`;
 
-          // Buscar o crear ave en SQLite local
+          // Crear directorio persistente
+          const sightingsDir = new Directory(Paths.document, 'sightings');
+          if (!sightingsDir.exists) {
+            sightingsDir.create();
+          }
+
+          // Copiar imagen al directorio persistente
+          const sourceFile = new File(imageUri!);
+          const destFile   = new File(sightingsDir, fileName);
+          sourceFile.move(destFile);
+
+          const destPath = destFile.uri;
+
+          // Buscar o crear ave en SQLite
           let localBirdId: string | null = null;
           const localBirds = await db.getAllAsync<any>(
             `SELECT id FROM birds WHERE lower(common_name) = lower(?) LIMIT 1`,
@@ -324,7 +337,7 @@ export default function RecordSightingScreen() {
             );
           }
 
-          // Guardar sighting con sync_status = 'pending'
+          // Guardar sighting con path persistente
           await db.runAsync(
             `INSERT INTO sightings
               (id, user_id, bird_id, description, latitude, longitude,
@@ -334,7 +347,7 @@ export default function RecordSightingScreen() {
               localId, user.id, localBirdId, notes,
               region.latitude, region.longitude,
               isPrivate ? 1 : 0,
-              localImagePath,
+              destPath,           // ✅ path persistente
               new Date().toISOString()
             ]
           );
@@ -347,9 +360,9 @@ export default function RecordSightingScreen() {
             latitude: region.latitude,
             longitude: region.longitude,
             is_location_private: isPrivate ? 1 : 0,
-            photo_url: null,           // se llenará cuando el sync suba la imagen
+            photo_url: null,
             sighting_date: new Date().toISOString(),
-            _localImagePath: localImagePath,   // campo extra para que el sync sepa qué subir
+            _localImagePath: destPath,    // ✅ path persistente para el sync
             _birdName: searchName,
             _scientificName: selectedBird?.scientific_name || null
           });

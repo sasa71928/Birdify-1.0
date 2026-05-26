@@ -139,12 +139,12 @@ export async function flushSyncQueue() {
 
         const { data: { publicUrl } } = supabase.storage.from('Sightings').getPublicUrl(fileName);
 
-        // 3. Insertar sighting en Supabase
-        ({ error } = await supabase.from('sightings').insert({
+        // 3. Insertar sighting en Supabase, upsert actualiza si ya existe, inserta si no
+        ({ error } = await supabase.from('sightings').upsert({
           ...sightingData,
           bird_id: finalBirdId,
           photo_url: publicUrl
-        }));
+        }, { onConflict: 'id' }));
 
         if (!error) {
           // 4. Actualizar SQLite local con URL real
