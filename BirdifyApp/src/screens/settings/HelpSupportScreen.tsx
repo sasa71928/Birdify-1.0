@@ -46,14 +46,12 @@ export default function HelpSupportScreen() {
   };
 
   const handleContactSupport = async () => {
-  const email = 'birdifysupport@gmail.com';
   const subject = `Birdify Support Request - ${user?.email || 'Unknown User'}`;
 
-  const body = `
-    Describe your issue here.
+  const body = `Describe your issue here, including steps to reproduce if applicable:
 
-    Device:
-    App Version:
+  Device:
+  App Version:
     `;
 
   const emailUrl =

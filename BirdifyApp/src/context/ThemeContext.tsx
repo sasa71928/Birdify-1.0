@@ -15,7 +15,6 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const systemColorScheme = useColorScheme();
-  console.log('SYSTEM THEME:', systemColorScheme);
 
   const [theme, setTheme] = useState<ThemeType>('system');
 

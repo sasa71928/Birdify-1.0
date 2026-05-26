@@ -2,12 +2,10 @@ import React from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ImageBackground,
   TouchableOpacity,
   StatusBar,
 } from 'react-native';
-import { Colors, Typography, Spacing, Radius } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
