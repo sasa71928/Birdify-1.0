@@ -4,13 +4,20 @@ import { supabase } from '../lib/supabase';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 
-export let isOnline = true;
+export let isOnline = false;
 
 export function generateId(): string {
   return uuidv4();
 }
 
 export function initNetworkListener() {
+  // Consulta el estado actual inmediatamente
+  NetInfo.fetch().then(state => {
+    isOnline = !!state.isConnected;
+    console.log(`📡 Estado inicial de red: ${isOnline ? 'online' : 'offline'}`);
+  });
+
+  // Luego escucha cambios
   NetInfo.addEventListener(state => {
     const wasOffline = !isOnline;
     isOnline = !!state.isConnected;
@@ -25,7 +32,6 @@ export function initNetworkListener() {
     }
   });
 }
-
 export async function addToQueue(
   tableName: string,
   operation: 'INSERT' | 'UPDATE' | 'DELETE',
