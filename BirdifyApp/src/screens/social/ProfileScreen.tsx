@@ -75,6 +75,8 @@ export default function ProfileScreen() {
         // 1. Cargar Perfil
         const data = await ProfileRepository.getById(displayUserId);
         if (data) {
+          console.log('PROFILE RAW:', data);
+          console.log('VERIFIED:', data.is_verified);
           setProfile(data);
         }
 
@@ -316,11 +318,11 @@ const userData = profile ? {
             source={{ uri: userData.avatar }}
             style={styles.avatar}
           />
-          {isMe && (
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-            </View>
-          )}
+            {userData.is_verified === true && (
+              <View style={styles.verifiedBadge}>
+                <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+              </View>
+            )}
         </View>
 
         <View style={styles.nameRow}>
