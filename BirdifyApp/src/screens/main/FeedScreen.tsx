@@ -24,7 +24,6 @@ function mapSightingToPost(sighting: any, currentUserId?: string): Post {
   // Handle case where Supabase join returns user as array or object
   const userData = Array.isArray(sighting.user) ? sighting.user[0] : sighting.user;
 
-  console.log('[FeedScreen] user data for post:', JSON.stringify(userData));
 
   return {
     id: sighting.id,

@@ -75,8 +75,6 @@ export default function ProfileScreen() {
         // 1. Cargar Perfil
         const data = await ProfileRepository.getById(displayUserId);
         if (data) {
-          console.log('PROFILE RAW:', data);
-          console.log('VERIFIED:', data.is_verified);
           setProfile(data);
         }
 
@@ -339,10 +337,6 @@ const userData = profile ? {
 
         <Text style={styles.usernameText}>@{userData.username}</Text>
 
-        <View style={styles.professionBadge}>
-          <MaterialCommunityIcons name="leaf" size={14} color={colors.primary} />
-          <Text style={styles.professionText}>{userData.profession || 'Bird Watcher'}</Text>
-        </View>
         {userData.is_verified === true && (
           <View style={styles.verificationBadge}>
             <MaterialCommunityIcons name="shield-check" size={14} color={colors.primary} />
