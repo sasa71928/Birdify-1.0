@@ -46,7 +46,7 @@ export const Colors = {
 
 export const DarkColors = {
   // Primary Palette (inverted for dark mode)
-  primary: '#A3D494',         // Spring Moss as primary
+  primary: '#1f7a00',         // Spring Moss as primary
   container: '#154212',
   subContainer: '#305A27',
   springMoss: '#154212',
@@ -72,7 +72,7 @@ export const DarkColors = {
   textPrimary: '#FEFEFE',
   textSecondary: '#A0A0A0',
   textOnPrimary: '#121212',
-  accent: '#A3D494',
+  accent: '#1f7a00',
   border: '#333333',
   headerBorder: '#154212',
 

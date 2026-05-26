@@ -1,28 +1,3 @@
-/**
- * InputField — Campo de formulario reutilizable
- *
- * Props:
- *  label            — etiqueta superior izquierda
- *  labelRight       — elemento opcional a la derecha del label (ej: link "¿Olvidaste?")
- *  placeholder      — texto de ayuda dentro del input
- *  iconSymbol       — emoji o string corto como ícono izquierdo
- *  secureTextEntry  — oculta el texto (contraseña)
- *  showToggle       — muestra botón ojo para revelar/ocultar
-/**
- * InputField — Campo de formulario reutilizable
- *
- * Props:
- *  label            — etiqueta superior izquierda
- *  labelRight       — elemento opcional a la derecha del label (ej: link "¿Olvidaste?")
- *  placeholder      — texto de ayuda dentro del input
- *  iconSymbol       — emoji o string corto como ícono izquierdo
- *  secureTextEntry  — oculta el texto (contraseña)
- *  showToggle       — muestra botón ojo para revelar/ocultar
- *  keyboardType     — tipo de teclado
- *  value            — valor controlado
- *  onChangeText     — callback de cambio
- *  editable         — si el campo acepta entrada (default: true)
- */
 import React, { useState, ReactNode } from 'react';
 import {
   View,
@@ -31,8 +6,11 @@ import {
   TouchableOpacity,
   KeyboardTypeOptions,
 } from 'react-native';
+
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, Radius } from '../theme';
+
+import { useDynamicStyles } from '../hooks/useDynamicStyles';
+import { createStyles } from '../styles/components/InputField.styles';
 
 type InputFieldProps = {
   label: string;
@@ -47,8 +25,6 @@ type InputFieldProps = {
   editable?: boolean;
 };
 
-import styles from '../styles/components/InputField.styles';
-
 export default function InputField({
   label,
   labelRight,
@@ -61,7 +37,11 @@ export default function InputField({
   onChangeText,
   editable = true,
 }: InputFieldProps) {
+
+  const { colors, screen: styles } = useDynamicStyles(createStyles);
+
   const [isSecure, setIsSecure] = useState(secureTextEntry);
+
   const hasLabel = label.length > 0 || labelRight;
 
   return (
@@ -71,16 +51,26 @@ export default function InputField({
           <Text style={styles.label}>{label}</Text>
         </View>
       )}
+
       <View style={styles.container}>
         {iconSymbol && (
-          <View style={{ marginRight: 8, opacity: 0.7, justifyContent: 'center' }}>
-            {typeof iconSymbol === 'string' ? <Text style={{ fontSize: 16 }}>{iconSymbol}</Text> : iconSymbol}
+          <View
+            style={{
+              marginRight: 8,
+              opacity: 0.7,
+              justifyContent: 'center',
+            }}
+          >
+            {typeof iconSymbol === 'string'
+              ? <Text style={{ fontSize: 16 }}>{iconSymbol}</Text>
+              : iconSymbol}
           </View>
         )}
+
         <TextInput
           style={styles.input}
           placeholder={placeholder}
-          placeholderTextColor={Colors.placeholder}
+          placeholderTextColor={colors.placeholder}
           secureTextEntry={isSecure}
           keyboardType={keyboardType}
           autoCapitalize="none"
@@ -88,6 +78,7 @@ export default function InputField({
           onChangeText={onChangeText}
           editable={editable}
         />
+
         {showToggle && (
           <TouchableOpacity
             onPress={() => setIsSecure(!isSecure)}
@@ -97,12 +88,17 @@ export default function InputField({
             <Ionicons
               name={isSecure ? 'eye-outline' : 'eye-off-outline'}
               size={20}
-              color={Colors.textSecondary}
+              color={colors.textSecondary}
             />
           </TouchableOpacity>
         )}
       </View>
-      {labelRight && <View style={styles.labelRight}>{labelRight}</View>}
+
+      {labelRight && (
+        <View style={styles.labelRight}>
+          {labelRight}
+        </View>
+      )}
     </View>
   );
 }
