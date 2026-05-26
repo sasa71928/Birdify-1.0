@@ -19,7 +19,6 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 import { Typography, Spacing, Radius, Shadows } from '../../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TopNavBar from '../../components/TopNavBar';
-import BottomNavBar from '../../components/BottomNavBar';
 import { createStyles } from '../../styles/screens/social/profileScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useAuth } from '../../context/AuthContext';
@@ -27,8 +26,6 @@ import { ProfileRepository } from '../../repositories/profile.repository';
 import { User } from '../../types/models';
 import { supabase } from '../../lib/supabase';
 import { FollowRepository } from '../../repositories/follow.repository';
-import { isOnline } from '../../services/syncService';
-import db from '../../lib/database';
 
 type ProfileRouteProp = RouteProp<RootStackParamList, 'Profile'>;
 
@@ -80,54 +77,22 @@ export default function ProfileScreen() {
           setProfile(data);
         }
 
-        // 2. Cargar Avistamientos — online: Supabase, offline: SQLite
-        let sightingsData: any[] = [];
-        if (isOnline) {
-          const { data: remoteData, error: sightingsError } = await supabase
-            .from('sightings')
-            .select(`id, description, photo_url, sighting_date, is_location_private,
-                    bird:birds (id, common_name, scientific_name)`)
-            .eq('user_id', displayUserId)
-            .order('created_at', { ascending: false });
+        // 2. Cargar Avistamientos Reales
+        const { data: sightingsData, error: sightingsError } = await supabase
+          .from('sightings')
+          .select(`
+            id,
+            description,
+            photo_url,
+            sighting_date,
+            is_location_private,
+            bird:birds (id, common_name, scientific_name)
+          `)
+          .eq('user_id', displayUserId)
+          .order('created_at', { ascending: false });
 
-          if (sightingsError) throw sightingsError;
-          sightingsData = remoteData || [];
-
-          // Cachea en local para uso offline
-          for (const s of sightingsData) {
-            await db.runAsync(
-              `INSERT OR REPLACE INTO sightings
-                (id, user_id, bird_id, description, photo_url, sighting_date, is_location_private)
-              VALUES (?, ?, ?, ?, ?, ?, ?)`,
-              [s.id, displayUserId, s.bird?.id ?? null, s.description ?? null,
-              s.photo_url ?? null, s.sighting_date ?? null, s.is_location_private ? 1 : 0]
-            );
-            if (s.bird) {
-              await db.runAsync(
-                `INSERT OR REPLACE INTO birds (id, common_name, scientific_name) VALUES (?, ?, ?)`,
-                [s.bird.id, s.bird.common_name ?? null, s.bird.scientific_name ?? null]
-              );
-            }
-          }
-        } else {
-          // Sin red: lee desde SQLite con JOIN al ave
-          const rows = await db.getAllAsync<any>(
-            `SELECT s.id, s.description, s.photo_url, s.sighting_date, s.is_location_private,
-                    b.id as bird_id, b.common_name, b.scientific_name
-            FROM sightings s
-            LEFT JOIN birds b ON s.bird_id = b.id
-            WHERE s.user_id = ?
-            ORDER BY s.sighting_date DESC`,
-            [displayUserId]
-          );
-          sightingsData = rows.map((r: any) => ({
-            id: r.id, description: r.description, photo_url: r.photo_url,
-            sighting_date: r.sighting_date, is_location_private: r.is_location_private,
-            bird: r.bird_id ? { id: r.bird_id, common_name: r.common_name,
-                                scientific_name: r.scientific_name } : null,
-          }));
-        }
-        setSightings(sightingsData);
+        if (sightingsError) throw sightingsError;
+        setSightings(sightingsData || []);
 
         // 3. Procesar Especies (Logbook) a partir de los avistamientos reales
         const speciesMap = new Map<string, any>();
@@ -152,47 +117,43 @@ export default function ProfileScreen() {
         });
         setSpecies(Array.from(speciesMap.values()));
 
-        // 4. Cargar Likes — online: Supabase, offline: SQLite
-        if (isOnline) {
-          const { data: reactionsData, error: reactionsError } = await supabase
-            .from('reactions')
-            .select(`sighting:sightings (id, photo_url,
-                      user:users!sightings_user_id_fkey (username))`)
-            .eq('user_id', displayUserId);
+        // 4. Cargar Likes (Reacciones)
+        const { data: reactionsData, error: reactionsError } = await supabase
+          .from('reactions')
+          .select(`
+            sighting:sightings (
+              id,
+              photo_url,
+              user:users!sightings_user_id_fkey (username)
+            )
+          `)
+          .eq('user_id', displayUserId);
 
-          if (reactionsError) throw reactionsError;
-          setLikes((reactionsData || []).filter((r: any) => r.sighting)
-            .map((r: any) => ({ id: r.sighting.id, image: r.sighting.photo_url,
-                                user: r.sighting.user?.username || 'user', likes: 1 })));
-        } else {
-          const rows = await db.getAllAsync<any>(
-            `SELECT r.sighting_id as id, s.photo_url, u.username
-            FROM reactions r
-            LEFT JOIN sightings s ON r.sighting_id = s.id
-            LEFT JOIN users u ON s.user_id = u.id
-            WHERE r.user_id = ?`,
-            [displayUserId]
-          );
-          setLikes(rows.map((r: any) => ({ id: r.id, image: r.photo_url,
-                                          user: r.username || 'user', likes: 1 })));
-        }
+        if (reactionsError) throw reactionsError;
+        
+        const mappedLikes = (reactionsData || [])
+          .filter((r: any) => r.sighting)
+          .map((r: any) => ({
+            id: r.sighting.id,
+            image: r.sighting.photo_url,
+            user: r.sighting.user?.username || 'user',
+            likes: 1
+          }));
+        setLikes(mappedLikes);
 
-        // 5. Conteos followers/following — online: Supabase, offline: SQLite
-        if (isOnline) {
-          const { count: fersCount } = await supabase.from('follows')
-            .select('*', { count: 'exact', head: true }).eq('following_id', displayUserId);
-          const { count: fingCount } = await supabase.from('follows')
-            .select('*', { count: 'exact', head: true }).eq('follower_id', displayUserId);
-          setFollowersCount(fersCount || 0);
-          setFollowingCount(fingCount || 0);
-        } else {
-          const fersRow = await db.getFirstAsync<{ total: number }>(
-            `SELECT COUNT(*) as total FROM follows WHERE following_id = ?`, [displayUserId]);
-          const fingRow = await db.getFirstAsync<{ total: number }>(
-            `SELECT COUNT(*) as total FROM follows WHERE follower_id = ?`, [displayUserId]);
-          setFollowersCount(fersRow?.total || 0);
-          setFollowingCount(fingRow?.total || 0);
-}
+        // 5. Cargar Seguidores/Seguidos
+        const { count: fersCount } = await supabase
+          .from('follows')
+          .select('*', { count: 'exact', head: true })
+          .eq('following_id', displayUserId);
+
+        const { count: fingCount } = await supabase
+          .from('follows')
+          .select('*', { count: 'exact', head: true })
+          .eq('follower_id', displayUserId);
+
+        setFollowersCount(fersCount || 0);
+        setFollowingCount(fingCount || 0);
 
         // 6. Verificar si el usuario actual sigue a este perfil
         if (authUser && displayUserId && !isMe) {
@@ -334,7 +295,6 @@ export default function ProfileScreen() {
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface }}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-        <BottomNavBar />
       </SafeAreaView>
     );
   }
@@ -531,8 +491,6 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
-
-      <BottomNavBar />
     </SafeAreaView>
   );
 }
