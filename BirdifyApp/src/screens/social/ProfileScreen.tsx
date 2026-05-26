@@ -404,7 +404,7 @@ const userData = profile ? {
           <Text style={styles.privateSubtitle}>Follow this account to see their sightings and activity.</Text>
         </View>
       ) : (
-        <View>
+        <View style={{ flex: 1 }}>
           {/* ── Tab bar horizontal ── */}
           <View style={styles.tabsContainer}>
             {(['Sightings', 'Logbook', 'Likes'] as Tab[]).map((tab) => (
