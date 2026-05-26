@@ -15,18 +15,28 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const systemColorScheme = useColorScheme();
+  console.log('SYSTEM THEME:', systemColorScheme);
+
   const [theme, setTheme] = useState<ThemeType>('system');
-  const [currentColors, setCurrentColors] = useState(Colors);
 
-  useEffect(() => {
-    const activeTheme = theme === 'system' ? systemColorScheme : theme;
-    setCurrentColors(activeTheme === 'dark' ? DarkColors as any : Colors);
-  }, [theme, systemColorScheme]);
+  const activeTheme =
+    theme === 'system'
+      ? systemColorScheme ?? 'light'
+      : theme;
 
-  const isDark = (theme === 'system' ? systemColorScheme : theme) === 'dark';
+  const colors = activeTheme === 'dark'
+    ? DarkColors
+    : Colors;
 
   return (
-    <ThemeContext.Provider value={{ theme, colors: currentColors, setTheme, isDark }}>
+    <ThemeContext.Provider
+      value={{
+        theme,
+        colors,
+        setTheme,
+        isDark: activeTheme === 'dark',
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   );

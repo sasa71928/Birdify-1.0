@@ -84,6 +84,9 @@ export const DarkColors = {
   // Social
   googleBg: '#1E1E1E',
   appleBg: '#1E1E1E',
+
+  primaryLight: '#C2E8B8',
+  primaryDark: '#154212',
 };
 
 // ─── TIPOGRAFÍA ──────────────────────────────────────────────────────────────
