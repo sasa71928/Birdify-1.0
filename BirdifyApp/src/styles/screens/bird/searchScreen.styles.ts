@@ -100,102 +100,40 @@ export const createStyles = (colors: typeof Colors) =>
       fontWeight: Typography.fontWeight.medium,
     },
 
-    // Featured card
-    featuredCard: {
-      borderRadius: Radius.lg,
-      overflow: 'hidden',
-      height: 180,
-      marginBottom: Spacing.md,
-      backgroundColor: colors.componentBase,
-      ...Shadows.card,
-    },
-
-    featuredImage: {
-      width: '100%',
-      height: '100%',
-    },
-
-    featuredOverlay: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      padding: Spacing.md,
-      backgroundColor: isDarkOverlay(colors),
-    },
-
-    featuredLabel: {
-      fontSize: Typography.fontSize.xs,
-      fontWeight: Typography.fontWeight.bold,
-      color: colors.springMoss,
-      letterSpacing: 1.2,
-      marginBottom: 4,
-    },
-
-    featuredTitle: {
-      fontSize: Typography.fontSize.xl,
-      fontWeight: Typography.fontWeight.bold,
-      color: colors.canvasPure,
-    },
-
-    // Category cards
-    categoriesRow: {
+    // Resultados
+    resultCard: {
       flexDirection: 'row',
-      gap: Spacing.md,
-    },
-
-    categoryCard: {
-      flex: 1,
-      borderRadius: Radius.lg,
-      padding: Spacing.md,
-      ...Shadows.card,
-    },
-
-    categoryIconCircle: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      justifyContent: 'center',
       alignItems: 'center',
+      padding: Spacing.md,
+      borderRadius: Radius.lg,
+      backgroundColor: colors.componentBase,
       marginBottom: Spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.border + '22',
     },
 
-    categoryName: {
+    resultImage: {
+      width: 60,
+      height: 60,
+      borderRadius: Radius.md,
+      marginRight: Spacing.md,
+    },
+
+    resultTitle: {
       fontSize: Typography.fontSize.md,
       fontWeight: Typography.fontWeight.bold,
+      color: colors.textPrimary,
     },
 
-    categorySubtitle: {
-      fontSize: Typography.fontSize.xs,
+    resultSubtitle: {
+      fontSize: Typography.fontSize.sm,
       color: colors.textSecondary,
       marginTop: 2,
     },
 
-    // Tags
-    tagsWrap: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: Spacing.sm,
-    },
-
-    tag: {
-      backgroundColor: colors.componentBase,
-      borderRadius: Radius.full,
-      paddingHorizontal: Spacing.md,
-      paddingVertical: Spacing.sm,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-
-    tagText: {
+    emptyText: {
+      color: colors.textSecondary,
+      marginTop: Spacing.sm,
       fontSize: Typography.fontSize.sm,
-      color: colors.textPrimary,
-      fontWeight: Typography.fontWeight.medium,
     },
   });
-
-const isDarkOverlay = (colors: typeof Colors) => {
-  return colors.surface === '#121212'
-    ? 'rgba(0,0,0,0.55)'
-    : 'rgba(21, 66, 18, 0.65)';
-};

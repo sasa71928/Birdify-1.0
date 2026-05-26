@@ -10,23 +10,34 @@ export const createStyles = (colors: typeof Colors) =>
 
     // Hero
     hero: {
+      margin: Spacing.sm,
       height: 260,
       position: 'relative',
-      paddingTop: 10,
-      paddingHorizontal: 20,
+      paddingVertical: 0,
+      paddingHorizontal: 0,
+      backgroundColor: colors.componentBase,
+      borderRadius: Radius.lg,
     },
 
     backBtn: {
       position: 'absolute',
       top: Spacing.md,
-      left: Spacing.lg,
+      left: Spacing.md,
       width: 38,
       height: 38,
       borderRadius: 19,
-      backgroundColor: 'rgba(0,0,0,0.35)',
+      backgroundColor: colors.surface,
       justifyContent: 'center',
       alignItems: 'center',
       zIndex: 10,
+    },
+
+    heroImageContainer: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: colors.componentBase,
+      borderRadius: Radius.lg,
+      overflow: 'hidden',
     },
 
     heroImage: {
@@ -42,9 +53,14 @@ export const createStyles = (colors: typeof Colors) =>
 
     heroContent: {
       position: 'absolute',
-      bottom: Spacing.lg,
-      left: Spacing.lg,
-      paddingHorizontal: 20,
+      bottom: 0,
+      left: 0,
+      paddingHorizontal: 10,
+      backgroundColor: colors.componentBase + 'CC',
+      borderBottomLeftRadius: Radius.lg,
+      borderBottomRightRadius: Radius.lg,
+      paddingVertical: Spacing.sm,
+      width: '100%',
     },
 
     heroName: {

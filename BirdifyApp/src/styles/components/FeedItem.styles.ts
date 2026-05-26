@@ -3,7 +3,7 @@ import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
 
 export const createStyles = (colors: any) => StyleSheet.create({
   container: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.canvasPure,
     borderRadius: Radius.xl,
     marginBottom: Spacing.lg,
     overflow: 'hidden',
@@ -48,10 +48,12 @@ export const createStyles = (colors: any) => StyleSheet.create({
     position: 'relative',
     width: '100%',
     aspectRatio: 1,
+    padding: Spacing.sm,
   },
   postImage: {
     width: '100%',
     height: '100%',
+    borderRadius: Radius.lg,
   },
   tagBadge: {
     position: 'absolute',

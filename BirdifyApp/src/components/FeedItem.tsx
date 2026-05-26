@@ -439,7 +439,7 @@ export default function FeedItem({ post }: FeedItemProps) {
             <Ionicons 
               name={liked ? "heart" : "heart-outline"} 
               size={26} 
-              color={liked ? "#FF5252" : Colors.textPrimary} 
+              color={liked ? "#FF5252" : Colors.primary} 
             />
             <Text style={[styles.actionText, liked && { color: "#FF5252" }]}>
               {likesCount}
@@ -452,7 +452,7 @@ export default function FeedItem({ post }: FeedItemProps) {
             <MaterialCommunityIcons 
               name="comment-outline" 
               size={24} 
-              color={Colors.textPrimary} 
+              color={Colors.primary} 
             />
             <Text style={styles.actionText}>
               {commentsCount}
@@ -460,7 +460,7 @@ export default function FeedItem({ post }: FeedItemProps) {
           </TouchableOpacity>
         </View>
         <TouchableOpacity onPress={handleShare}>
-          <Ionicons name="share-outline" size={24} color={Colors.textPrimary} />
+          <Ionicons name="share-outline" size={24} color={Colors.primary} />
         </TouchableOpacity>
       </View>
 

@@ -1,173 +1,250 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Image,
   StatusBar,
-  FlatList,
+  Image,
 } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
-import { RootStackParamList } from '../../navigation/AppNavigator';
+
+import { Ionicons } from '@expo/vector-icons';
+
+import { RootStackParamList, BirdSpeciesData } from '../../navigation/AppNavigator';
 
 import { createStyles } from '../../styles/screens/bird/searchScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
+import { BirdRepository } from '../../repositories/bird.repository';
+import { mapBird } from '../../utils/mapBird';
+
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-// ── Datos de ejemplo ──────────────────────────────────────────────────────────
-const RECENT_SEARCHES = ['Northern Cardinal', 'La Paz', 'Spring Migration'];
-
-const POPULAR_TAGS = ['#Hummingbirds', '#Endemic', '#WinterVisitors', '#Wetlands'];
-
-const CATEGORIES = [
-  {
-    id: '1',
-    name: 'Songbirds',
-    subtitle: '12 new entries',
-    icon: 'leaf-outline' as const,
-    iconColor: Colors.primary,
-    bg: Colors.springMoss,
-  },
-  {
-    id: '2',
-    name: 'Raptors',
-    subtitle: 'Trending now',
-    icon: 'eye-outline' as const,
-    iconColor: Colors.deepTerrain,
-    bg: Colors.componentBase,
-  },
-];
-
-// ── Componente principal ──────────────────────────────────────────────────────
 export default function SearchScreen() {
   const navigation = useNavigation<NavigationProp>();
   const inputRef = useRef<TextInput>(null);
-  const [query, setQuery] = useState('');
-  const [recentSearches, setRecentSearches] = useState(RECENT_SEARCHES);
 
-  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const { screen: styles, colors, isDark } =
+    useDynamicStyles(createStyles);
+
+  const [query, setQuery] = useState('');
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [birds, setBirds] = useState<BirdSpeciesData[]>([]);
+  const [results, setResults] = useState<BirdSpeciesData[]>([]);
+
+  // ─────────────────────────────────────────────
+  // LOAD DATA
+  // ─────────────────────────────────────────────
+  useEffect(() => {
+    loadBirds();
+  }, []);
+
+  const loadBirds = async () => {
+    try {
+      const dbBirds = await BirdRepository.getAll();
+
+      // ✔ MISMA FUENTE QUE DICTIONARY (SIN MOCKS)
+      const mapped = dbBirds.map(mapBird);
+
+      setBirds(mapped);
+    } catch (error) {
+      console.error('Error loading birds:', error);
+    }
+  };
+
+  // ─────────────────────────────────────────────
+  // SEARCH
+  // ─────────────────────────────────────────────
+  const handleSearch = (text: string) => {
+    setQuery(text);
+
+    if (!text.trim()) {
+      setResults([]);
+      return;
+    }
+
+    const filtered = birds.filter(
+      bird =>
+        bird.name.toLowerCase().includes(text.toLowerCase()) ||
+        bird.scientificName.toLowerCase().includes(text.toLowerCase())
+    );
+
+    setResults(filtered);
+  };
+
+  // ─────────────────────────────────────────────
+  // OPEN BIRD
+  // ─────────────────────────────────────────────
+  const openBird = (bird: BirdSpeciesData) => {
+    if (!recentSearches.includes(bird.name)) {
+      setRecentSearches(prev => [bird.name, ...prev.slice(0, 4)]);
+    }
+
+    navigation.navigate('BirdDetail', { bird });
+  };
 
   const removeRecent = (item: string) =>
-    setRecentSearches((prev) => prev.filter((s) => s !== item));
+    setRecentSearches(prev => prev.filter(s => s !== item));
 
   const clearAll = () => setRecentSearches([]);
 
+  // ─────────────────────────────────────────────
+  // UI
+  // ─────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={Colors.surface} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      {/* ── Barra de búsqueda ── */}
+      {/* SEARCH BAR */}
       <View style={styles.searchBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={colors.primary} />
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+        >
+          <Ionicons
+            name="arrow-back"
+            size={24}
+            color={colors.primary}
+          />
         </TouchableOpacity>
 
         <View style={styles.inputWrapper}>
-          <Ionicons name="search-outline" size={18} color={colors.textSecondary} style={styles.searchIcon} />
+          <Ionicons
+            name="search-outline"
+            size={18}
+            color={colors.textSecondary}
+            style={styles.searchIcon}
+          />
+
           <TextInput
             ref={inputRef}
             autoFocus
             value={query}
-            onChangeText={setQuery}
-            placeholder="Search Observations"
+            onChangeText={handleSearch}
+            placeholder="Search birds..."
             placeholderTextColor={colors.placeholder}
             style={styles.input}
             returnKeyType="search"
           />
+
           {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery('')}>
-              <Ionicons name="close" size={18} color={colors.textSecondary} />
+            <TouchableOpacity
+              onPress={() => {
+                setQuery('');
+                setResults([]);
+              }}
+            >
+              <Ionicons
+                name="close"
+                size={18}
+                color={colors.textSecondary}
+              />
             </TouchableOpacity>
           )}
         </View>
-
-        <TouchableOpacity style={styles.filterBtn}>
-          <Ionicons name="options-outline" size={22} color={colors.primary} />
-        </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-
-        {/* ── Búsquedas recientes ── */}
-        {recentSearches.length > 0 && (
+      {/* CONTENT */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+      >
+        {query.length > 0 ? (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Searches</Text>
-              <TouchableOpacity onPress={clearAll}>
-                <Text style={styles.clearAll}>Clear All</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.sectionTitle}>
+              Search Results
+            </Text>
 
-            {recentSearches.map((item) => (
-              <TouchableOpacity
-                key={item}
-                style={styles.recentItem}
-                onPress={() => setQuery(item)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="time-outline" size={20} color={colors.textSecondary} style={{ marginRight: 12 }} />
-                <Text style={styles.recentText}>{item}</Text>
-                <TouchableOpacity onPress={() => removeRecent(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="close" size={18} color={colors.textSecondary} />
+            {results.length > 0 ? (
+              results.map(bird => (
+                <TouchableOpacity
+                  key={bird.id}
+                  style={styles.resultCard}
+                  activeOpacity={0.8}
+                  onPress={() => openBird(bird)}
+                >
+                  {/* ✔ IMAGEN 100% VIENE DE mapBird */}
+                  <Image
+                    source={{ uri: bird.image }}
+                    style={styles.resultImage}
+                  />
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.resultTitle}>
+                      {bird.name}
+                    </Text>
+
+                    <Text style={styles.resultSubtitle}>
+                      {bird.scientificName}
+                    </Text>
+                  </View>
+
+                  <Ionicons
+                    name="chevron-forward"
+                    size={20}
+                    color={colors.textSecondary}
+                  />
                 </TouchableOpacity>
-              </TouchableOpacity>
-            ))}
+              ))
+            ) : (
+              <Text style={styles.emptyText}>
+                No birds found.
+              </Text>
+            )}
           </View>
-        )}
+        ) : (
+          <>
+            {/* RECENT SEARCHES */}
+            {recentSearches.length > 0 && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>
+                    Recent Searches
+                  </Text>
 
-        {/* ── Discover ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Discover</Text>
-
-          {/* Tarjeta destacada */}
-          <TouchableOpacity style={styles.featuredCard} activeOpacity={0.9}>
-            <Image
-              source={{ uri: 'https://images.unsplash.com/photo-1444464666168-49d633b86797?auto=format&fit=crop&q=80&w=800' }}
-              style={styles.featuredImage}
-            />
-            <View style={styles.featuredOverlay}>
-              <Text style={styles.featuredLabel}>FEATURED GUIDE</Text>
-              <Text style={styles.sectionTitle}>Nesting Season 2024</Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Categorías */}
-          <View style={styles.categoriesRow}>
-            {CATEGORIES.map((cat) => (
-              <TouchableOpacity key={cat.id} style={[styles.categoryCard, { backgroundColor: cat.bg }]} activeOpacity={0.85}>
-                <View style={[styles.categoryIconCircle, { backgroundColor: cat.iconColor + '22' }]}>
-                  <Ionicons name={cat.icon} size={22} color={cat.iconColor} />
+                  <TouchableOpacity onPress={clearAll}>
+                    <Text style={styles.clearAll}>
+                      Clear All
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-                <Text style={[styles.categoryName, { color: cat.iconColor }]}>{cat.name}</Text>
-                <Text style={styles.categorySubtitle}>{cat.subtitle}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
 
-        {/* ── Popular Tags ── */}
-        <View style={[styles.section, { marginBottom: 40 }]}>
-          <Text style={styles.sectionTitle}>Popular Tags</Text>
-          <View style={styles.tagsWrap}>
-            {POPULAR_TAGS.map((tag) => (
-              <TouchableOpacity key={tag} style={styles.tag} onPress={() => setQuery(tag)} activeOpacity={0.75}>
-                <Text style={styles.tagText}>{tag}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+                {recentSearches.map(item => (
+                  <TouchableOpacity
+                    key={item}
+                    style={styles.recentItem}
+                    onPress={() => handleSearch(item)}
+                  >
+                    <Ionicons
+                      name="time-outline"
+                      size={20}
+                      color={colors.textSecondary}
+                      style={{ marginRight: 12 }}
+                    />
 
+                    <Text style={styles.recentText}>
+                      {item}
+                    </Text>
+
+                    <TouchableOpacity onPress={() => removeRecent(item)}>
+                      <Ionicons
+                        name="close"
+                        size={18}
+                        color={colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 }
-
-

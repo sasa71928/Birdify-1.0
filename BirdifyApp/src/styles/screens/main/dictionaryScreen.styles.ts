@@ -5,6 +5,10 @@ export const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
+  safe:{
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -27,7 +31,10 @@ export const createStyles = (colors: any) => StyleSheet.create({
   },
   filtersScroll: {
     paddingHorizontal: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.sm,
+    paddingVertical: 8,
   },
   filterChip: {
     paddingHorizontal: 16,
@@ -60,6 +67,13 @@ export const createStyles = (colors: any) => StyleSheet.create({
   imageContainer: {
     height: 160,
     width: '100%',
+    backgroundColor: colors.componentBase,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageLoader: {
+    position: 'absolute',
+    zIndex: 1,
   },
   birdImage: {
     width: '100%',
@@ -106,5 +120,6 @@ export const createStyles = (colors: any) => StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
+  
 });
 
