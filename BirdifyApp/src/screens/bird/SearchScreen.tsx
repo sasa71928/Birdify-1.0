@@ -16,7 +16,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import styles from '../../styles/screens/bird/searchScreen.styles';
+
+import { createStyles } from '../../styles/screens/bird/searchScreen.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -51,6 +53,8 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState(RECENT_SEARCHES);
 
+  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+
   const removeRecent = (item: string) =>
     setRecentSearches((prev) => prev.filter((s) => s !== item));
 
@@ -58,35 +62,35 @@ export default function SearchScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.surface} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={Colors.surface} />
 
       {/* ── Barra de búsqueda ── */}
       <View style={styles.searchBar}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
 
         <View style={styles.inputWrapper}>
-          <Ionicons name="search-outline" size={18} color={Colors.textSecondary} style={styles.searchIcon} />
+          <Ionicons name="search-outline" size={18} color={colors.textSecondary} style={styles.searchIcon} />
           <TextInput
             ref={inputRef}
             autoFocus
             value={query}
             onChangeText={setQuery}
             placeholder="Search Observations"
-            placeholderTextColor={Colors.placeholder}
+            placeholderTextColor={colors.placeholder}
             style={styles.input}
             returnKeyType="search"
           />
           {query.length > 0 && (
             <TouchableOpacity onPress={() => setQuery('')}>
-              <Ionicons name="close" size={18} color={Colors.textSecondary} />
+              <Ionicons name="close" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
           )}
         </View>
 
         <TouchableOpacity style={styles.filterBtn}>
-          <Ionicons name="options-outline" size={22} color={Colors.primary} />
+          <Ionicons name="options-outline" size={22} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -109,10 +113,10 @@ export default function SearchScreen() {
                 onPress={() => setQuery(item)}
                 activeOpacity={0.7}
               >
-                <Ionicons name="time-outline" size={20} color={Colors.outlineGrey} style={{ marginRight: 12 }} />
+                <Ionicons name="time-outline" size={20} color={colors.textSecondary} style={{ marginRight: 12 }} />
                 <Text style={styles.recentText}>{item}</Text>
                 <TouchableOpacity onPress={() => removeRecent(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="close" size={18} color={Colors.outlineGrey} />
+                  <Ionicons name="close" size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
               </TouchableOpacity>
             ))}
@@ -131,7 +135,7 @@ export default function SearchScreen() {
             />
             <View style={styles.featuredOverlay}>
               <Text style={styles.featuredLabel}>FEATURED GUIDE</Text>
-              <Text style={styles.featuredTitle}>Nesting Season 2024</Text>
+              <Text style={styles.sectionTitle}>Nesting Season 2024</Text>
             </View>
           </TouchableOpacity>
 
@@ -166,5 +170,4 @@ export default function SearchScreen() {
   );
 }
 
-// ── Estilos ───────────────────────────────────────────────────────────────────
 
