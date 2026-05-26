@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { NotificationService } from '../services/notification.service';
 
 interface AuthContextProps {
   user: User | null;
@@ -20,6 +21,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+  if (user) {
+    registerPush(user.id);
+  }
+}, [user]);
+
+  const registerPush = async (userId: string) => {
+    const token = await NotificationService.register();
+
+    if (!token) return;
+
+    await supabase
+      .from('users')
+      .update({
+        expo_push_token: token
+      })
+      .eq('id', userId);
+  };
 
   const signOut = async () => {
     await supabase.auth.signOut();

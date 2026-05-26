@@ -21,13 +21,20 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.jcota_22.BirdifyApp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-font"
-    ]
+      "expo-font",
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "95e30ded-a907-41b7-a9fe-597f3035d7b3"
+      }
+    }
   }
 }

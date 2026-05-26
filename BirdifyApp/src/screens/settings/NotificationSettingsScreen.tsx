@@ -7,11 +7,16 @@ import {
   StatusBar,
   Alert,
 } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+
 import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 const INITIAL_PUSH = [
   { id: '1', title: 'New Sighting', desc: 'Alerts for rare birds in your area', icon: 'eye-outline', active: false },
@@ -31,17 +36,53 @@ export default function NotificationSettingsScreen() {
   const [pushNotifs, setPushNotifs] = useState(INITIAL_PUSH);
   const [emailNotifs, setEmailNotifs] = useState(INITIAL_EMAIL);
 
-  const togglePush = (id: string) => {
-    setPushNotifs(prev => prev.map(item => 
-      item.id === id ? { ...item, active: !item.active } : item
-    ));
-  };
+  const { user } = useAuth();
 
-  const toggleEmail = (id: string) => {
-    setEmailNotifs(prev => prev.map(item => 
-      item.id === id ? { ...item, active: !item.active } : item
-    ));
-  };
+  const togglePush = async (id: string) => {
+  try {
+    const updated = pushNotifs.map(item =>
+      item.id === id
+        ? { ...item, active: !item.active }
+        : item
+    );
+
+    setPushNotifs(updated);
+
+    await supabase
+      .from('profiles')
+      .update({
+        push_notifications: updated
+      })
+      .eq('id', user?.id);
+
+  } catch (error) {
+    console.error(error);
+    Alert.alert('Error', 'No se pudieron guardar las notificaciones.');
+  }
+};
+
+const toggleEmail = async (id: string) => {
+  try {
+    const updated = emailNotifs.map(item =>
+      item.id === id
+        ? { ...item, active: !item.active }
+        : item
+    );
+
+    setEmailNotifs(updated);
+
+    await supabase
+      .from('profiles')
+      .update({
+        email_notifications: updated
+      })
+      .eq('id', user?.id);
+
+  } catch (error) {
+    console.error(error);
+    Alert.alert('Error', 'No se pudieron guardar las notificaciones.');
+  }
+};
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
