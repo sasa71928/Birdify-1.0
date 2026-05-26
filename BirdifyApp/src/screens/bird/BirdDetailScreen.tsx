@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   Image,
   ScrollView,
   TouchableOpacity,
@@ -12,36 +11,67 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
-import { RootStackParamList, BirdSpeciesData } from '../../navigation/AppNavigator';
-import styles from '../../styles/screens/bird/birdDetailScreen.styles';
+import { RootStackParamList } from '../../navigation/AppNavigator';
+
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { createStyles } from '../../styles/screens/bird/birdDetailScreen.styles';
+
+import FeedItem, { Post } from '../../components/FeedItem';
+import { SightingRepository } from '../../repositories/sighting.repository';
+import { useAuth } from '../../context/AuthContext';
 
 type BirdDetailNavProp = NativeStackNavigationProp<RootStackParamList, 'BirdDetail'>;
 type BirdDetailRouteProp = RouteProp<RootStackParamList, 'BirdDetail'>;
 
-// ── Avistamientos de ejemplo ──────────────────────────────────────────────────
-const MOCK_SIGHTINGS = [
-  {
-    id: '1',
-    user: 'Alex Rivera',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100',
-    timeAgo: '2 hours ago',
-    location: 'La Paz, BCS',
-    image: 'https://images.unsplash.com/photo-1555169062-013468b47731?auto=format&fit=crop&q=80&w=600',
-    likes: 24,
-    comments: 3,
-  },
-  {
-    id: '2',
-    user: 'Mario Santos',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=100',
-    timeAgo: 'Yesterday',
-    location: 'Ensenada',
-    image: 'https://images.unsplash.com/photo-1470114716159-e389f8ae4b57?auto=format&fit=crop&q=80&w=600',
-    likes: 12,
-    comments: 1,
-  },
-];
+function mapSightingToPost(sighting: any, currentUserId?: string): Post {
+  const timeDiff = Date.now() - new Date(sighting.created_at).getTime();
+  const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60));
+
+  const timeAgoStr =
+    hoursAgo < 24
+      ? hoursAgo === 0
+        ? 'Hace un momento'
+        : `Hace ${hoursAgo} hora${hoursAgo === 1 ? '' : 's'}`
+      : `Hace ${Math.floor(hoursAgo / 24)} día${
+          Math.floor(hoursAgo / 24) === 1 ? '' : 's'
+        }`;
+
+  const reactionsList = sighting.reactions || [];
+  const likesCount = reactionsList.length;
+
+  const hasLiked = currentUserId
+    ? reactionsList.some((r: any) => r.user_id === currentUserId)
+    : false;
+
+  const userData = Array.isArray(sighting.user)
+    ? sighting.user[0]
+    : sighting.user;
+
+  return {
+    id: sighting.id,
+    userId: sighting.user_id,
+    username: userData?.username || 'Usuario',
+    userAvatar:
+      userData?.profile_pic_url ||
+      'https://gravatar.com/avatar/?d=mp',
+    location: sighting.is_location_private
+      ? 'Ubicación Privada'
+      : 'En la Naturaleza',
+    image:
+      sighting.photo_url ||
+      'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=600',
+    tag: sighting.bird?.common_name || 'Ave',
+    likes: likesCount,
+    comments: sighting.comments?.length || 0,
+    caption: sighting.description || '',
+    timeAgo: timeAgoStr,
+    isVerified: userData?.is_verified === true,
+    commentsList: [],
+    hasLiked,
+  };
+}
+
+
 
 // ── Componente ────────────────────────────────────────────────────────────────
 export default function BirdDetailScreen() {
@@ -51,9 +81,44 @@ export default function BirdDetailScreen() {
 
   const classification = bird.classification;
 
+  const { user } = useAuth();
+
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+
+  useEffect(() => {
+  loadBirdSightings();
+  }, []);
+
+  const loadBirdSightings = async () => {
+    try {
+      setIsLoading(true);
+
+      const sightings = await SightingRepository.getFeed();
+
+      // FILTRAR SOLO ESTA AVE
+      const filtered = sightings.filter(
+        (item: any) =>
+          item.bird_id === bird.id
+      );
+
+      const mapped = filtered.map((item: any) =>
+        mapSightingToPost(item, user?.id)
+      );
+
+      setPosts(mapped);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
 
         {/* ── Hero con imagen ── */}
@@ -64,7 +129,7 @@ export default function BirdDetailScreen() {
 
           {/* Back button */}
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={22} color={Colors.canvasPure} />
+            <Ionicons name="arrow-back" size={22} color={colors.primary} />
           </TouchableOpacity>
 
           {/* Bird name over image */}
@@ -78,7 +143,7 @@ export default function BirdDetailScreen() {
         {classification && (
           <View style={styles.card}>
             <View style={styles.sectionRow}>
-              <MaterialCommunityIcons name="dna" size={18} color={Colors.primary} />
+              <MaterialCommunityIcons name="dna" size={18} color={colors.primary} />
               <Text style={styles.cardTitle}> Scientific Classification</Text>
             </View>
             <View style={styles.classGrid}>
@@ -106,8 +171,8 @@ export default function BirdDetailScreen() {
 
           {/* Habitat */}
           <View style={styles.infoBlock}>
-            <View style={[styles.infoIconCircle, { backgroundColor: Colors.primary }]}>
-              <MaterialCommunityIcons name="tree" size={18} color={Colors.canvasPure} />
+            <View style={[styles.infoIconCircle, { backgroundColor: colors.primary }]}>
+              <MaterialCommunityIcons name="tree" size={18} color={colors.canvasPure} />
             </View>
             <View style={styles.infoBlockText}>
               <Text style={styles.infoBlockTitle}>Habitat</Text>
@@ -117,8 +182,8 @@ export default function BirdDetailScreen() {
 
           {/* Conservation */}
           <View style={styles.infoBlock}>
-            <View style={[styles.infoIconCircle, { backgroundColor: Colors.secondaryBlue }]}>
-              <MaterialCommunityIcons name="shield-check-outline" size={18} color={Colors.canvasPure} />
+            <View style={[styles.infoIconCircle, { backgroundColor: colors.secondaryBlue }]}>
+              <MaterialCommunityIcons name="shield-check-outline" size={18} color={colors.canvasPure} />
             </View>
             <View style={styles.infoBlockText}>
               <Text style={styles.infoBlockTitle}>Conservation Status</Text>
@@ -131,41 +196,17 @@ export default function BirdDetailScreen() {
         <View style={styles.section}>
           <View style={styles.sightingsHeader}>
             <Text style={styles.sectionTitle}>Avistamientos Recientes</Text>
-            <TouchableOpacity>
-              <Text style={styles.viewAll}>View all</Text>
-            </TouchableOpacity>
           </View>
 
-          {MOCK_SIGHTINGS.map((s) => (
-            <View key={s.id} style={styles.sightingCard}>
-              {/* Author row */}
-              <View style={styles.sightingAuthorRow}>
-                <Image source={{ uri: s.avatar }} style={styles.sightingAvatar} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.sightingUser}>{s.user}</Text>
-                  <Text style={styles.sightingMeta}>{s.timeAgo} • {s.location}</Text>
-                </View>
-              </View>
-              {/* Photo */}
-              <Image source={{ uri: s.image }} style={styles.sightingImage} />
-              {/* Actions */}
-              <View style={styles.sightingActions}>
-                <View style={styles.sightingActionGroup}>
-                  <TouchableOpacity style={styles.sightingAction}>
-                    <Ionicons name="heart-outline" size={22} color={Colors.textPrimary} />
-                    <Text style={styles.sightingActionText}>{s.likes}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.sightingAction}>
-                    <MaterialCommunityIcons name="comment-outline" size={22} color={Colors.textPrimary} />
-                    <Text style={styles.sightingActionText}>{s.comments}</Text>
-                  </TouchableOpacity>
-                </View>
-                <TouchableOpacity>
-                  <Ionicons name="share-outline" size={22} color={Colors.textPrimary} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
+            {posts.length === 0 ? (
+              <Text style={{ color: colors.textSecondary }}>
+                No hay avistamientos para esta especie.
+              </Text>
+            ) : (
+              posts.map((post) => (
+                <FeedItem key={post.id} post={post} />
+              ))
+            )}
         </View>
 
       </ScrollView>
