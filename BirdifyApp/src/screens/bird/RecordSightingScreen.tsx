@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import MapView, { Marker } from 'react-native-maps';
 import { Typography, Spacing, Radius, Shadows } from '../../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TopNavBar from '../../components/TopNavBar';
@@ -72,9 +73,72 @@ const MOCK_BIRDS_CATALOG = [
   { id: '7', common_name: 'Zenzontle', scientific_name: 'Mimus polyglottos' },
 ];
 
+const createMapStyle = (colors: any) => [
+    {
+      elementType: 'geometry',
+      stylers: [{ color: colors.surfaceDim }],
+    },
+    {
+      elementType: 'labels.icon',
+      stylers: [{ visibility: 'off' }],
+    },
+    {
+      elementType: 'labels.text.fill',
+      stylers: [{ color: colors.textPrimary }],
+    },
+    {
+      elementType: 'labels.text.stroke',
+      stylers: [{ color: colors.surface }],
+    },
+    {
+      featureType: 'administrative.land_parcel',
+      stylers: [{ visibility: 'off' }],
+    },
+    {
+      featureType: 'administrative.neighborhood',
+      stylers: [{ visibility: 'off' }],
+    },
+    {
+      featureType: 'road',
+      elementType: 'geometry',
+      stylers: [{ color: colors.componentBase }],
+    },
+    {
+      featureType: 'road',
+      elementType: 'labels',
+      stylers: [{ visibility: 'off' }],
+    },
+    {
+      featureType: 'road.highway',
+      elementType: 'geometry',
+      stylers: [{ color: colors.canvasPure }],
+    },
+    {
+      featureType: 'water',
+      elementType: 'geometry',
+      stylers: [{ color: colors.deepTerrain }],
+    },
+    {
+      featureType: 'poi',
+      elementType: 'geometry',
+      stylers: [{ color: colors.surfaceDim }],
+    },
+    {
+      featureType: 'landscape',
+      elementType: 'geometry',
+      stylers: [{ color: colors.surface }],
+    },
+  ];
+
 export default function RecordSightingScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { shared, screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+
+  const MAP_STYLE = useMemo(
+  () => createMapStyle(colors),
+  [colors]
+);
+
   const { user } = useAuth();
   
   const [birdName, setBirdName] = useState('');
@@ -97,12 +161,13 @@ export default function RecordSightingScreen() {
   
   // Mapa y Ubicación
   const [region, setRegion] = useState({
-    latitude: 19.4326,
-    longitude: -99.1332,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
+    latitude: 24.1426,
+    longitude: -110.3128,
+    latitudeDelta: 0.08,
+    longitudeDelta: 0.08,
   });
   const [isLocating, setIsLocating] = useState(false);
+  const mapRef = useRef<MapView>(null);
 
   // Selector de foto (Bottom Sheet Modal)
   const [modalVisible, setModalVisible] = useState(false);
@@ -341,6 +406,8 @@ export default function RecordSightingScreen() {
       setIsPosting(false);
     }
   };
+
+  
 
   return (
     <SafeAreaView style={shared.safe}>
@@ -584,7 +651,19 @@ export default function RecordSightingScreen() {
                   placeholderTextColor={colors.placeholder}
                   keyboardType="numeric"
                   value={region.latitude.toString()}
-                  onChangeText={(val) => setRegion(prev => ({ ...prev, latitude: parseFloat(val) || 0 }))}
+                  onChangeText={(val) => {
+                    const latitude = parseFloat(val) || 0;
+
+                    setRegion(prev => ({
+                      ...prev,
+                      latitude,
+                    }));
+
+                    mapRef.current?.animateToRegion({
+                      ...region,
+                      latitude,
+                    });
+                  }}
                 />
               </View>
               <View style={[styles.searchContainer, { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border + '80' }]}>
@@ -594,21 +673,149 @@ export default function RecordSightingScreen() {
                   placeholderTextColor={colors.placeholder}
                   keyboardType="numeric"
                   value={region.longitude.toString()}
-                  onChangeText={(val) => setRegion(prev => ({ ...prev, longitude: parseFloat(val) || 0 }))}
+                  onChangeText={(val) => {
+                    const longitude = parseFloat(val) || 0;
+
+                    setRegion(prev => ({
+                      ...prev,
+                      longitude,
+                    }));
+
+                    mapRef.current?.animateToRegion({
+                      ...region,
+                      longitude,
+                    });
+                  }}
                 />
               </View>
             </View>
 
-            <View style={[styles.mapContainer, { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: colors.border + '40', height: 200, backgroundColor: colors.surface, position: 'relative' }]}>
-              <Image 
-                source={{ uri: `https://api.mapbox.com/styles/v1/mapbox/${isDark ? 'dark-v11' : 'outdoors-v12'}/static/${region.longitude},${region.latitude},14,0/800x400?access_token=${process.env.EXPO_PUBLIC_MAPBOX_API_KEY || 'pk.eyJ1IjoiY2hpdHUiLCJhIjoiY2tobnVnZzJvMGNxZzJzbXowam1vM3Z1ciJ9.9_n6rFv_Y0Z_X_1_1_1_1'}` }} 
-                style={{ width: '100%', height: '100%' }}
-                resizeMode="cover"
-              />
-              {/* Pin central */}
-              <View style={{ position: 'absolute', top: '50%', left: '50%', marginLeft: -15, marginTop: -30 }}>
-                <Ionicons name="location" size={30} color={colors.primary} />
-              </View>
+            <View
+              style={[
+                styles.mapContainer,
+                {
+                  borderRadius: 24,
+                  overflow: 'hidden',
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  height: 240,
+                  backgroundColor: colors.surface,
+                  ...Shadows.card,
+                },
+              ]}
+            >
+              <MapView
+                ref={mapRef}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                }}
+                showsCompass={false}
+                showsMyLocationButton={false}
+                customMapStyle={isDark ? MAP_STYLE : []}
+                region={region}
+                onPress={(e) => {
+                  const { latitude, longitude } =
+                    e.nativeEvent.coordinate;
+
+                  setRegion((prev) => ({
+                    ...prev,
+                    latitude,
+                    longitude,
+                  }));
+                }}
+              >
+                <Marker
+                  coordinate={{
+                    latitude: region.latitude,
+                    longitude: region.longitude,
+                  }}
+                  draggable
+                  onDragEnd={(e) => {
+                    const { latitude, longitude } =
+                      e.nativeEvent.coordinate;
+
+                    setRegion((prev) => ({
+                      ...prev,
+                      latitude,
+                      longitude,
+                    }));
+                  }}
+                >
+                  <View
+                    style={{
+                      alignItems: 'center',
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 21,
+                        backgroundColor: colors.primary,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        borderWidth: 3,
+                        borderColor: colors.surface,
+                        ...Shadows.card,
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name="bird"
+                        size={22}
+                        color={colors.canvasPure}
+                      />
+                    </View>
+
+                    <View
+                      style={{
+                        width: 0,
+                        height: 0,
+                        backgroundColor: 'transparent',
+                        borderStyle: 'solid',
+                        borderLeftWidth: 6,
+                        borderRightWidth: 6,
+                        borderTopWidth: 8,
+                        borderLeftColor: 'transparent',
+                        borderRightColor: 'transparent',
+                        borderTopColor: colors.surface,
+                        marginTop: -2,
+                      }}
+                    />
+                  </View>
+                </Marker>
+              </MapView>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={handleUseCurrentLocation}
+                disabled={isLocating}
+                style={{
+                  position: 'absolute',
+                  bottom: 14,
+                  right: 14,
+                  width: 52,
+                  height: 52,
+                  borderRadius: 26,
+                  backgroundColor: colors.surface,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  ...Shadows.card,
+                }}
+              >
+                {isLocating ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={colors.primary}
+                  />
+                ) : (
+                  <MaterialCommunityIcons
+                    name="crosshairs-gps"
+                    size={24}
+                    color={colors.textPrimary}
+                  />
+                )}
+              </TouchableOpacity>
             </View>
           </View>
 
