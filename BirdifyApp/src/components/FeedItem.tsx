@@ -65,30 +65,45 @@ export default function FeedItem({ post }: FeedItemProps) {
   const [commentText, setCommentText] = React.useState('');
   const [replyingTo, setReplyingTo] = React.useState<{ id: string, username: string, parentId?: string | null } | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
+  const [isAnimating, setIsAnimating] = React.useState(false);
 
   const images = Array.isArray(post.image) ? post.image : [post.image];
   const currentImage = images[currentImageIndex];
 
   const panX = React.useRef(new Animated.Value(0)).current;
+  const currentImageIndexRef = React.useRef(currentImageIndex);
+
+  React.useEffect(() => {
+    currentImageIndexRef.current = currentImageIndex;
+  }, [currentImageIndex]);
 
   const imagePanResponder = React.useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 5 && Math.abs(gestureState.dy) < 10;
+        return !isAnimating && Math.abs(gestureState.dx) > 5 && Math.abs(gestureState.dy) < 10;
       },
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 5 && Math.abs(gestureState.dy) < 15;
+        return !isAnimating && Math.abs(gestureState.dx) > 5 && Math.abs(gestureState.dy) < 15;
       },
       onPanResponderMove: (_, gestureState) => {
-        panX.setValue(gestureState.dx);
+        if (!isAnimating) {
+          panX.setValue(gestureState.dx);
+        }
       },
       onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx > 50 && currentImageIndex > 0) {
-          setCurrentImageIndex(currentImageIndex - 1);
+        if (isAnimating) return;
+
+        const index = currentImageIndexRef.current;
+        if (gestureState.dx > 50 && index > 0) {
+          setIsAnimating(true);
           panX.setValue(0);
-        } else if (gestureState.dx < -50 && currentImageIndex < images.length - 1) {
-          setCurrentImageIndex(currentImageIndex + 1);
+          setCurrentImageIndex(index - 1);
+          setIsAnimating(false);
+        } else if (gestureState.dx < -50 && index < images.length - 1) {
+          setIsAnimating(true);
           panX.setValue(0);
+          setCurrentImageIndex(index + 1);
+          setIsAnimating(false);
         } else {
           Animated.spring(panX, {
             toValue: 0,
@@ -128,6 +143,12 @@ export default function FeedItem({ post }: FeedItemProps) {
       hideSubscription.remove();
     };
   }, []);
+
+  React.useEffect(() => {
+    return () => {
+      panX.setValue(0);
+    };
+  }, [panX]);
 
   React.useEffect(() => {
     if (showComments) {

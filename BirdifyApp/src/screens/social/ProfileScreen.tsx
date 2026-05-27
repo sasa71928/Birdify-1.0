@@ -60,9 +60,13 @@ export default function ProfileScreen() {
   const [loadingModalUsers, setLoadingModalUsers] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+    const abortController = new AbortController();
+
     async function loadProfileAndActivity() {
       if (!displayUserId) return;
       try {
+        if (!isMounted) return;
         setProfile(null);
         setSightings([]);
         setLikes([]);
@@ -71,9 +75,10 @@ export default function ProfileScreen() {
         setFollowingCount(0);
         setIsFollowingUser(false);
         setLoadingProfile(true);
-        
+
         // 1. Cargar Perfil
         const data = await ProfileRepository.getById(displayUserId);
+        if (!isMounted) return;
         if (data) {
           setProfile(data);
         }
@@ -92,6 +97,7 @@ export default function ProfileScreen() {
           .eq('user_id', displayUserId)
           .order('created_at', { ascending: false });
 
+        if (!isMounted) return;
         if (sightingsError) throw sightingsError;
         setSightings(sightingsData || []);
 
@@ -116,6 +122,7 @@ export default function ProfileScreen() {
             }
           }
         });
+        if (!isMounted) return;
         setSpecies(Array.from(speciesMap.values()));
 
         // 4. Cargar Likes (Reacciones)
@@ -130,8 +137,9 @@ export default function ProfileScreen() {
           `)
           .eq('user_id', displayUserId);
 
+        if (!isMounted) return;
         if (reactionsError) throw reactionsError;
-        
+
         const mappedLikes = (reactionsData || [])
           .filter((r: any) => r.sighting)
           .map((r: any) => ({
@@ -153,24 +161,34 @@ export default function ProfileScreen() {
           .select('*', { count: 'exact', head: true })
           .eq('follower_id', displayUserId);
 
+        if (!isMounted) return;
         setFollowersCount(fersCount || 0);
         setFollowingCount(fingCount || 0);
 
         // 6. Verificar si el usuario actual sigue a este perfil
         if (authUser && displayUserId && !isMe) {
           const isFollowing = await FollowRepository.isFollowing(authUser.id, displayUserId);
+          if (!isMounted) return;
           setIsFollowingUser(isFollowing);
         }
 
       } catch (error) {
+        if (!isMounted) return;
         console.error('Error cargando perfil y actividad:', error);
       } finally {
-        setLoadingProfile(false);
+        if (isMounted) {
+          setLoadingProfile(false);
+        }
       }
     }
     if (isFocused) {
       loadProfileAndActivity();
     }
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
   }, [displayUserId, isFocused, authUser, isMe]);
 
   const handleFollowToggle = async () => {
