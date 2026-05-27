@@ -196,7 +196,7 @@ export default function RecordSightingScreen() {
       const options: ImagePicker.ImagePickerOptions = {
         mediaTypes: 'images',
         allowsEditing: source === 'gallery' ? false : true,
-        allowsMultiple: source === 'gallery' ? true : false,
+        allowsMultipleSelection: source === 'gallery' ? true : false,
         aspect: [4, 3],
         quality: 0.8,
         base64: true,
