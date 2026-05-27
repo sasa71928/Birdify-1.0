@@ -310,19 +310,20 @@ export const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
-  dotsContainer: {
-    position: 'absolute',
-    bottom: Spacing.md,
-    left: '50%',
-    transform: [{ translateX: -40 }],
+    dotsContainer: {
     flexDirection: 'row',
-    gap: 6,
-    zIndex: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+    bottom: 120,
+    width: '100%',
   },
   dot: {
     width: 6,
     height: 6,
-    borderRadius: 3,
+    borderRadius: 100,
+    marginHorizontal: 4,
+    backgroundColor: 'rgba(255,255,255,0.4)',
   },
   dotActive: {
     backgroundColor: '#ffffff',
@@ -345,5 +346,24 @@ export const createStyles = (colors: any) => StyleSheet.create({
     color: '#ffffff',
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.bold,
+  },
+  activeDot: {
+    backgroundColor: '#fff',
+    width: 8,
+    height: 8,
+  },
+  imageCounter: {
+    position: 'absolute',
+    top: 80,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    zIndex: 10,
+  },
+  imageCounterText: {
+    color: '#fff',
+    fontSize: 12,
   },
 });

@@ -10,6 +10,7 @@ import { Colors, Spacing } from '../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { createStyles } from '../styles/components/FeedItem.styles';
 import { useDynamicStyles } from '../hooks/useDynamicStyles';
+import PagerView from 'react-native-pager-view';
 
 export interface Comment {
   id: string;
@@ -63,56 +64,22 @@ export default function FeedItem({ post }: FeedItemProps) {
   const lastTap = React.useRef(0);
   const [expandedComments, setExpandedComments] = React.useState<Record<string, boolean>>({});
   const [commentText, setCommentText] = React.useState('');
-  const [replyingTo, setReplyingTo] = React.useState<{ id: string, username: string, parentId?: string | null } | null>(null);
+  const [replyingTo, setReplyingTo] = React.useState<{
+    id: string;
+    username: string;
+    parentId: string | null;
+  } | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
-  const [isAnimating, setIsAnimating] = React.useState(false);
 
   const images = Array.isArray(post.image) ? post.image : [post.image];
   const currentImage = images[currentImageIndex];
+  const totalImages = images.length;
 
-  const panX = React.useRef(new Animated.Value(0)).current;
-  const currentImageIndexRef = React.useRef(currentImageIndex);
 
-  React.useEffect(() => {
-    currentImageIndexRef.current = currentImageIndex;
-  }, [currentImageIndex]);
+  const screenHeight = Dimensions.get('window').height;
+  const panY = React.useRef(new Animated.Value(screenHeight)).current;
+  const optionsPanY = React.useRef(new Animated.Value(screenHeight)).current;
 
-  const imagePanResponder = React.useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: (_, gestureState) => {
-        return !isAnimating && Math.abs(gestureState.dx) > 5 && Math.abs(gestureState.dy) < 10;
-      },
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return !isAnimating && Math.abs(gestureState.dx) > 5 && Math.abs(gestureState.dy) < 15;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (!isAnimating) {
-          panX.setValue(gestureState.dx);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (isAnimating) return;
-
-        const index = currentImageIndexRef.current;
-        if (gestureState.dx > 50 && index > 0) {
-          setIsAnimating(true);
-          panX.setValue(0);
-          setCurrentImageIndex(index - 1);
-          setIsAnimating(false);
-        } else if (gestureState.dx < -50 && index < images.length - 1) {
-          setIsAnimating(true);
-          panX.setValue(0);
-          setCurrentImageIndex(index + 1);
-          setIsAnimating(false);
-        } else {
-          Animated.spring(panX, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
-        }
-      },
-    })
-  ).current;
 
   const loadComments = React.useCallback(async () => {
     try {
@@ -146,13 +113,12 @@ export default function FeedItem({ post }: FeedItemProps) {
 
   React.useEffect(() => {
     return () => {
-      panX.setValue(0);
-      heartScale.setValue(0);
-      heartOpacity.setValue(0);
-      panY.setValue(screenHeight);
-      optionsPanY.setValue(screenHeight);
+      heartScale.stopAnimation();
+      heartOpacity.stopAnimation();
+      panY.stopAnimation();
+      optionsPanY.stopAnimation();
     };
-  }, [panX, heartScale, heartOpacity, panY, optionsPanY, screenHeight]);
+  }, []);
 
   React.useEffect(() => {
     if (showComments) {
@@ -191,19 +157,9 @@ export default function FeedItem({ post }: FeedItemProps) {
       setCommentText('');
       setReplyingTo(null);
 
-      // Si es una respuesta a un comentario, lo expandimos automáticamente
-      if (parentId) {
-        setExpandedComments(prev => ({
-          ...prev,
-          [parentId]: true
-        }));
-      }
-
       // Recargar comentarios
       await loadComments();
       
-      // Incrementar contador local
-      setCommentsCount(prev => prev + 1);
     } catch (error) {
       Alert.alert('Error', 'No se pudo publicar tu comentario. Inténtalo de nuevo.');
     }
@@ -307,10 +263,6 @@ export default function FeedItem({ post }: FeedItemProps) {
     ? post.caption.substring(0, CAPTION_LIMIT) + '...' 
     : post.caption;
 
-  // Swipe to close and entrance logic
-  const screenHeight = Dimensions.get('window').height;
-  const panY = React.useRef(new Animated.Value(screenHeight)).current;
-
   const panResponder = React.useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -329,7 +281,7 @@ export default function FeedItem({ post }: FeedItemProps) {
             duration: 300,
             useNativeDriver: true,
           }).start(() => {
-            setShowComments(false);
+            resetModal();
           });
         } else {
           Animated.spring(panY, {
@@ -371,9 +323,6 @@ export default function FeedItem({ post }: FeedItemProps) {
       setShowComments(false);
     });
   };
-
-  // ----- Animación para el Options Menu -----
-  const optionsPanY = React.useRef(new Animated.Value(screenHeight)).current;
 
   const optionsPanResponder = React.useRef(
     PanResponder.create({
@@ -459,6 +408,7 @@ export default function FeedItem({ post }: FeedItemProps) {
     resetOptionsModal();
   };
 
+  const pagerRef = React.useRef<PagerView>(null);
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -483,64 +433,47 @@ export default function FeedItem({ post }: FeedItemProps) {
         </TouchableOpacity>
       </View>
 
+      {totalImages > 1 && (
+        <View style={styles.imageCounter}>
+          <Text style={styles.imageCounterText}>
+            {currentImageIndex + 1} / {totalImages}
+          </Text>
+        </View>
+      )}
+      
+
       {/* Image Content */}
-      <Animated.View
-        {...imagePanResponder.panHandlers}
-        style={[styles.imageContainer, { transform: [{ translateX: panX }] }]}
+      <PagerView
+        ref={pagerRef}
+        style={styles.imageContainer}
+        initialPage={0}
+        scrollEnabled={true}
+        offscreenPageLimit={1}
+        overdrag={false}
+        onPageSelected={(e) => setCurrentImageIndex(e.nativeEvent.position)}
       >
-        <TouchableWithoutFeedback onPress={handleImageTap}>
-          <View style={{ width: '100%', height: '100%' }}>
-            <Image source={{ uri: currentImage }} style={styles.postImage} />
-            <TouchableOpacity
-              style={styles.tagBadge}
-              onPress={() => navigation.navigate('MainTabs', {
-                screen: 'Dictionary',
-                params: { searchQuery: post.tag }
-              })}
-            >
-              <Ionicons name="information-circle-outline" size={16} color="#5D4037" />
-              <Text style={styles.tagText}>{post.tag}</Text>
-            </TouchableOpacity>
-
-            {/* Image Navigation Dots */}
-            {images.length > 1 && (
-              <>
-                <View style={styles.imageIndicator}>
-                  <Text style={styles.imageIndicatorText}>
-                    {currentImageIndex + 1}/{images.length}
-                  </Text>
-                </View>
-
-                <View style={styles.dotsContainer}>
-                  {images.map((_, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={[
-                        styles.dot,
-                        index === currentImageIndex ? styles.dotActive : styles.dotInactive
-                      ]}
-                      onPress={() => setCurrentImageIndex(index)}
-                    />
-                  ))}
-                </View>
-              </>
-            )}
-
-            {/* Animated Heart Overlay */}
-            <Animated.View
-              style={[
-                styles.heartOverlay,
-                {
-                  transform: [{ scale: heartScale }],
-                  opacity: heartOpacity
-                }
-              ]}
-            >
-              <Ionicons name="heart" size={100} color={'#FF5252CC'} />
-            </Animated.View>
+        {images.map((img, index) => (
+          <View key={index} style={{ flex: 1 }}>
+            <TouchableWithoutFeedback onPress={handleImageTap}>
+              <Image source={{ uri: img }} style={styles.postImage} />
+            </TouchableWithoutFeedback>
           </View>
-        </TouchableWithoutFeedback>
-      </Animated.View>
+        ))}
+      </PagerView>
+      {/* Dots indicator */}
+        {totalImages > 1 && (
+          <View style={styles.dotsContainer}>
+            {images.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.dot,
+                  currentImageIndex === index && styles.activeDot
+                ]}
+              />
+            ))}
+          </View>
+        )}
 
       {/* Actions */}
       <View style={styles.actions}>
@@ -667,7 +600,7 @@ export default function FeedItem({ post }: FeedItemProps) {
                     </View>
                     
                     <TouchableOpacity 
-                      onPress={() => setReplyingTo({ id: comment.id, username: comment.username })}
+                      onPress={() => setReplyingTo({ id: comment.id, username: comment.username, parentId: null })}
                       style={styles.replyButton}
                     >
                       <Text style={styles.replyButtonText}>Responder</Text>
