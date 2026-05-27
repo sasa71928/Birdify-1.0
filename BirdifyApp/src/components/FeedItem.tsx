@@ -47,7 +47,7 @@ export default function FeedItem({ post }: FeedItemProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const { user } = useAuth();
-  
+
   const [isCaptionExpanded, setIsCaptionExpanded] = React.useState(false);
   const [showComments, setShowComments] = React.useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = React.useState(false);
@@ -68,6 +68,34 @@ export default function FeedItem({ post }: FeedItemProps) {
 
   const images = Array.isArray(post.image) ? post.image : [post.image];
   const currentImage = images[currentImageIndex];
+
+  const panX = React.useRef(new Animated.Value(0)).current;
+
+  const imagePanResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dy) < 10;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        panX.setValue(gestureState.dx);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx > 50 && currentImageIndex > 0) {
+          setCurrentImageIndex(currentImageIndex - 1);
+          panX.setValue(0);
+        } else if (gestureState.dx < -50 && currentImageIndex < images.length - 1) {
+          setCurrentImageIndex(currentImageIndex + 1);
+          panX.setValue(0);
+        } else {
+          Animated.spring(panX, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   const loadComments = React.useCallback(async () => {
     try {
@@ -404,74 +432,63 @@ export default function FeedItem({ post }: FeedItemProps) {
       </View>
 
       {/* Image Content */}
-      <TouchableWithoutFeedback onPress={handleImageTap}>
-        <View style={styles.imageContainer}>
-          <Image source={{ uri: currentImage }} style={styles.postImage} />
-          <TouchableOpacity
-            style={styles.tagBadge}
-            onPress={() => navigation.navigate('MainTabs', {
-              screen: 'Dictionary',
-              params: { searchQuery: post.tag }
-            })}
-          >
-            <Ionicons name="information-circle-outline" size={16} color="#5D4037" />
-            <Text style={styles.tagText}>{post.tag}</Text>
-          </TouchableOpacity>
+      <Animated.View
+        {...imagePanResponder.panHandlers}
+        style={[styles.imageContainer, { transform: [{ translateX: panX }] }]}
+      >
+        <TouchableWithoutFeedback onPress={handleImageTap}>
+          <View style={{ width: '100%', height: '100%' }}>
+            <Image source={{ uri: currentImage }} style={styles.postImage} />
+            <TouchableOpacity
+              style={styles.tagBadge}
+              onPress={() => navigation.navigate('MainTabs', {
+                screen: 'Dictionary',
+                params: { searchQuery: post.tag }
+              })}
+            >
+              <Ionicons name="information-circle-outline" size={16} color="#5D4037" />
+              <Text style={styles.tagText}>{post.tag}</Text>
+            </TouchableOpacity>
 
-          {/* Image Navigation */}
-          {images.length > 1 && (
-            <>
-              <TouchableOpacity
-                style={[styles.navButton, styles.navButtonLeft]}
-                onPress={() => setCurrentImageIndex(Math.max(0, currentImageIndex - 1))}
-                disabled={currentImageIndex === 0}
-              >
-                <Ionicons name="chevron-back" size={24} color={currentImageIndex === 0 ? '#ffffff60' : '#ffffff'} />
-              </TouchableOpacity>
+            {/* Image Navigation Dots */}
+            {images.length > 1 && (
+              <>
+                <View style={styles.imageIndicator}>
+                  <Text style={styles.imageIndicatorText}>
+                    {currentImageIndex + 1}/{images.length}
+                  </Text>
+                </View>
 
-              <TouchableOpacity
-                style={[styles.navButton, styles.navButtonRight]}
-                onPress={() => setCurrentImageIndex(Math.min(images.length - 1, currentImageIndex + 1))}
-                disabled={currentImageIndex === images.length - 1}
-              >
-                <Ionicons name="chevron-forward" size={24} color={currentImageIndex === images.length - 1 ? '#ffffff60' : '#ffffff'} />
-              </TouchableOpacity>
+                <View style={styles.dotsContainer}>
+                  {images.map((_, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.dot,
+                        index === currentImageIndex ? styles.dotActive : styles.dotInactive
+                      ]}
+                      onPress={() => setCurrentImageIndex(index)}
+                    />
+                  ))}
+                </View>
+              </>
+            )}
 
-              <View style={styles.imageIndicator}>
-                <Text style={styles.imageIndicatorText}>
-                  {currentImageIndex + 1}/{images.length}
-                </Text>
-              </View>
-
-              <View style={styles.dotsContainer}>
-                {images.map((_, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.dot,
-                      index === currentImageIndex ? styles.dotActive : styles.dotInactive
-                    ]}
-                    onPress={() => setCurrentImageIndex(index)}
-                  />
-                ))}
-              </View>
-            </>
-          )}
-
-          {/* Animated Heart Overlay */}
-          <Animated.View
-            style={[
-              styles.heartOverlay,
-              {
-                transform: [{ scale: heartScale }],
-                opacity: heartOpacity
-              }
-            ]}
-          >
-            <Ionicons name="heart" size={100} color={'#FF5252CC'} />
-          </Animated.View>
-        </View>
-      </TouchableWithoutFeedback>
+            {/* Animated Heart Overlay */}
+            <Animated.View
+              style={[
+                styles.heartOverlay,
+                {
+                  transform: [{ scale: heartScale }],
+                  opacity: heartOpacity
+                }
+              ]}
+            >
+              <Ionicons name="heart" size={100} color={'#FF5252CC'} />
+            </Animated.View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Animated.View>
 
       {/* Actions */}
       <View style={styles.actions}>

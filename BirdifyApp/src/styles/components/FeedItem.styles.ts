@@ -310,24 +310,6 @@ export const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
-  navButton: {
-    position: 'absolute',
-    top: '50%',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 8,
-    marginTop: -22,
-  },
-  navButtonLeft: {
-    left: Spacing.sm,
-  },
-  navButtonRight: {
-    right: Spacing.sm,
-  },
   dotsContainer: {
     position: 'absolute',
     bottom: Spacing.md,
