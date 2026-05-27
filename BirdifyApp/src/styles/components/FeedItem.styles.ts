@@ -310,4 +310,58 @@ export const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
+  navButton: {
+    position: 'absolute',
+    top: '50%',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 8,
+    marginTop: -22,
+  },
+  navButtonLeft: {
+    left: Spacing.sm,
+  },
+  navButtonRight: {
+    right: Spacing.sm,
+  },
+  dotsContainer: {
+    position: 'absolute',
+    bottom: Spacing.md,
+    left: '50%',
+    transform: [{ translateX: -40 }],
+    flexDirection: 'row',
+    gap: 6,
+    zIndex: 9,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  dotActive: {
+    backgroundColor: '#ffffff',
+    width: 20,
+  },
+  dotInactive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  imageIndicator: {
+    position: 'absolute',
+    top: Spacing.md,
+    right: Spacing.md,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: Radius.sm,
+    zIndex: 9,
+  },
+  imageIndicatorText: {
+    color: '#ffffff',
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.bold,
+  },
 });

@@ -29,7 +29,7 @@ export interface Sighting {
   latitude: number | null;
   longitude: number | null;
   is_location_private: boolean;
-  photo_url: string | null;
+  photo_url: string | string[] | null;
   sighting_date: string;
   created_at: string;
   updated_at: string;

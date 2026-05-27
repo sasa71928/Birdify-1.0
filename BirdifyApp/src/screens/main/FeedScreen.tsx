@@ -13,17 +13,28 @@ import { useAuth } from '../../context/AuthContext';
 function mapSightingToPost(sighting: any, currentUserId?: string): Post {
   const timeDiff = Date.now() - new Date(sighting.created_at).getTime();
   const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60));
-  const timeAgoStr = hoursAgo < 24 
-    ? (hoursAgo === 0 ? 'Hace un momento' : `Hace ${hoursAgo} hora${hoursAgo === 1 ? '' : 's'}`) 
+  const timeAgoStr = hoursAgo < 24
+    ? (hoursAgo === 0 ? 'Hace un momento' : `Hace ${hoursAgo} hora${hoursAgo === 1 ? '' : 's'}`)
     : `Hace ${Math.floor(hoursAgo/24)} día${Math.floor(hoursAgo/24) === 1 ? '' : 's'}`;
 
   const reactionsList = sighting.reactions || [];
   const likesCount = reactionsList.length;
   const hasLiked = currentUserId ? reactionsList.some((r: any) => r.user_id === currentUserId) : false;
 
-  // Handle case where Supabase join returns user as array or object
   const userData = Array.isArray(sighting.user) ? sighting.user[0] : sighting.user;
 
+  let photoUrl: string | string[] = sighting.photo_url || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=600';
+
+  if (typeof photoUrl === 'string') {
+    try {
+      const parsed = JSON.parse(photoUrl);
+      if (Array.isArray(parsed)) {
+        photoUrl = parsed;
+      }
+    } catch {
+      // Es una URL simple, no un JSON
+    }
+  }
 
   return {
     id: sighting.id,
@@ -31,7 +42,7 @@ function mapSightingToPost(sighting: any, currentUserId?: string): Post {
     username: userData?.username || 'Usuario',
     userAvatar: userData?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
     location: sighting.is_location_private ? 'Ubicación Privada' : 'En la Naturaleza',
-    image: sighting.photo_url || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=600',
+    image: photoUrl,
     tag: sighting.bird?.common_name || 'Ave Sin Identificar',
     likes: likesCount,
     comments: sighting.comments ? sighting.comments.length : 0,

@@ -25,7 +25,7 @@ export interface Post {
   username: string;
   userAvatar: string;
   location: string;
-  image: string;
+  image: string | string[];
   tag: string;
   likes: number;
   comments: number;
@@ -64,6 +64,10 @@ export default function FeedItem({ post }: FeedItemProps) {
   const [expandedComments, setExpandedComments] = React.useState<Record<string, boolean>>({});
   const [commentText, setCommentText] = React.useState('');
   const [replyingTo, setReplyingTo] = React.useState<{ id: string, username: string, parentId?: string | null } | null>(null);
+  const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
+
+  const images = Array.isArray(post.image) ? post.image : [post.image];
+  const currentImage = images[currentImageIndex];
 
   const loadComments = React.useCallback(async () => {
     try {
@@ -223,11 +227,11 @@ export default function FeedItem({ post }: FeedItemProps) {
 
   const handleShare = async () => {
     try {
-      const shareMessage = `¡Mira este increíble avistamiento en Birdify!\n\nSe avistó un ${post.tag} por @${post.username}\n\n${post.image}`;
-      
+      const shareMessage = `¡Mira este increíble avistamiento en Birdify!\n\nSe avistó un ${post.tag} por @${post.username}\n\n${currentImage}`;
+
       const result = await Share.share({
         message: shareMessage,
-        url: post.image, // For iOS support
+        url: currentImage,
       });
       if (result.action === Share.sharedAction) {
         if (result.activityType) {
@@ -402,10 +406,10 @@ export default function FeedItem({ post }: FeedItemProps) {
       {/* Image Content */}
       <TouchableWithoutFeedback onPress={handleImageTap}>
         <View style={styles.imageContainer}>
-          <Image source={{ uri: post.image }} style={styles.postImage} />
-          <TouchableOpacity 
+          <Image source={{ uri: currentImage }} style={styles.postImage} />
+          <TouchableOpacity
             style={styles.tagBadge}
-            onPress={() => navigation.navigate('MainTabs', { 
+            onPress={() => navigation.navigate('MainTabs', {
               screen: 'Dictionary',
               params: { searchQuery: post.tag }
             })}
@@ -413,12 +417,52 @@ export default function FeedItem({ post }: FeedItemProps) {
             <Ionicons name="information-circle-outline" size={16} color="#5D4037" />
             <Text style={styles.tagText}>{post.tag}</Text>
           </TouchableOpacity>
-          
+
+          {/* Image Navigation */}
+          {images.length > 1 && (
+            <>
+              <TouchableOpacity
+                style={[styles.navButton, styles.navButtonLeft]}
+                onPress={() => setCurrentImageIndex(Math.max(0, currentImageIndex - 1))}
+                disabled={currentImageIndex === 0}
+              >
+                <Ionicons name="chevron-back" size={24} color={currentImageIndex === 0 ? '#ffffff60' : '#ffffff'} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.navButton, styles.navButtonRight]}
+                onPress={() => setCurrentImageIndex(Math.min(images.length - 1, currentImageIndex + 1))}
+                disabled={currentImageIndex === images.length - 1}
+              >
+                <Ionicons name="chevron-forward" size={24} color={currentImageIndex === images.length - 1 ? '#ffffff60' : '#ffffff'} />
+              </TouchableOpacity>
+
+              <View style={styles.imageIndicator}>
+                <Text style={styles.imageIndicatorText}>
+                  {currentImageIndex + 1}/{images.length}
+                </Text>
+              </View>
+
+              <View style={styles.dotsContainer}>
+                {images.map((_, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.dot,
+                      index === currentImageIndex ? styles.dotActive : styles.dotInactive
+                    ]}
+                    onPress={() => setCurrentImageIndex(index)}
+                  />
+                ))}
+              </View>
+            </>
+          )}
+
           {/* Animated Heart Overlay */}
-          <Animated.View 
+          <Animated.View
             style={[
-              styles.heartOverlay, 
-              { 
+              styles.heartOverlay,
+              {
                 transform: [{ scale: heartScale }],
                 opacity: heartOpacity
               }

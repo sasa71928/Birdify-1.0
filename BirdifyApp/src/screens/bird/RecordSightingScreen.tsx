@@ -81,8 +81,8 @@ export default function RecordSightingScreen() {
   const [selectedBird, setSelectedBird] = useState<any>(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [notes, setNotes] = useState('');
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [imageUris, setImageUris] = useState<string[]>([]);
+  const [imageBase64s, setImageBase64s] = useState<string[]>([]);
   const [isPrivate, setIsPrivate] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   
@@ -180,6 +180,10 @@ export default function RecordSightingScreen() {
 
   const handlePickImage = async (source: 'gallery' | 'camera') => {
     try {
+      if (imageUris.length >= 10) {
+        return Alert.alert('Límite alcanzado', 'Puedes añadir un máximo de 10 imágenes.');
+      }
+
       if (source === 'gallery') {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') return Alert.alert('Permiso denegado', 'Se requiere acceso a tu galería.');
@@ -204,8 +208,8 @@ export default function RecordSightingScreen() {
       }
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setImageUri(result.assets[0].uri);
-        setImageBase64(result.assets[0].base64 || null);
+        setImageUris([...imageUris, result.assets[0].uri]);
+        setImageBase64s([...imageBase64s, result.assets[0].base64 || '']);
       }
     } catch (err: any) {
       Alert.alert('Error', err.message);
@@ -239,7 +243,7 @@ export default function RecordSightingScreen() {
   const handlePost = async () => {
     if (!user) return Alert.alert('Sesión Inválida', 'Inicia sesión para compartir un avistamiento.');
     if (!birdName.trim()) return Alert.alert('Información incompleta', 'Debes nombrar o describir al ave.');
-    if (!imageBase64) return Alert.alert('Información incompleta', '¡Una buena foto es esencial para registrar un avistamiento!');
+    if (imageBase64s.length === 0) return Alert.alert('Información incompleta', '¡Debes añadir al menos una foto!');
 
     setIsPosting(true);
     try {
@@ -247,7 +251,7 @@ export default function RecordSightingScreen() {
       let finalBirdId = null;
       const searchName = selectedBird ? selectedBird.common_name : birdName;
       const birds = await BirdRepository.search(searchName);
-      
+
       if (birds && birds.length > 0) {
         finalBirdId = birds[0].id;
       } else {
@@ -271,27 +275,35 @@ export default function RecordSightingScreen() {
         finalBirdId = newBird.id;
       }
 
-      // --- FLUJO DE SUBIDA A SUPABASE ---
-      const fileExt = imageUri?.split('.').pop() || 'jpg';
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      const arrayBuffer = decodeBase64ToArrayBuffer(imageBase64);
+      // --- FLUJO DE SUBIDA DE MÚLTIPLES IMÁGENES A SUPABASE ---
+      const photoUrls: string[] = [];
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('Sightings')
-        .upload(fileName, arrayBuffer, {
-          contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
-          upsert: true,
-        });
+      for (let i = 0; i < imageBase64s.length; i++) {
+        const base64 = imageBase64s[i];
+        const uri = imageUris[i];
+        const fileExt = uri?.split('.').pop() || 'jpg';
+        const fileName = `${user.id}/${Date.now()}_${i}.${fileExt}`;
+        const arrayBuffer = decodeBase64ToArrayBuffer(base64);
 
-      if (uploadError) {
-        throw new Error('Error al subir imagen: ' + uploadError.message);
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('Sightings')
+          .upload(fileName, arrayBuffer, {
+            contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+            upsert: true,
+          });
+
+        if (uploadError) {
+          throw new Error('Error al subir imagen: ' + uploadError.message);
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('Sightings')
+          .getPublicUrl(fileName);
+
+        photoUrls.push(publicUrl);
       }
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('Sightings')
-        .getPublicUrl(fileName);
-
-      // Crear el registro de avistamiento
+      // Crear el registro de avistamiento con array de URLs
       await SightingRepository.create({
         user_id: user.id,
         bird_id: finalBirdId,
@@ -299,7 +311,7 @@ export default function RecordSightingScreen() {
         latitude: region.latitude,
         longitude: region.longitude,
         is_location_private: isPrivate,
-        photo_url: publicUrl,
+        photo_url: photoUrls.length === 1 ? photoUrls[0] : JSON.stringify(photoUrls) as any,
         sighting_date: new Date().toISOString()
       });
 
@@ -364,12 +376,68 @@ export default function RecordSightingScreen() {
           <Text style={styles.subtitle}>Documenta una nueva observación para tu bitácora y la comunidad.</Text>
 
           {/* Photo Upload Area */}
-          <TouchableOpacity 
-            style={[styles.photoContainer, { borderColor: imageUri ? colors.primary : colors.border + '40', borderWidth: imageUri ? 2 : 1 }]} 
-            onPress={() => { setModalVisible(true); }}
+          <TouchableOpacity
+            style={[styles.photoContainer, { borderColor: imageUris.length > 0 ? colors.primary : colors.border + '40', borderWidth: imageUris.length > 0 ? 2 : 1 }]}
+            onPress={() => imageUris.length < 10 && setModalVisible(true)}
+            activeOpacity={1}
           >
-            {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.uploadedImage} />
+            {imageUris.length > 0 ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 12 }}>
+                {imageUris.map((uri, index) => (
+                  <View key={index} style={{ width: '47%', aspectRatio: 1 }}>
+                    <Image
+                      source={{ uri }}
+                      style={{ width: '100%', height: '100%', borderRadius: 12 }}
+                    />
+                    <TouchableOpacity
+                      style={{
+                        position: 'absolute',
+                        top: -8,
+                        right: -8,
+                        backgroundColor: '#FF5252',
+                        borderRadius: 50,
+                        padding: 4,
+                      }}
+                      onPress={() => {
+                        setImageUris(imageUris.filter((_, i) => i !== index));
+                        setImageBase64s(imageBase64s.filter((_, i) => i !== index));
+                      }}
+                    >
+                      <Ionicons name="close" size={16} color="white" />
+                    </TouchableOpacity>
+                    <View style={{
+                      position: 'absolute',
+                      bottom: 4,
+                      right: 4,
+                      backgroundColor: colors.primary + 'dd',
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 6,
+                    }}>
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>
+                        {index + 1}/{imageUris.length}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+                {imageUris.length < 10 && (
+                  <TouchableOpacity
+                    style={{
+                      width: '47%',
+                      aspectRatio: 1,
+                      borderRadius: 12,
+                      borderWidth: 2,
+                      borderStyle: 'dashed',
+                      borderColor: colors.primary + '40',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                    onPress={() => setModalVisible(true)}
+                  >
+                    <Ionicons name="add" size={32} color={colors.primary + '60'} />
+                  </TouchableOpacity>
+                )}
+              </View>
             ) : (
               <View style={styles.photoInner}>
                 <View style={styles.cameraIconBg}>
@@ -379,7 +447,7 @@ export default function RecordSightingScreen() {
                     </View>
                 </View>
                 <Text style={styles.photoTitle}>Toca para añadir foto</Text>
-                <Text style={styles.photoSubtitle}>Las fotos de alta calidad ayudan a la identificación</Text>
+                <Text style={styles.photoSubtitle}>Puedes añadir hasta 10 fotos (calidad alta)</Text>
               </View>
             )}
           </TouchableOpacity>
