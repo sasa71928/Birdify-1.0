@@ -25,6 +25,7 @@ import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { BirdRepository } from '../../repositories/bird.repository';
 import { mapBird } from '../../utils/mapBird';
 
+
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Dictionary'>;
 
 const FILTERS = ['All', 'A-Z', 'Season', 'Habitat', 'Family'];

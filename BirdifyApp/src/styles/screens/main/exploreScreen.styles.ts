@@ -80,5 +80,52 @@ export const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     ...Shadows.card,
   },
+  customMarker: {
+  width: 42,
+  height: 42,
+  borderRadius: 21,
+  backgroundColor: colors.primary,
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 3,
+  borderColor: colors.surface,
+},
+
+customMarkerActive: {
+  transform: [{ scale: 1.12 }],
+},
+
+calloutContainer: {
+  position: 'absolute',
+  alignSelf: 'center',
+  minWidth: 140,
+  backgroundColor: colors.surface,
+  paddingHorizontal: 14,
+  paddingVertical: 10,
+  borderRadius: 16,
+  borderWidth: 1,
+  borderColor: colors.border,
+  alignItems: 'center',
+  top: 250
+},
+
+calloutTitle: {
+  color: colors.textPrimary,
+  fontSize: 14,
+  fontWeight: '700',
+},
+
+calloutSubtitle: {
+  color: colors.textSecondary,
+  fontSize: 12,
+  marginTop: 2,
+},
+
+calloutHint: {
+  color: colors.primary,
+  fontSize: 11,
+  marginTop: 6,
+  fontWeight: '600',
+},
 });
 

@@ -8,10 +8,12 @@ import React, {
 
 import {
   View,
+  Text,
   TextInput,
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
+  FlatList,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,11 +25,35 @@ import {
   MaterialCommunityIcons,
 } from '@expo/vector-icons';
 
+import { useNavigation } from '@react-navigation/native';
+
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+import { RootStackParamList } from '../../navigation/AppNavigator';
+
 import { createStyles } from '../../styles/screens/main/exploreScreen.styles';
 
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 import { SightingRepository } from '../../repositories/sighting.repository';
+
+import { mapBird } from '../../utils/mapBird';
+
+import * as Location from 'expo-location';
+
+type NavProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'Explore'
+>;
+
+type MapSighting = {
+  id: string;
+  latitude: number | string;
+  longitude: number | string;
+  created_at: string;
+  is_location_private?: boolean;
+  bird?: any;
+};
 
 const createMapStyle = (colors: any) => [
   {
@@ -86,33 +112,103 @@ const createMapStyle = (colors: any) => [
   },
 ];
 
-type MapSighting = {
-  id: string;
-  latitude: number | string;
-  longitude: number | string;
-  created_at: string;
-  is_location_private?: boolean;
-  bird?: {
-    common_name?: string;
-  };
-};
-
 export default function ExploreScreen() {
   const { screen: styles, colors, isDark } =
     useDynamicStyles(createStyles);
+
+  const navigation = useNavigation<NavProp>();
+
+  const mapRef = useRef<MapView>(null);
 
   const MAP_STYLE = useMemo(
     () => createMapStyle(colors),
     [colors]
   );
 
-  const mapRef = useRef<MapView>(null);
-
   const [loading, setLoading] = useState(true);
+
+  const [selectedMarker, setSelectedMarker] =
+    useState<string | null>(null);
 
   const [sightings, setSightings] = useState<
     MapSighting[]
   >([]);
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const [filteredSightings, setFilteredSightings] =
+    useState<MapSighting[]>([]);
+
+  const [userLocation, setUserLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+
+  const DEFAULT_REGION = {
+    latitude: 24.1426,
+    longitude: -110.3128,
+    latitudeDelta: 0.08,
+    longitudeDelta: 0.08,
+  };
+
+  const getTimeAgo = (dateString: string) => {
+    const now = new Date();
+
+    const date = new Date(dateString);
+
+    const seconds = Math.floor(
+      (now.getTime() - date.getTime()) / 1000
+    );
+
+    const minutes = Math.floor(seconds / 60);
+
+    const hours = Math.floor(minutes / 60);
+
+    const days = Math.floor(hours / 24);
+
+    if (seconds < 60) return 'Just now';
+
+    if (minutes < 60) {
+      return `${minutes}m ago`;
+    }
+
+    if (hours < 24) {
+      return `${hours}h ago`;
+    }
+
+    return `${days}d ago`;
+  };
+
+  const calculateDistance = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ) => {
+    const R = 6371;
+
+    const dLat =
+      ((lat2 - lat1) * Math.PI) / 180;
+
+    const dLon =
+      ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(dLat / 2) *
+        Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+
+    const c =
+      2 * Math.atan2(
+        Math.sqrt(a),
+        Math.sqrt(1 - a)
+      );
+
+    return (R * c).toFixed(1);
+  };
 
   const loadSightings = useCallback(async () => {
     try {
@@ -128,21 +224,8 @@ export default function ExploreScreen() {
           !item.is_location_private
       );
 
-
       setSightings(validSightings);
 
-      if (validSightings.length > 0) {
-        mapRef.current?.animateToRegion({
-          latitude: Number(
-            validSightings[0].latitude
-          ),
-          longitude: Number(
-            validSightings[0].longitude
-          ),
-          latitudeDelta: 0.08,
-          longitudeDelta: 0.08,
-        });
-      }
     } catch (error) {
       console.error(
         'Error loading sightings:',
@@ -153,9 +236,95 @@ export default function ExploreScreen() {
     }
   }, []);
 
+  const loadUserLocation = async () => {
+    try {
+      const { status } =
+        await Location.requestForegroundPermissionsAsync();
+
+      if (status !== 'granted') {
+        return;
+      }
+
+      const location =
+        await Location.getCurrentPositionAsync({
+          accuracy:
+            Location.Accuracy.High,
+        });
+
+      setUserLocation({
+        latitude:
+          location.coords.latitude,
+        longitude:
+          location.coords.longitude,
+      });
+
+    } catch (error) {
+      console.error(
+        'Error getting location:',
+        error
+      );
+    }
+  };
+
   useEffect(() => {
     loadSightings();
+    loadUserLocation();
   }, [loadSightings]);
+
+  useEffect(() => {
+    setFilteredSightings(sightings);
+  }, [sightings]);
+
+  const selectedSighting = useMemo(() => {
+    return (
+      sightings.find(
+        (s) => s.id === selectedMarker
+      ) ?? null
+    );
+  }, [sightings, selectedMarker]);
+
+  const closeSelection = useCallback(() => {
+    if (!selectedSighting) {
+      setSelectedMarker(null);
+      return;
+    }
+
+    mapRef.current?.animateToRegion({
+      latitude: Number(
+        selectedSighting.latitude
+      ),
+      longitude: Number(
+        selectedSighting.longitude
+      ),
+      latitudeDelta: 0.08,
+      longitudeDelta: 0.08,
+    });
+
+    setSelectedMarker(null);
+
+  }, [selectedSighting]);
+
+  const handleSearch = (text: string) => {
+    setSearchQuery(text);
+
+    if (!text.trim()) {
+      setFilteredSightings(sightings);
+      return;
+    }
+
+    const filtered = sightings.filter(
+      (item) => {
+        const birdName =
+          item.bird?.common_name?.toLowerCase() || '';
+
+        return birdName.includes(
+          text.toLowerCase()
+        );
+      }
+    );
+
+    setFilteredSightings(filtered);
+  };
 
   if (loading) {
     return (
@@ -185,38 +354,6 @@ export default function ExploreScreen() {
     );
   }
 
-  const getTimeAgo = (dateString: string) => {
-    const now = new Date();
-    const date = new Date(dateString);
-
-    const seconds = Math.floor(
-      (now.getTime() - date.getTime()) / 1000
-    );
-
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (seconds < 60) return 'Just now';
-
-    if (minutes < 60) {
-      return `${minutes}m ago`;
-    }
-
-    if (hours < 24) {
-      return `${hours}h ago`;
-    }
-
-    return `${days}d ago`;
-  };
-
-  const DEFAULT_REGION = {
-  latitude: 24.1426,
-  longitude: -110.3128,
-  latitudeDelta: 0.08,
-  longitudeDelta: 0.08,
-};
-
   return (
     <View style={styles.container}>
       <StatusBar
@@ -235,45 +372,88 @@ export default function ExploreScreen() {
         showsMyLocationButton={false}
         customMapStyle={isDark ? MAP_STYLE : []}
         initialRegion={DEFAULT_REGION}
+        onPress={closeSelection}
       >
-        {sightings.map((item) => (
-          <Marker
-            key={item.id}
-            coordinate={{
-              latitude: Number(item.latitude),
-              longitude: Number(item.longitude),
-            }}
-            title={item.bird?.common_name ?? 'Bird'}
-            description={`${getTimeAgo(item.created_at)} • Bird sighting`}
-            onPress={() => {
-              mapRef.current?.animateToRegion({
+        {filteredSightings.map((item) => {
+          const isSelected =
+            selectedMarker === item.id;
+
+          return (
+            <Marker
+              key={item.id}
+              coordinate={{
                 latitude: Number(item.latitude),
                 longitude: Number(item.longitude),
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-              });
-            }}
-            onDeselect={async () => {
-              const camera = await mapRef.current?.getCamera();
+              }}
+              onPress={() => {
 
-              if (!camera) return;
+                setSelectedMarker(item.id);
 
-              mapRef.current?.animateToRegion({
-                latitude: camera.center.latitude,
-                longitude: camera.center.longitude,
-                latitudeDelta: 0.08,
-                longitudeDelta: 0.08,
-              });
-            }}
-          >
-            <MaterialCommunityIcons
-              name="map-marker"
-              size={42}
-              color={colors.primary}
-            />
-          </Marker>
-        ))}
+                mapRef.current?.animateToRegion({
+                  latitude: Number(
+                    item.latitude
+                  ),
+                  longitude: Number(
+                    item.longitude
+                  ),
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                });
+              }}
+            >
+              <MaterialCommunityIcons
+                name="bird"
+                size={42}
+                color={
+                  isSelected
+                    ? colors.primaryDark
+                    : colors.primary
+                }
+              />
+            </Marker>
+          );
+        })}
       </MapView>
+
+      {selectedSighting && (
+        <TouchableOpacity
+          activeOpacity={0.9}
+          style={styles.calloutContainer}
+          onPress={() => {
+
+            if (!selectedSighting.bird) {
+              return;
+            }
+
+            const mappedBird = mapBird(
+              selectedSighting.bird,
+              0
+            );
+
+            navigation.navigate(
+              'BirdDetail',
+              {
+                bird: mappedBird,
+              }
+            );
+          }}
+        >
+          <Text style={styles.calloutTitle}>
+            {selectedSighting.bird
+              ?.common_name ?? 'Bird'}
+          </Text>
+
+          <Text style={styles.calloutSubtitle}>
+            {getTimeAgo(
+              selectedSighting.created_at
+            )}
+          </Text>
+
+          <Text style={styles.calloutHint}>
+            Tap here for details
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <SafeAreaView
         style={styles.overlay}
@@ -290,33 +470,130 @@ export default function ExploreScreen() {
           <TextInput
             style={styles.searchInput}
             placeholder="Search locations or species..."
-            placeholderTextColor={
-              colors.placeholder
-            }
+            placeholderTextColor={colors.placeholder}
+            value={searchQuery}
+            onChangeText={handleSearch}
           />
-
-          <TouchableOpacity
-            style={styles.filterButton}
-          >
-            <MaterialCommunityIcons
-              name="filter-variant"
-              size={20}
-              color={colors.textPrimary}
-            />
-          </TouchableOpacity>
         </View>
       </SafeAreaView>
+
+      {searchQuery.length > 0 && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 110,
+            left: 16,
+            right: 16,
+            maxHeight: 320,
+            backgroundColor: colors.surface,
+            borderRadius: 20,
+            overflow: 'hidden',
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          <FlatList
+            data={filteredSightings}
+            keyExtractor={(item) => item.id}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => {
+              const distance = userLocation
+                ? calculateDistance(
+                    userLocation.latitude,
+                    userLocation.longitude,
+                    Number(item.latitude),
+                    Number(item.longitude)
+                  )
+                : null;
+
+              return (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setSelectedMarker(item.id);
+
+                    setSearchQuery('');
+
+                    mapRef.current?.animateToRegion({
+                      latitude: Number(item.latitude),
+                      longitude: Number(item.longitude),
+                      latitudeDelta: 0.01,
+                      longitudeDelta: 0.01,
+                    });
+                  }}
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.border,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.textPrimary,
+                      fontSize: 15,
+                      fontWeight: '600',
+                    }}
+                  >
+                    {item.bird?.common_name ?? 'Bird'}
+                  </Text>
+
+                  <Text
+                    style={{
+                      color: colors.textSecondary,
+                      marginTop: 4,
+                    }}
+                  >
+                    Lat: {Number(item.latitude).toFixed(4)}
+                  </Text>
+
+                  <Text
+                    style={{
+                      color: colors.textSecondary,
+                    }}
+                  >
+                    Lng: {Number(item.longitude).toFixed(4)}
+                  </Text>
+
+                  {distance && (
+                    <Text
+                      style={{
+                        color: colors.primary,
+                        marginTop: 6,
+                        fontWeight: '600',
+                      }}
+                    >
+                      {distance} km away
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+      )}
 
       <TouchableOpacity
         style={styles.locationButton}
         activeOpacity={0.8}
+        onPress={() => {
+          if (!userLocation) return;
+
+          mapRef.current?.animateToRegion({
+            latitude: userLocation.latitude,
+            longitude: userLocation.longitude,
+            latitudeDelta: 0.02,
+            longitudeDelta: 0.02,
+          });
+          setSelectedMarker(null);
+        }}
       >
         <MaterialCommunityIcons
-          name="target"
+          name="crosshairs-gps"
           size={24}
           color={colors.textPrimary}
         />
       </TouchableOpacity>
-    </View>
+       </View>
   );
 }

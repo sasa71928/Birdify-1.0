@@ -121,5 +121,6 @@ export const createStyles = (colors: any) => StyleSheet.create({
     letterSpacing: 1,
   },
   
+  
 });
 
