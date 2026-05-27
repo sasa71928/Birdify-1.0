@@ -130,6 +130,8 @@ const createMapStyle = (colors: any) => [
     },
   ];
 
+  
+
 export default function RecordSightingScreen({ route }: { route: any }) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { shared, screen: styles, colors, isDark } = useDynamicStyles(createStyles);
@@ -141,13 +143,17 @@ export default function RecordSightingScreen({ route }: { route: any }) {
 
   const { user } = useAuth();
 
-  const editingSighting = route?.params?.editingSighting;
-  const isEditMode = !!editingSighting;
+  const editingSightingId = route?.params?.editingSighting;
+  const isEditMode = !!editingSightingId;
+  const [editingSighting, setEditingSighting] = useState<any>(null);
 
-  const [birdName, setBirdName] = useState(editingSighting?.tag || '');
+
+  const [birdName, setBirdName] = useState('');
+  const [notes, setNotes] = useState('');
+
+  
   const [selectedBird, setSelectedBird] = useState<any>(null);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [notes, setNotes] = useState(editingSighting?.caption || '');
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [imageBase64s, setImageBase64s] = useState<string[]>([]);
   const [isPrivate, setIsPrivate] = useState(false);
@@ -157,14 +163,78 @@ export default function RecordSightingScreen({ route }: { route: any }) {
   const [toast, setToast] = useState<{ visible: boolean, message: string, type: 'success' | 'error' }>({ visible: false, message: '', type: 'success' });
 
   useEffect(() => {
+    if (!editingSightingId) return;
+
+    const loadSighting = async () => {
+      const { data, error } = await supabase
+        .from('sightings')
+        .select(`*, 
+          birds (id, common_name, scientific_name)`)
+        .eq('id', editingSightingId)
+        .single();
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+      setEditingSighting(data);
+      
+    };
+
+    loadSighting();
+  }, [editingSightingId]);
+
+  useEffect(() => {
     if (!editingSighting) return;
 
-    if (Array.isArray(editingSighting.image)) {
-      setImageUris(editingSighting.image);
-    } else if (editingSighting.image) {
-      setImageUris([editingSighting.image]);
+    setBirdName(editingSighting.birds?.common_name || '');
+
+    setNotes(editingSighting.description || '');
+
+    setRegion({
+      latitude: editingSighting.latitude || 24.1426,
+      longitude: editingSighting.longitude || -110.3128,
+      latitudeDelta: 0.08,
+      longitudeDelta: 0.08,
+    });
+
+    // imagen
+   const raw = editingSighting.photo_url; // <-- IMPORTANTE
+
+    let parsed: string[] = [];
+
+    try {
+      if (Array.isArray(raw)) {
+        parsed = raw;
+      } else if (typeof raw === 'string') {
+        parsed = raw.startsWith('[') ? JSON.parse(raw) : [raw];
+      }
+    } catch {
+      parsed = [];
     }
+
+    setImageUris(parsed);
+
+    setIsPrivate(!!editingSighting.is_location_private);
+
+    // si tienes bird_id, aquí deberías resolver el nombre
   }, [editingSighting]);
+
+  const EDIT_LIMIT_MINUTES = 5;
+
+
+  const createdAt = useMemo(() => {
+    return editingSighting?.created_at
+      ? new Date(editingSighting.created_at)
+      : null;
+  }, [editingSighting]);
+
+  const isLocked = useMemo(() => {
+    if (!isEditMode || !createdAt) return false;
+    return Date.now() - createdAt.getTime() > EDIT_LIMIT_MINUTES * 60000;
+  }, [isEditMode, createdAt]);
+
+  const canEdit = !isLocked;
 
   useEffect(() => {
     if (!toast.visible) return;
@@ -492,6 +562,11 @@ export default function RecordSightingScreen({ route }: { route: any }) {
         >
           <Text style={styles.title}>Registrar Avistamiento</Text>
           <Text style={styles.subtitle}>Documenta una nueva observación para tu bitácora y la comunidad.</Text>
+          {isLocked && (
+            <Text style={{ color: 'orange', marginBottom: 10 }}>
+              Solo puedes modificar la privacidad. El resto de campos ya no es editable después de 5 minutos.
+            </Text>
+          )}
 
           {/* Photo Upload Area */}
           <View
@@ -520,6 +595,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                           borderRadius: 50,
                           padding: 4,
                         }}
+                        disabled={isLocked}
                         onPress={() => {
                           setImageUris(imageUris.filter((_, i) => i !== index));
                           setImageBase64s(imageBase64s.filter((_, i) => i !== index));
@@ -542,7 +618,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                       </View>
                     </View>
                   ))}
-                  {imageUris.length < 10 && (
+                  {imageUris.length < 10 || isLocked && (
                     <TouchableOpacity
                       style={{
                         width: '47%',
@@ -554,6 +630,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                         justifyContent: 'center',
                         alignItems: 'center',
                       }}
+                      disabled={isLocked}
                       onPress={() => setModalVisible(true)}
                     >
                       <Ionicons name="add" size={32} color={colors.primary + '60'} />
@@ -581,6 +658,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
 
           {/* Form Fields - Ajustando Contrastes */}
           <View style={[styles.section, { zIndex: 10 }]}>
+            
             <Text style={styles.label}>¿Qué ave observaste?</Text>
             <View style={{ position: 'relative' }}>
               <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border + '80' }]}>
@@ -591,18 +669,23 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                   placeholderTextColor={colors.placeholder}
                   value={birdName}
                   onFocus={() => {
+                    if (!canEdit) return;
                     if (birdName.length > 0) setShowDropdown(true);
                   }}
                   onChangeText={(text) => {
+                    if (!canEdit) return;
                     setBirdName(text);
                     setSelectedBird(null);
                     setShowDropdown(text.length > 0);
                   }}
+                  editable={!isLocked}
                 />
                 {birdName.length > 0 && (
-                  <TouchableOpacity onPress={() => { setBirdName(''); setSelectedBird(null); setShowDropdown(false); }}>
-                    <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
-                  </TouchableOpacity>
+                  (!isLocked) && (
+                    <TouchableOpacity onPress={() => { setBirdName(''); setSelectedBird(null); setShowDropdown(false); }}>
+                      <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  )
                 )}
               </View>
 
@@ -631,6 +714,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                         key={bird.id}
                         style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border + '20' }}
                         onPress={() => {
+                          if (!canEdit) return;
                           setBirdName(bird.common_name);
                           setSelectedBird(bird);
                           setShowDropdown(false);
@@ -663,6 +747,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                 textAlignVertical="top"
                 value={notes}
                 onChangeText={setNotes}
+                editable={!isLocked}
               />
             </View>
           </View>
@@ -671,14 +756,20 @@ export default function RecordSightingScreen({ route }: { route: any }) {
           <View style={styles.section}>
             <View style={styles.locationHeader}>
               <Text style={styles.label}>Ubicación (Lat/Lng)</Text>
-              <TouchableOpacity style={styles.useCurrentBtn} onPress={handleUseCurrentLocation} disabled={isLocating}>
-                {isLocating ? (
-                   <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 4 }} />
-                ) : (
-                   <MaterialCommunityIcons name="target" size={18} color={colors.primary} />
-                )}
-                <Text style={styles.useCurrentText}>Mi Ubicación</Text>
-              </TouchableOpacity>
+              {!isLocked && (
+                <TouchableOpacity
+                  style={styles.useCurrentBtn}
+                  onPress={handleUseCurrentLocation}
+                  disabled={isLocating}
+                >
+                  {isLocating ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <MaterialCommunityIcons name="target" size={18} color={colors.primary} />
+                  )}
+                  <Text style={styles.useCurrentText}>Mi Ubicación</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Inputs de Coordenadas */}
@@ -691,6 +782,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                   keyboardType="numeric"
                   value={region.latitude.toString()}
                   onChangeText={(val) => {
+                    if (!canEdit) return;
                     const latitude = parseFloat(val) || 0;
 
                     setRegion(prev => ({
@@ -703,6 +795,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                       latitude,
                     });
                   }}
+                  editable={!isLocked}
                 />
               </View>
               <View style={[styles.searchContainer, { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border + '80' }]}>
@@ -713,6 +806,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                   keyboardType="numeric"
                   value={region.longitude.toString()}
                   onChangeText={(val) => {
+                    if (!canEdit) return;
                     const longitude = parseFloat(val) || 0;
 
                     setRegion(prev => ({
@@ -725,6 +819,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                       longitude,
                     });
                   }}
+                  editable={!isLocked}
                 />
               </View>
             </View>
@@ -754,6 +849,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                 customMapStyle={isDark ? MAP_STYLE : []}
                 region={region}
                 onPress={(e) => {
+                  if (!canEdit) return;
                   const { latitude, longitude } =
                     e.nativeEvent.coordinate;
 
@@ -763,6 +859,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                     longitude,
                   }));
                 }}
+                scrollEnabled={!isLocked}
               >
                 <Marker
                   coordinate={{
@@ -771,6 +868,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                   }}
                   draggable
                   onDragEnd={(e) => {
+                    if (!canEdit) return;
                     const { latitude, longitude } =
                       e.nativeEvent.coordinate;
 
@@ -828,7 +926,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={handleUseCurrentLocation}
-                disabled={isLocating}
+                disabled={isLocating || isLocked}
                 style={{
                   position: 'absolute',
                   bottom: 14,
@@ -841,6 +939,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                   alignItems: 'center',
                   ...Shadows.card,
                 }}
+                
               >
                 {isLocating ? (
                   <ActivityIndicator

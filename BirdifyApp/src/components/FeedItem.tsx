@@ -388,7 +388,7 @@ export default function FeedItem({ post }: FeedItemProps) {
   const handleEditSighting = () => {
     resetOptionsModal();
     setTimeout(() => {
-      navigation.navigate('RecordSighting', { editingSighting: post });
+      navigation.navigate('RecordSighting', { editingSighting: post.id });
     }, 300);
   };
 

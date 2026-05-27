@@ -36,7 +36,6 @@ export const SightingRepository = {
         comments (id)
       `)
       .order('created_at', { ascending: false });
-
     if (error) {
       console.error('Error in getFeed:', error);
       throw error;
