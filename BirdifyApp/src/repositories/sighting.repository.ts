@@ -13,6 +13,18 @@ export const SightingRepository = {
     return data;
   },
 
+  async update(id: string, sighting: Partial<Omit<Sighting, 'id' | 'created_at' | 'updated_at'>>): Promise<Sighting> {
+    const { data, error } = await supabase
+      .from('sightings')
+      .update(sighting)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
   async getFeed(): Promise<any[]> {
     const { data, error } = await supabase
       .from('sightings')

@@ -73,25 +73,28 @@ export default function ChatScreen() {
 
   React.useEffect(() => {
     const hasUnread = messages.some(m => !m.isMine && !m.isRead);
-    
+
+    let timeoutId: NodeJS.Timeout;
+
     if (hasUnread) {
-      // Animated scroll to the first unread
       const firstUnreadIndex = messages.findIndex(m => !m.isMine && !m.isRead);
       if (firstUnreadIndex !== -1) {
-        setTimeout(() => {
-          listRef.current?.scrollToIndex({ 
-            index: firstUnreadIndex, 
+        timeoutId = setTimeout(() => {
+          listRef.current?.scrollToIndex({
+            index: firstUnreadIndex,
             animated: true,
             viewPosition: 0
           });
         }, 500);
       }
     } else {
-      // Immediate scroll to bottom if everything is read
-      // No timeout or animation for a "direct" appearance
       listRef.current?.scrollToEnd({ animated: false });
     }
-  }, []);
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [messages]);
 
   const sendMessage = () => {
     const text = input.trim();
@@ -108,6 +111,7 @@ export default function ChatScreen() {
     setMessages((prev) => [...prev, newMsg]);
     setInput('');
     setReplyingTo(null);
+
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
   };
 

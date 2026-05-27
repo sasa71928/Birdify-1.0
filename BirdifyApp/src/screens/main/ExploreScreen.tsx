@@ -236,7 +236,7 @@ export default function ExploreScreen() {
     }
   }, []);
 
-  const loadUserLocation = async () => {
+  const loadUserLocation = async (isMounted: boolean) => {
     try {
       const { status } =
         await Location.requestForegroundPermissionsAsync();
@@ -251,6 +251,8 @@ export default function ExploreScreen() {
             Location.Accuracy.High,
         });
 
+      if (!isMounted) return;
+
       setUserLocation({
         latitude:
           location.coords.latitude,
@@ -259,6 +261,7 @@ export default function ExploreScreen() {
       });
 
     } catch (error) {
+      if (!isMounted) return;
       console.error(
         'Error getting location:',
         error
@@ -267,8 +270,18 @@ export default function ExploreScreen() {
   };
 
   useEffect(() => {
-    loadSightings();
-    loadUserLocation();
+    let isMounted = true;
+
+    const initializeScreen = async () => {
+      await loadSightings();
+      await loadUserLocation(isMounted);
+    };
+
+    initializeScreen();
+
+    return () => {
+      isMounted = false;
+    };
   }, [loadSightings]);
 
   useEffect(() => {

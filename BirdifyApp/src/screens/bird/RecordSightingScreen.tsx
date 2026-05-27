@@ -130,7 +130,7 @@ const createMapStyle = (colors: any) => [
     },
   ];
 
-export default function RecordSightingScreen() {
+export default function RecordSightingScreen({ route }: { route: any }) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { shared, screen: styles, colors, isDark } = useDynamicStyles(createStyles);
 
@@ -140,23 +140,55 @@ export default function RecordSightingScreen() {
 );
 
   const { user } = useAuth();
-  
-  const [birdName, setBirdName] = useState('');
+
+  const editingSighting = route?.params?.editingSighting;
+  const isEditMode = !!editingSighting;
+
+  const [birdName, setBirdName] = useState(editingSighting?.tag || '');
   const [selectedBird, setSelectedBird] = useState<any>(null);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(editingSighting?.caption || '');
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [imageBase64s, setImageBase64s] = useState<string[]>([]);
   const [isPrivate, setIsPrivate] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
-  
+  const [shouldNavigateToFeed, setShouldNavigateToFeed] = useState(false);
+
   const [toast, setToast] = useState<{ visible: boolean, message: string, type: 'success' | 'error' }>({ visible: false, message: '', type: 'success' });
+
+  useEffect(() => {
+    if (!editingSighting) return;
+
+    if (Array.isArray(editingSighting.image)) {
+      setImageUris(editingSighting.image);
+    } else if (editingSighting.image) {
+      setImageUris([editingSighting.image]);
+    }
+  }, [editingSighting]);
+
+  useEffect(() => {
+    if (!toast.visible) return;
+
+    const timeoutId = setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    }, 3500);
+
+    return () => clearTimeout(timeoutId);
+  }, [toast.visible]);
+
+  useEffect(() => {
+    if (!shouldNavigateToFeed) return;
+
+    const timeoutId = setTimeout(() => {
+      navigation.navigate('MainTabs', { screen: 'Feed' });
+      setShouldNavigateToFeed(false);
+    }, 1500);
+
+    return () => clearTimeout(timeoutId);
+  }, [shouldNavigateToFeed, navigation]);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ visible: true, message, type });
-    setTimeout(() => {
-      setToast(prev => ({ ...prev, visible: false }));
-    }, 3500);
   };
   
   // Mapa y Ubicación
@@ -320,7 +352,7 @@ export default function RecordSightingScreen() {
   const handlePost = async () => {
     if (!user) return Alert.alert('Sesión Inválida', 'Inicia sesión para compartir un avistamiento.');
     if (!birdName.trim()) return Alert.alert('Información incompleta', 'Debes nombrar o describir al ave.');
-    if (imageBase64s.length === 0) return Alert.alert('Información incompleta', '¡Debes añadir al menos una foto!');
+    if (!isEditMode && imageBase64s.length === 0) return Alert.alert('Información incompleta', '¡Debes añadir al menos una foto!');
 
     setIsPosting(true);
     try {
@@ -353,52 +385,59 @@ export default function RecordSightingScreen() {
       }
 
       // --- FLUJO DE SUBIDA DE MÚLTIPLES IMÁGENES A SUPABASE ---
-      const photoUrls: string[] = [];
+      let photoUrls: string[] = [];
 
-      for (let i = 0; i < imageBase64s.length; i++) {
-        const base64 = imageBase64s[i];
-        const uri = imageUris[i];
-        const fileExt = uri?.split('.').pop() || 'jpg';
-        const fileName = `${user.id}/${Date.now()}_${i}.${fileExt}`;
-        const arrayBuffer = decodeBase64ToArrayBuffer(base64);
+      if (isEditMode && imageBase64s.length === 0) {
+        photoUrls = Array.isArray(editingSighting.image) ? editingSighting.image : [editingSighting.image];
+      } else {
+        for (let i = 0; i < imageBase64s.length; i++) {
+          const base64 = imageBase64s[i];
+          const uri = imageUris[i];
+          const fileExt = uri?.split('.').pop() || 'jpg';
+          const fileName = `${user.id}/${Date.now()}_${i}.${fileExt}`;
+          const arrayBuffer = decodeBase64ToArrayBuffer(base64);
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('Sightings')
-          .upload(fileName, arrayBuffer, {
-            contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
-            upsert: true,
-          });
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('Sightings')
+            .upload(fileName, arrayBuffer, {
+              contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+              upsert: true,
+            });
 
-        if (uploadError) {
-          throw new Error('Error al subir imagen: ' + uploadError.message);
+          if (uploadError) {
+            throw new Error('Error al subir imagen: ' + uploadError.message);
+          }
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('Sightings')
+            .getPublicUrl(fileName);
+
+          photoUrls.push(publicUrl);
         }
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('Sightings')
-          .getPublicUrl(fileName);
-
-        photoUrls.push(publicUrl);
       }
 
-      // Crear el registro de avistamiento con array de URLs
-      await SightingRepository.create({
-        user_id: user.id,
+      const sightingData = {
         bird_id: finalBirdId,
         description: notes,
         latitude: region.latitude,
         longitude: region.longitude,
         is_location_private: isPrivate,
         photo_url: photoUrls.length === 1 ? photoUrls[0] : JSON.stringify(photoUrls) as any,
-        sighting_date: new Date().toISOString()
-      });
+      };
 
-      // Éxito: Mostrar Toast discreto arriba
-      showToast('¡Avistamiento publicado con éxito!', 'success');
+      if (isEditMode) {
+        await SightingRepository.update(editingSighting.id, sightingData);
+        showToast('¡Avistamiento actualizado con éxito!', 'success');
+      } else {
+        await SightingRepository.create({
+          ...sightingData,
+          user_id: user.id,
+          sighting_date: new Date().toISOString()
+        });
+        showToast('¡Avistamiento publicado con éxito!', 'success');
+      }
 
-      // Navegar al Feed después de una breve pausa
-      setTimeout(() => {
-        navigation.navigate('MainTabs', { screen: 'Feed' });
-      }, 1500);
+      setShouldNavigateToFeed(true);
 
     } catch (error: any) {
       showToast(error.message || 'No se pudo publicar el avistamiento.', 'error');
@@ -837,17 +876,17 @@ export default function RecordSightingScreen() {
           </View>
 
           {/* Post Button */}
-          <TouchableOpacity 
-            style={[styles.postButton, isPosting && { opacity: 0.7 }]} 
-            onPress={handlePost} 
+          <TouchableOpacity
+            style={[styles.postButton, isPosting && { opacity: 0.7 }]}
+            onPress={handlePost}
             disabled={isPosting}
           >
             {isPosting ? (
               <ActivityIndicator size="small" color={colors.canvasPure} />
             ) : (
               <>
-                <Ionicons name="paper-plane" size={20} color={colors.canvasPure} style={styles.postIcon} />
-                <Text style={styles.postButtonText}>Publicar Avistamiento</Text>
+                <Ionicons name={isEditMode ? "checkmark-circle" : "paper-plane"} size={20} color={colors.canvasPure} style={styles.postIcon} />
+                <Text style={styles.postButtonText}>{isEditMode ? 'Actualizar Avistamiento' : 'Publicar Avistamiento'}</Text>
               </>
             )}
           </TouchableOpacity>

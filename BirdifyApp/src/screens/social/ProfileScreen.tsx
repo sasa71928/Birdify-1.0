@@ -16,10 +16,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import { Typography, Spacing, Radius, Shadows } from '../../theme';
+import { Typography, Spacing, Radius, Shadows, Colors } from '../../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TopNavBar from '../../components/TopNavBar';
 import BottomNavBar from '../../components/BottomNavBar';
+import FeedItem, { Post } from '../../components/FeedItem';
 import { createStyles } from '../../styles/screens/social/profileScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useAuth } from '../../context/AuthContext';
@@ -58,6 +59,15 @@ export default function ProfileScreen() {
   // States for dynamic followers/following list inside modal
   const [modalUsersList, setModalUsersList] = useState<any[]>([]);
   const [loadingModalUsers, setLoadingModalUsers] = useState(false);
+
+  // States for sighting modal
+  const [selectedSighting, setSelectedSighting] = useState<any>(null);
+  const [showSightingModal, setShowSightingModal] = useState(false);
+
+  const handleSightingPress = (sighting: any) => {
+    setSelectedSighting(sighting);
+    setShowSightingModal(true);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -438,7 +448,7 @@ const userData = profile ? {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {activeTab === 'Sightings' && <SightingsGrid sightings={sightings} />}
+            {activeTab === 'Sightings' && <SightingsGrid sightings={sightings} onItemPress={handleSightingPress} />}
             {activeTab === 'Logbook'   && <LogbookView species={species} />}
             {activeTab === 'Likes'     && <LikesView likes={likes} />}
           </ScrollView>
@@ -517,14 +527,77 @@ const userData = profile ? {
         </View>
       </Modal>
 
+      {/* ── Sighting Modal ── */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showSightingModal}
+        onRequestClose={() => setShowSightingModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)' }}>
+          <TouchableOpacity
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+            activeOpacity={1}
+            onPress={() => setShowSightingModal(false)}
+          >
+            {selectedSighting && (
+              <FeedItem post={mapSightingToPost(selectedSighting, authUser?.id)} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 50, right: 20, zIndex: 10 }}
+            onPress={() => setShowSightingModal(false)}
+          >
+            <Ionicons name="close-circle" size={36} color={Colors.white} />
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
       <BottomNavBar />
     </SafeAreaView>
 );
 
+// ── mapSightingToPost ─────────────────────────────────────────────────────────
+function mapSightingToPost(sighting: any, currentUserId?: string): Post {
+  const timeDiff = Date.now() - new Date(sighting.created_at || sighting.sighting_date).getTime();
+  const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60));
+  const timeAgoStr = hoursAgo < 24
+    ? (hoursAgo === 0 ? 'Hace un momento' : `Hace ${hoursAgo} hora${hoursAgo === 1 ? '' : 's'}`)
+    : `Hace ${Math.floor(hoursAgo/24)} día${Math.floor(hoursAgo/24) === 1 ? '' : 's'}`;
+
+  let photoUrl: string | string[] = sighting.photo_url || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=600';
+
+  if (typeof photoUrl === 'string') {
+    try {
+      const parsed = JSON.parse(photoUrl);
+      if (Array.isArray(parsed)) {
+        photoUrl = parsed;
+      }
+    } catch {
+      // Es una URL simple, no un JSON
+    }
+  }
+
+  return {
+    id: sighting.id,
+    userId: sighting.user_id,
+    username: sighting.user?.username || 'Usuario',
+    userAvatar: sighting.user?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
+    location: sighting.is_location_private ? 'Ubicación privada' : 'Ubicación del mapa',
+    image: photoUrl,
+    tag: sighting.bird?.common_name || 'Ave desconocida',
+    likes: 0,
+    comments: 0,
+    caption: sighting.description || '',
+    timeAgo: timeAgoStr,
+    hasLiked: false,
+  };
+}
+
 // ── Sightings grid ────────────────────────────────────────────────────────────
-function SightingsGrid({ sightings }: { sightings: any[] }) {
+function SightingsGrid({ sightings, onItemPress }: { sightings: any[], onItemPress?: (sighting: any) => void }) {
   const { screen: styles, colors } = useDynamicStyles(createStyles);
-  
+
   if (sightings.length === 0) {
     return (
       <View style={{ padding: 40, alignItems: 'center' }}>
@@ -539,7 +612,7 @@ function SightingsGrid({ sightings }: { sightings: any[] }) {
   return (
     <View style={styles.grid}>
       {sightings.map((item) => (
-        <TouchableOpacity key={item.id} style={styles.gridItem} activeOpacity={0.85}>
+        <TouchableOpacity key={item.id} style={styles.gridItem} activeOpacity={0.85} onPress={() => onItemPress?.(item)}>
           <Image source={{ uri: item.photo_url || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300' }} style={styles.gridImage} />
           <View style={styles.locationBadge}>
             <Ionicons name="location" size={11} color={colors.white} />

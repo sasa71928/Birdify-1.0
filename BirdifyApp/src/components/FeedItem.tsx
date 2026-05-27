@@ -147,8 +147,12 @@ export default function FeedItem({ post }: FeedItemProps) {
   React.useEffect(() => {
     return () => {
       panX.setValue(0);
+      heartScale.setValue(0);
+      heartOpacity.setValue(0);
+      panY.setValue(screenHeight);
+      optionsPanY.setValue(screenHeight);
     };
-  }, [panX]);
+  }, [panX, heartScale, heartOpacity, panY, optionsPanY, screenHeight]);
 
   React.useEffect(() => {
     if (showComments) {
@@ -428,6 +432,31 @@ export default function FeedItem({ post }: FeedItemProps) {
     }).start(() => {
       setShowOptionsMenu(false);
     });
+  };
+
+  const isOwnPost = user?.id === post.userId;
+
+  const handleEditSighting = () => {
+    resetOptionsModal();
+    setTimeout(() => {
+      navigation.navigate('RecordSighting', { editingSighting: post });
+    }, 300);
+  };
+
+  const handleSavePost = () => {
+    resetOptionsModal();
+  };
+
+  const handleCopyLink = () => {
+    resetOptionsModal();
+  };
+
+  const handleNotInterested = () => {
+    resetOptionsModal();
+  };
+
+  const handleReport = () => {
+    resetOptionsModal();
   };
 
   return (
@@ -770,24 +799,34 @@ export default function FeedItem({ post }: FeedItemProps) {
             </View>
             
             <View style={styles.optionsList}>
-              <TouchableOpacity style={styles.optionItem}>
+              {isOwnPost && (
+                <>
+                  <TouchableOpacity style={styles.optionItem} onPress={handleEditSighting}>
+                    <Ionicons name="pencil-outline" size={22} color={Colors.textPrimary} />
+                    <Text style={styles.optionText}>Editar publicación</Text>
+                  </TouchableOpacity>
+                  <View style={styles.optionDivider} />
+                </>
+              )}
+
+              <TouchableOpacity style={styles.optionItem} onPress={handleSavePost}>
                 <Ionicons name="bookmark-outline" size={22} color={Colors.textPrimary} />
                 <Text style={styles.optionText}>Guardar publicación</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.optionItem}>
+
+              <TouchableOpacity style={styles.optionItem} onPress={handleCopyLink}>
                 <Ionicons name="link-outline" size={22} color={Colors.textPrimary} />
                 <Text style={styles.optionText}>Copiar enlace</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.optionItem}>
+
+              <TouchableOpacity style={styles.optionItem} onPress={handleNotInterested}>
                 <Ionicons name="eye-off-outline" size={22} color={Colors.textPrimary} />
                 <Text style={styles.optionText}>No me interesa</Text>
               </TouchableOpacity>
-              
+
               <View style={styles.optionDivider} />
-              
-              <TouchableOpacity style={styles.optionItem}>
+
+              <TouchableOpacity style={styles.optionItem} onPress={handleReport}>
                 <Ionicons name="alert-circle-outline" size={22} color="#FF5252" />
                 <Text style={[styles.optionText, { color: '#FF5252' }]}>Reportar</Text>
               </TouchableOpacity>
