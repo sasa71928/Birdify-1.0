@@ -31,7 +31,7 @@ const SETTING_SECTIONS: SettingSection[] = [
       { id: '1', icon: 'person-outline', label: 'Edit Profile' },
       { id: '2', icon: 'lock-closed-outline', label: 'Privacy & Security' },
       { id: '3', icon: 'notifications-outline', label: 'Notifications' },
-      { id: 'verify', icon: 'mail-outline', label: 'Solicitar verificación de observador de aves' },
+      { id: 'verify', icon: 'mail-outline', label: 'Request Verification as a Certified Birdwatcher' },
     ],
   },
   {
