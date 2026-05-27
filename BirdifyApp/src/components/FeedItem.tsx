@@ -73,9 +73,11 @@ export default function FeedItem({ post }: FeedItemProps) {
 
   const imagePanResponder = React.useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 5 && Math.abs(gestureState.dy) < 10;
+      },
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dy) < 10;
+        return Math.abs(gestureState.dx) > 5 && Math.abs(gestureState.dy) < 15;
       },
       onPanResponderMove: (_, gestureState) => {
         panX.setValue(gestureState.dx);

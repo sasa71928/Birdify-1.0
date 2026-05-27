@@ -195,7 +195,8 @@ export default function RecordSightingScreen() {
       let result;
       const options: ImagePicker.ImagePickerOptions = {
         mediaTypes: 'images',
-        allowsEditing: true,
+        allowsEditing: source === 'gallery' ? false : true,
+        allowsMultiple: source === 'gallery' ? true : false,
         aspect: [4, 3],
         quality: 0.8,
         base64: true,
@@ -208,8 +209,19 @@ export default function RecordSightingScreen() {
       }
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setImageUris([...imageUris, result.assets[0].uri]);
-        setImageBase64s([...imageBase64s, result.assets[0].base64 || '']);
+        const newUris = result.assets.map(asset => asset.uri);
+        const newBase64s = result.assets.map(asset => asset.base64 || '');
+        const totalImages = imageUris.length + newUris.length;
+
+        if (totalImages > 10) {
+          const available = 10 - imageUris.length;
+          setImageUris([...imageUris, ...newUris.slice(0, available)]);
+          setImageBase64s([...imageBase64s, ...newBase64s.slice(0, available)]);
+          Alert.alert('Límite alcanzado', `Solo se pudieron añadir ${available} de ${newUris.length} imágenes.`);
+        } else {
+          setImageUris([...imageUris, ...newUris]);
+          setImageBase64s([...imageBase64s, ...newBase64s]);
+        }
       }
     } catch (err: any) {
       Alert.alert('Error', err.message);
@@ -376,70 +388,79 @@ export default function RecordSightingScreen() {
           <Text style={styles.subtitle}>Documenta una nueva observación para tu bitácora y la comunidad.</Text>
 
           {/* Photo Upload Area */}
-          <TouchableOpacity
+          <View
             style={[styles.photoContainer, { borderColor: imageUris.length > 0 ? colors.primary : colors.border + '40', borderWidth: imageUris.length > 0 ? 2 : 1 }]}
-            onPress={() => imageUris.length < 10 && setModalVisible(true)}
-            activeOpacity={1}
           >
             {imageUris.length > 0 ? (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 12 }}>
-                {imageUris.map((uri, index) => (
-                  <View key={index} style={{ width: '47%', aspectRatio: 1 }}>
-                    <Image
-                      source={{ uri }}
-                      style={{ width: '100%', height: '100%', borderRadius: 12 }}
-                    />
+              <ScrollView
+                style={{ maxHeight: 500 }}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={imageUris.length > 4}
+              >
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 12 }}>
+                  {imageUris.map((uri, index) => (
+                    <View key={index} style={{ width: '47%', aspectRatio: 1 }}>
+                      <Image
+                        source={{ uri }}
+                        style={{ width: '100%', height: '100%', borderRadius: 12 }}
+                      />
+                      <TouchableOpacity
+                        style={{
+                          position: 'absolute',
+                          top: -8,
+                          right: -8,
+                          backgroundColor: '#FF5252',
+                          borderRadius: 50,
+                          padding: 4,
+                        }}
+                        onPress={() => {
+                          setImageUris(imageUris.filter((_, i) => i !== index));
+                          setImageBase64s(imageBase64s.filter((_, i) => i !== index));
+                        }}
+                      >
+                        <Ionicons name="close" size={16} color="white" />
+                      </TouchableOpacity>
+                      <View style={{
+                        position: 'absolute',
+                        bottom: 4,
+                        right: 4,
+                        backgroundColor: colors.primary + 'dd',
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 6,
+                      }}>
+                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>
+                          {index + 1}/{imageUris.length}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                  {imageUris.length < 10 && (
                     <TouchableOpacity
                       style={{
-                        position: 'absolute',
-                        top: -8,
-                        right: -8,
-                        backgroundColor: '#FF5252',
-                        borderRadius: 50,
-                        padding: 4,
+                        width: '47%',
+                        aspectRatio: 1,
+                        borderRadius: 12,
+                        borderWidth: 2,
+                        borderStyle: 'dashed',
+                        borderColor: colors.primary + '40',
+                        justifyContent: 'center',
+                        alignItems: 'center',
                       }}
-                      onPress={() => {
-                        setImageUris(imageUris.filter((_, i) => i !== index));
-                        setImageBase64s(imageBase64s.filter((_, i) => i !== index));
-                      }}
+                      onPress={() => setModalVisible(true)}
                     >
-                      <Ionicons name="close" size={16} color="white" />
+                      <Ionicons name="add" size={32} color={colors.primary + '60'} />
                     </TouchableOpacity>
-                    <View style={{
-                      position: 'absolute',
-                      bottom: 4,
-                      right: 4,
-                      backgroundColor: colors.primary + 'dd',
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
-                      borderRadius: 6,
-                    }}>
-                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>
-                        {index + 1}/{imageUris.length}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-                {imageUris.length < 10 && (
-                  <TouchableOpacity
-                    style={{
-                      width: '47%',
-                      aspectRatio: 1,
-                      borderRadius: 12,
-                      borderWidth: 2,
-                      borderStyle: 'dashed',
-                      borderColor: colors.primary + '40',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                    onPress={() => setModalVisible(true)}
-                  >
-                    <Ionicons name="add" size={32} color={colors.primary + '60'} />
-                  </TouchableOpacity>
-                )}
-              </View>
+                  )}
+                </View>
+              </ScrollView>
             ) : (
-              <View style={styles.photoInner}>
+              <TouchableOpacity
+                style={styles.photoInner}
+                onPress={() => setModalVisible(true)}
+                activeOpacity={1}
+              >
                 <View style={styles.cameraIconBg}>
                     <Ionicons name="camera-outline" size={32} color={colors.primary} />
                     <View style={styles.plusIconBadge}>
@@ -448,9 +469,9 @@ export default function RecordSightingScreen() {
                 </View>
                 <Text style={styles.photoTitle}>Toca para añadir foto</Text>
                 <Text style={styles.photoSubtitle}>Puedes añadir hasta 10 fotos (calidad alta)</Text>
-              </View>
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+          </View>
 
           {/* Form Fields - Ajustando Contrastes */}
           <View style={[styles.section, { zIndex: 10 }]}>
