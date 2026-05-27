@@ -6,7 +6,7 @@ import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput, ScrollView,
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { Colors, Typography, Spacing, Radius } from '../theme';
+import { Colors, Spacing } from '../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { createStyles } from '../styles/components/FeedItem.styles';
 import { useDynamicStyles } from '../hooks/useDynamicStyles';
