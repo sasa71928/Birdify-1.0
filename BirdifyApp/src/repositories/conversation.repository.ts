@@ -7,7 +7,7 @@ export interface ConversationMember {
   user_id: string;
   joined_at?: string;
   role?: ConversationRole;
-  user?: {
+  users?: {
     id: string;
     username: string;
     fullname: string | null;
@@ -173,12 +173,51 @@ export const ConversationRepository = {
   }): Promise<string> {
     const { creatorId, name, description, avatarUrl, memberIds } = params;
 
+    // Upload avatar to Supabase Storage if provided
+    let finalAvatarUrl = avatarUrl || null;
+    if (avatarUrl && avatarUrl.startsWith('file://')) {
+      try {
+        const fileName = `group-avatars/${creatorId}/${Date.now()}.jpg`;
+        
+        // Use FormData for React Native compatibility
+        const formData = new FormData();
+        formData.append('file', {
+          uri: avatarUrl,
+          type: 'image/jpeg',
+          name: fileName,
+        } as any);
+
+        // Upload using FormData
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('group-avatars')
+          .upload(fileName, formData, {
+            contentType: 'image/jpeg',
+            upsert: true,
+          });
+
+        if (uploadError) {
+          console.error('Error uploading group avatar:', uploadError);
+          console.error('Make sure the "group-avatars" bucket exists in Supabase Storage');
+          // Continue without avatar if upload fails
+        } else {
+          const { data: { publicUrl } } = supabase.storage
+            .from('group-avatars')
+            .getPublicUrl(fileName);
+          finalAvatarUrl = publicUrl;
+          console.log('Group avatar uploaded successfully:', publicUrl);
+        }
+      } catch (error) {
+        console.error('Error processing group avatar:', error);
+        // Continue without avatar if processing fails
+      }
+    }
+
     const { data: conv, error: convError } = await supabase
       .from('conversations')
       .insert({
         name,
         description: description || null,
-        avatar_url: avatarUrl || null,
+        avatar_url: finalAvatarUrl,
         is_group: true,
         created_by: creatorId,
       })
@@ -219,7 +258,78 @@ export const ConversationRepository = {
   },
 
   async deleteConversation(conversationId: string): Promise<void> {
-    const { error } = await supabase.from('conversations').delete().eq('id', conversationId);
+    // Delete all messages in the conversation
+    const { error: messagesError } = await supabase
+      .from('messages')
+      .delete()
+      .eq('conversation_id', conversationId);
+    if (messagesError) throw messagesError;
+
+    // Delete all members in the conversation
+    const { error: membersError } = await supabase
+      .from('conversation_members')
+      .delete()
+      .eq('conversation_id', conversationId);
+    if (membersError) throw membersError;
+
+    // Delete the conversation
+    const { error: conversationError } = await supabase
+      .from('conversations')
+      .delete()
+      .eq('id', conversationId);
+    if (conversationError) throw conversationError;
+  },
+
+  async getById(conversationId: string): Promise<Conversation | null> {
+    const { data, error } = await supabase
+      .from('conversations')
+      .select(`
+        *,
+        members:conversation_members (
+          user_id,
+          users (id, username, fullname, profile_pic_url)
+        )
+      `)
+      .eq('id', conversationId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw error;
+    }
+    return data as Conversation;
+  },
+
+  async getConversationMembers(conversationId: string): Promise<ConversationMember[]> {
+    const { data, error } = await supabase
+      .from('conversation_members')
+      .select(`
+        *,
+        users (id, username, fullname, profile_pic_url)
+      `)
+      .eq('conversation_id', conversationId);
+
+    if (error) throw error;
+    return data as ConversationMember[];
+  },
+
+  async addConversationMembers(conversationId: string, userIds: string[]): Promise<void> {
+    const rows = userIds.map((userId) => ({
+      conversation_id: conversationId,
+      user_id: userId,
+      role: 'member',
+    }));
+
+    const { error } = await supabase.from('conversation_members').insert(rows);
+    if (error) throw error;
+  },
+
+  async removeConversationMembers(conversationId: string, userIds: string[]): Promise<void> {
+    const { error } = await supabase
+      .from('conversation_members')
+      .delete()
+      .eq('conversation_id', conversationId)
+      .in('user_id', userIds);
     if (error) throw error;
   },
 };

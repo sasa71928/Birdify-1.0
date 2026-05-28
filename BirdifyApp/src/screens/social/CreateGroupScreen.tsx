@@ -114,7 +114,7 @@ export default function CreateGroupScreen() {
 
       showToast('Grupo creado.', 'success');
       setTimeout(() => {
-        navigation.navigate('Chat', { conversationId });
+        navigation.navigate('MainTabs', { screen: 'Messages' });
       }, 500);
     } catch (e) {
       console.error('Error creating group:', e);

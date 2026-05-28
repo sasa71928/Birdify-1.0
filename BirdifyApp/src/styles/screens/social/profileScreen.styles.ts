@@ -412,5 +412,45 @@ export const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  logbookModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+  },
+  logbookModalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '80%',
+    ...Shadows.modal,
+  },
+  logbookModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  logbookModalTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: colors.textPrimary,
+  },
+  logbookModalImagesContainer: {
+    flex: 1,
+  },
+  logbookModalImagesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  logbookModalImage: {
+    width: 100,
+    height: 100,
+    borderRadius: Radius.md,
+  },
 });
 

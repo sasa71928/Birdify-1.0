@@ -16,6 +16,7 @@ import SearchScreen         from '../screens/bird/SearchScreen';
 import BirdDetailScreen     from '../screens/bird/BirdDetailScreen';
 import ChatScreen           from '../screens/social/ChatScreen';
 import CreateGroupScreen    from '../screens/social/CreateGroupScreen';
+import EditGroupScreen      from '../screens/social/EditGroupScreen';
 import SearchMessagesScreen from '../screens/social/SearchMessagesScreen';
 import SettingsScreen       from '../screens/settings/SettingsScreen';
 import OfflineStorageScreen from '../screens/settings/OfflineStorageScreen';
@@ -74,6 +75,7 @@ export type RootStackParamList = {
   BirdDetail: { bird: BirdSpeciesData };
   Chat: { conversationId: string };
   CreateGroup: undefined;
+  EditGroup: { conversationId: string };
   SearchMessages: undefined;
   Settings: undefined;
   OfflineStorage: undefined;
@@ -144,6 +146,7 @@ export default function AppNavigator() {
           <Stack.Screen name="BirdDetail"      component={BirdDetailScreen} />
           <Stack.Screen name="Chat"            component={ChatScreen} />
           <Stack.Screen name="CreateGroup"      component={CreateGroupScreen} />
+          <Stack.Screen name="EditGroup"        component={EditGroupScreen} />
           <Stack.Screen name="SearchMessages"   component={SearchMessagesScreen} />
           <Stack.Screen name="Settings"         component={SettingsScreen} />
           <Stack.Screen name="OfflineStorage"   component={OfflineStorageScreen} />

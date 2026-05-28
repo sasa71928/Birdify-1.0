@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   TextInput,
   StatusBar,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -21,6 +22,8 @@ import { createStyles } from '../../styles/screens/main/messagesScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useAuth } from '../../context/AuthContext';
 import { ConversationRepository } from '../../repositories/conversation.repository';
+import { supabase } from '../../lib/supabase';
+import AppToast from '../../components/AppToast';
 
 type MessagesNavProp = NativeStackNavigationProp<RootStackParamList, 'Messages'>;
 
@@ -30,52 +33,125 @@ export default function MessagesScreen() {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const [threads, setThreads] = useState<ChatThread[]>([]);
+  const subscription = useRef<any>(null);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
+
+  const load = async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      const items = await ConversationRepository.listForUser(user.id);
+
+      const mapped: ChatThread[] = items.map((item) => {
+        const c = item.conversation;
+        const members = c.members || [];
+        const other = members.find((m) => m.user_id !== user.id)?.users;
+
+        const title = c.is_group ? (c.name || 'Group') : (other?.fullname || other?.username || 'Usuario');
+        const avatar =
+          c.is_group
+            ? (c.avatar_url || 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=100')
+            : (other?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp');
+
+        const lastMessageText = item.lastMessage?.content || (item.lastMessage?.image_url ? '📷 Foto' : '');
+
+        return {
+          id: c.id,
+          name: title,
+          avatar,
+          lastMessage: lastMessageText || '',
+          time: '',
+          isGroup: c.is_group,
+        };
+      });
+
+      setThreads(mapped);
+    } catch (e) {
+      console.error('Error loading conversations:', e);
+      showToast('Error al cargar conversaciones', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
-    const load = async () => {
-      if (!user) return;
-      try {
-        setLoading(true);
-        const items = await ConversationRepository.listForUser(user.id);
-
-        const mapped: ChatThread[] = items.map((item) => {
-          const c = item.conversation;
-          const members = c.members || [];
-          const other = members.find((m) => m.user_id !== user.id)?.user;
-
-          const title = c.is_group ? (c.name || 'Group') : (other?.fullname || other?.username || 'Chat');
-          const avatar =
-            c.is_group
-              ? (c.avatar_url || 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=100')
-              : (other?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp');
-
-          const lastMessageText = item.lastMessage?.content || (item.lastMessage?.image_url ? '📷 Foto' : '');
-
-          return {
-            id: c.id,
-            name: title,
-            avatar,
-            lastMessage: lastMessageText || '',
-            time: '',
-            isGroup: c.is_group,
-          };
-        });
-
-        if (!mounted) return;
-        setThreads(mapped);
-      } catch (e) {
-        console.error('Error loading conversations:', e);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
     load();
+
+    // Set up real-time subscription for messages
+    if (user) {
+      const channelName = `messages-changes-${user.id}-${Date.now()}`;
+      subscription.current = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'messages',
+          },
+          () => {
+            load();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'conversation_members',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            load();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'conversations',
+          },
+          () => {
+            load();
+          }
+        )
+        .subscribe();
+    }
+
     return () => {
       mounted = false;
+      if (subscription.current) {
+        supabase.removeChannel(subscription.current);
+      }
     };
-  }, []);
+  }, [user]);
+
+  const handleDeleteConversation = async (conversationId: string) => {
+    setConversationToDelete(conversationId);
+    setDeleteModalVisible(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!conversationToDelete) return;
+    try {
+      await ConversationRepository.deleteConversation(conversationToDelete);
+      setDeleteModalVisible(false);
+      setConversationToDelete(null);
+      showToast('Conversación eliminada correctamente', 'success');
+      load();
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      showToast('No se pudo eliminar la conversación', 'error');
+    }
+  };
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ visible: true, message, type });
+  };
 
   const renderItem = ({ item }: { item: ChatThread }) => (
     <TouchableOpacity
@@ -107,6 +183,12 @@ export default function MessagesScreen() {
           ) : null}
         </View>
       </View>
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={() => handleDeleteConversation(item.id)}
+      >
+        <Ionicons name="trash-outline" size={20} color={colors.textSecondary} />
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 
@@ -149,6 +231,50 @@ export default function MessagesScreen() {
           />
         )}
       </View>
+
+      {/* Custom Delete Modal */}
+      <Modal
+        visible={deleteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalIcon}>
+              <Ionicons name="trash-outline" size={48} color="#FF6B6B" />
+            </View>
+            <Text style={styles.modalTitle}>Eliminar conversación</Text>
+            <Text style={styles.modalMessage}>
+              ¿Estás seguro de que quieres eliminar esta conversación? Esta acción no se puede deshacer.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => {
+                  setDeleteModalVisible(false);
+                  setConversationToDelete(null);
+                }}
+              >
+                <Text style={styles.modalButtonTextCancel}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonDelete]}
+                onPress={confirmDelete}
+              >
+                <Text style={styles.modalButtonTextDelete}>Eliminar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <AppToast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+      />
     </SafeAreaView>
   );
 }

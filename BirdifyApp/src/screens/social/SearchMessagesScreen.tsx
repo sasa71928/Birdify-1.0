@@ -52,8 +52,8 @@ export default function SearchMessagesScreen() {
     ? conversations.filter((item) => {
         const c = item.conversation;
         const members = c.members || [];
-        const other = members.find((m: any) => m.user_id !== user?.id)?.users?.[0];
-        const name = c.is_group ? (c.name || 'Group') : (other?.fullname || other?.username || 'Chat');
+        const other = members.find((m: any) => m.user_id !== user?.id)?.users;
+        const name = c.is_group ? (c.name || 'Group') : (other?.fullname || other?.username || 'Usuario');
         const lastMessage = item.lastMessage?.content || (item.lastMessage?.image_url ? '📷 Foto' : '');
         return (
           name.toLowerCase().includes(query.toLowerCase()) ||
@@ -78,8 +78,8 @@ export default function SearchMessagesScreen() {
   const renderItem = ({ item }: { item: any }) => {
     const c = item.conversation;
     const members = c.members || [];
-    const other = members.find((m: any) => m.user_id !== user?.id)?.users?.[0];
-    const name = c.is_group ? (c.name || 'Group') : (other?.fullname || other?.username || 'Chat');
+    const other = members.find((m: any) => m.user_id !== user?.id)?.users;
+    const name = c.is_group ? (c.name || 'Group') : (other?.fullname || other?.username || 'Usuario');
     const avatar = c.is_group
       ? (c.avatar_url || 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=100')
       : (other?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp');

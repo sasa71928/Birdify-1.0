@@ -26,5 +26,15 @@ export const ProfileRepository = {
 
     if (error) throw error;
     return data;
+  },
+
+  async getAll(): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, username, fullname, profile_pic_url')
+      .order('username');
+
+    if (error) throw error;
+    return data || [];
   }
 };

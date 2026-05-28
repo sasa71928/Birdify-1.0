@@ -181,8 +181,9 @@ export default function ChatScreen() {
     load();
     return () => {
       mounted = false;
+      navigation.navigate('MainTabs', { screen: 'Messages' });
     };
-  }, [conversationId, user?.id]);
+  }, [conversationId, user?.id, navigation]);
 
   React.useEffect(() => {
     const hasUnread = messages.some(m => !m.isMine && !m.isRead);
@@ -428,7 +429,7 @@ export default function ChatScreen() {
 
       {/* ── Header ── */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.navigate('MainTabs', { screen: 'Messages' })}>
           <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
 
@@ -445,9 +446,15 @@ export default function ChatScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.headerAction} onPress={() => setOptionsVisible(true)}>
-          <Ionicons name="ellipsis-vertical" size={20} color={colors.textPrimary} />
-        </TouchableOpacity>
+        {isGroup ? (
+          <TouchableOpacity style={styles.headerAction} onPress={() => navigation.navigate('EditGroup', { conversationId })}>
+            <Ionicons name="pencil-outline" size={20} color={colors.textPrimary} />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.headerAction} onPress={() => setOptionsVisible(true)}>
+            <Ionicons name="ellipsis-vertical" size={20} color={colors.textPrimary} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* ── Messages ── */}

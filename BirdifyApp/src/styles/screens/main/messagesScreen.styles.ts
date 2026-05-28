@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { Colors, Typography, Spacing, Radius } from '../../../theme';
+import { Colors, Typography, Spacing, Radius, Shadows } from '../../../theme';
 
 export const createStyles = (colors: any) => StyleSheet.create({
   container: {
@@ -139,6 +139,69 @@ export const createStyles = (colors: any) => StyleSheet.create({
     color: colors.white,
     fontSize: 10,
     fontWeight: 'bold',
+  },
+  deleteButton: {
+    padding: Spacing.sm,
+    marginLeft: Spacing.sm,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    width: '100%',
+    maxWidth: 400,
+    ...Shadows.modal,
+  },
+  modalIcon: {
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalTitle: {
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
+  },
+  modalMessage: {
+    fontSize: Typography.fontSize.md,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: Spacing.lg,
+    lineHeight: 22,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+  },
+  modalButtonCancel: {
+    backgroundColor: colors.componentBase,
+  },
+  modalButtonDelete: {
+    backgroundColor: '#FF6B6B',
+  },
+  modalButtonTextCancel: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: Typography.fontWeight.semiBold,
+    color: colors.textPrimary,
+  },
+  modalButtonTextDelete: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: Typography.fontWeight.semiBold,
+    color: colors.white,
   },
 });
 

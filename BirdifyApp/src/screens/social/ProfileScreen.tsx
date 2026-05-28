@@ -72,6 +72,11 @@ export default function ProfileScreen() {
     setShowSightingModal(true);
   };
 
+  const handleLikePress = (post: any) => {
+    setSelectedSighting(post);
+    setShowSightingModal(true);
+  };
+
   const handlePostDeleted = async () => {
     setShowSightingModal(false);
     // Recargar los avistamientos del perfil
@@ -187,15 +192,17 @@ export default function ProfileScreen() {
             const existing = speciesMap.get(birdId);
             if (existing) {
               existing.count += 1;
+              existing.images.push(item.photo_url);
             } else {
               speciesMap.set(birdId, {
                 id: birdId,
                 name: item.bird.common_name,
                 scientificName: item.bird.scientific_name,
-                image: item.photo_url || 'https://images.unsplash.com/photo-1444464666168-49d633b867ad?auto=format&fit=crop&q=80&w=200',
+                image: item.bird.image || 'https://images.unsplash.com/photo-1444464666168-49d633b867ad?auto=format&fit=crop&q=80&w=200',
                 count: 1,
                 date: new Date(item.sighting_date).toLocaleDateString(),
-                rare: false
+                rare: false,
+                images: [item.photo_url]
               });
             }
           }
@@ -509,7 +516,7 @@ const userData = profile ? {
           >
             {activeTab === 'Sightings' && <SightingsGrid sightings={sightings} onItemPress={handleSightingPress} />}
             {activeTab === 'Logbook'   && <LogbookView species={species} />}
-            {activeTab === 'Likes'     && <LikesView likes={likes} />}
+            {activeTab === 'Likes'     && <LikesView likes={likes} onItemPress={handleLikePress} />}
           </ScrollView>
         </View>
       )}
@@ -658,6 +665,14 @@ function mapSightingToPost(sighting: any, currentUserId?: string): Post {
 function SightingsGrid({ sightings, onItemPress }: { sightings: any[], onItemPress?: (sighting: any) => void }) {
   const { screen: styles, colors } = useDynamicStyles(createStyles);
 
+  const getFirstImage = (photoUrl: string | string[] | null) => {
+    if (!photoUrl) return 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300';
+    if (Array.isArray(photoUrl)) {
+      return photoUrl[0] || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300';
+    }
+    return photoUrl;
+  };
+
   if (sightings.length === 0) {
     return (
       <View style={{ padding: 40, alignItems: 'center' }}>
@@ -673,7 +688,7 @@ function SightingsGrid({ sightings, onItemPress }: { sightings: any[], onItemPre
     <View style={styles.grid}>
       {sightings.map((item) => (
         <TouchableOpacity key={item.id} style={styles.gridItem} activeOpacity={0.85} onPress={() => onItemPress?.(item)}>
-          <Image source={{ uri: item.photo_url || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300' }} style={styles.gridImage} />
+          <Image source={{ uri: getFirstImage(item.photo_url) }} style={styles.gridImage} />
           <View style={styles.locationBadge}>
             <Ionicons name="location" size={11} color={colors.white} />
           </View>
@@ -686,9 +701,24 @@ function SightingsGrid({ sightings, onItemPress }: { sightings: any[], onItemPre
 // ── Logbook ───────────────────────────────────────────────────────────────────
 function LogbookView({ species }: { species: any[] }) {
   const { screen: styles, colors } = useDynamicStyles(createStyles);
-  const totalSpecies = species.length;
+  const [selectedSpecies, setSelectedSpecies] = useState<any>(null);
+  const [showImagesModal, setShowImagesModal] = useState(false);
+  
   const rareCount    = species.filter((e) => e.rare).length;
   const totalSightings = species.reduce((sum, e) => sum + e.count, 0);
+
+  const handleSpeciesPress = (entry: any) => {
+    setSelectedSpecies(entry);
+    setShowImagesModal(true);
+  };
+
+  const getFirstImage = (imageUrl: string | string[] | null) => {
+    if (!imageUrl) return 'https://images.unsplash.com/photo-1444464666168-49d633b867ad?auto=format&fit=crop&q=80&w=200';
+    if (Array.isArray(imageUrl)) {
+      return imageUrl[0] || 'https://images.unsplash.com/photo-1444464666168-49d633b867ad?auto=format&fit=crop&q=80&w=200';
+    }
+    return imageUrl;
+  };
 
   if (species.length === 0) {
     return (
@@ -707,12 +737,6 @@ function LogbookView({ species }: { species: any[] }) {
       {/* Summary bar */}
       <View style={styles.logbookSummary}>
         <View style={styles.logbookStat}>
-          <MaterialCommunityIcons name="bird" size={22} color={colors.primary} />
-          <Text style={styles.logbookStatValue}>{totalSpecies}</Text>
-          <Text style={styles.logbookStatLabel}>Especies</Text>
-        </View>
-        <View style={styles.logbookStatDivider} />
-        <View style={styles.logbookStat}>
           <MaterialCommunityIcons name="star-outline" size={22} color={colors.tertiaryBrown} />
           <Text style={styles.logbookStatValue}>{rareCount}</Text>
           <Text style={styles.logbookStatLabel}>Raras</Text>
@@ -729,7 +753,7 @@ function LogbookView({ species }: { species: any[] }) {
       <Text style={styles.logbookSectionTitle}>Estampas de Aves</Text>
       <View style={styles.stampsGrid}>
         {species.map((entry) => (
-          <TouchableOpacity key={entry.id} style={styles.stampCard} activeOpacity={0.82}>
+          <TouchableOpacity key={entry.id} style={styles.stampCard} activeOpacity={0.82} onPress={() => handleSpeciesPress(entry)}>
             {/* Stamp image */}
             <View style={[styles.stampImageWrap, entry.rare && styles.stampImageRare]}>
               <Image source={{ uri: entry.image }} style={styles.stampImage} />
@@ -764,13 +788,47 @@ function LogbookView({ species }: { species: any[] }) {
         ))}
       </View>
 
+      {/* Images Modal */}
+      <Modal
+        visible={showImagesModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowImagesModal(false)}
+      >
+        <View style={styles.logbookModalOverlay}>
+          <View style={styles.logbookModalContent}>
+            <View style={styles.logbookModalHeader}>
+              <Text style={styles.logbookModalTitle}>{selectedSpecies?.name}</Text>
+              <TouchableOpacity onPress={() => setShowImagesModal(false)}>
+                <Ionicons name="close" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.logbookModalImagesContainer}>
+              <View style={styles.logbookModalImagesGrid}>
+                {selectedSpecies?.images?.map((img: any, index: number) => (
+                  <Image key={index} source={{ uri: getFirstImage(img) }} style={styles.logbookModalImage} />
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
 
 // ── Likes ─────────────────────────────────────────────────────────────────────
-function LikesView({ likes }: { likes: any[] }) {
+function LikesView({ likes, onItemPress }: { likes: any[], onItemPress?: (post: any) => void }) {
   const { screen: styles, colors } = useDynamicStyles(createStyles);
+
+  const getFirstImage = (imageUrl: string | string[] | null) => {
+    if (!imageUrl) return 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300';
+    if (Array.isArray(imageUrl)) {
+      return imageUrl[0] || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300';
+    }
+    return imageUrl;
+  };
 
   if (likes.length === 0) {
     return (
@@ -786,8 +844,8 @@ function LikesView({ likes }: { likes: any[] }) {
   return (
     <View style={styles.grid}>
       {likes.map((post) => (
-        <TouchableOpacity key={post.id} style={styles.gridItem} activeOpacity={0.85}>
-          <Image source={{ uri: post.image || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300' }} style={styles.gridImage} />
+        <TouchableOpacity key={post.id} style={styles.gridItem} activeOpacity={0.85} onPress={() => onItemPress?.(post)}>
+          <Image source={{ uri: getFirstImage(post.image) }} style={styles.gridImage} />
           <View style={styles.likeHeartBadge}>
             <Ionicons name="heart" size={11} color={colors.errorRed} />
             <Text style={styles.likeGridCount}>{post.likes}</Text>
@@ -796,5 +854,5 @@ function LikesView({ likes }: { likes: any[] }) {
       ))}
     </View>
   );
-  }
+}
 }

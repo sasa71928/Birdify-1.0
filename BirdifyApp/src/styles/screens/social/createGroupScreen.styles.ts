@@ -188,5 +188,100 @@ export const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
+  userItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  userItemSelected: {
+    backgroundColor: colors.primary + '10',
+  },
+  userAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: Spacing.md,
+  },
+  userName: {
+    flex: 1,
+    fontSize: Typography.fontSize.md,
+    color: colors.textPrimary,
+  },
+  saveBtn: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
+  },
+  saveBtnActive: {
+    backgroundColor: colors.primary,
+  },
+  saveBtnDisabled: {
+    backgroundColor: colors.outlineGrey,
+  },
+  saveBtnText: {
+    color: colors.canvasPure,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semiBold,
+  },
+  avatarSection: {
+    alignItems: 'center',
+    paddingVertical: Spacing.lg,
+  },
+  groupAvatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
+  groupAvatarPlaceholder: {
+    backgroundColor: colors.componentBase,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  changeAvatarBtn: {
+    marginTop: Spacing.sm,
+  },
+  changeAvatarText: {
+    color: colors.primary,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semiBold,
+  },
+  inputSection: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  label: {
+    fontSize: Typography.fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: Spacing.xs,
+  },
+  input: {
+    backgroundColor: colors.componentBase,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: Typography.fontSize.md,
+    color: colors.textPrimary,
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  membersSection: {
+    flex: 1,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+  },
+  sectionTitle: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: Typography.fontWeight.bold,
+    color: colors.textPrimary,
+    marginBottom: Spacing.md,
+  },
+  usersList: {
+    paddingBottom: 20,
+  },
 });
 
