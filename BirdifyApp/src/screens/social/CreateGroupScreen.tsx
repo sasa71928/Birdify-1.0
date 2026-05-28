@@ -19,26 +19,60 @@ import { Typography, Spacing, Radius, Shadows } from '../../theme';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { createStyles } from '../../styles/screens/social/createGroupScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { useAuth } from '../../context/AuthContext';
+import { FollowRepository } from '../../repositories/follow.repository';
+import { ConversationRepository } from '../../repositories/conversation.repository';
+import AppToast from '../../components/AppToast';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'CreateGroup'>;
-
-// ── Contactos de ejemplo ───────────────────────────────────────────────────────
-const CONTACTS = [
-  { id: '1', name: 'Sarah Jenkins',   avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=100', isOnline: true },
-  { id: '2', name: 'Mike Thompson',   avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=100' },
-  { id: '3', name: 'Anna K.',          avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=100' },
-  { id: '4', name: 'Carlos Mendez',   avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=100' },
-  { id: '5', name: 'Elena Rios',      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=100' },
-  { id: '6', name: 'David Park',      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=100' },
-];
 
 export default function CreateGroupScreen() {
   const navigation = useNavigation<NavProp>();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const { user } = useAuth();
   const [groupName, setGroupName] = useState('');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [contacts, setContacts] = useState<{ id: string; name: string; avatar: string }[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3600);
+  };
+
+  React.useEffect(() => {
+    let mounted = true;
+    const loadContacts = async () => {
+      if (!user) return;
+      try {
+        setLoadingContacts(true);
+        const following = await FollowRepository.getFollowing(user.id);
+        const mapped = (following || []).map((u: any) => ({
+          id: u.id,
+          name: u.fullname || u.username || 'Usuario',
+          avatar: u.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
+        }));
+        if (mounted) setContacts(mapped);
+      } catch (e) {
+        console.error('Error loading contacts:', e);
+        showToast('No se pudo cargar tu lista de contactos.', 'error');
+      } finally {
+        if (mounted) setLoadingContacts(false);
+      }
+    };
+    loadContacts();
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
 
   const toggle = (id: string) =>
     setSelected((prev) => {
@@ -66,20 +100,40 @@ export default function CreateGroupScreen() {
     }
   };
 
-  const handleCreate = () => {
-    if (!canCreate) return;
-    
-    // Simulate API call
-    console.log('Creating group:', { groupName, description, image, members: Array.from(selected) });
-    
-    // Show success alert or navigate back
-    navigation.goBack();
+  const handleCreate = async () => {
+    if (!canCreate || !user || creating) return;
+    try {
+      setCreating(true);
+      const conversationId = await ConversationRepository.createGroupConversation({
+        creatorId: user.id,
+        name: groupName.trim(),
+        description: description.trim() || undefined,
+        avatarUrl: image,
+        memberIds: Array.from(selected),
+      });
+
+      showToast('Grupo creado.', 'success');
+      setTimeout(() => {
+        navigation.navigate('Chat', { conversationId });
+      }, 500);
+    } catch (e) {
+      console.error('Error creating group:', e);
+      showToast('No se pudo crear el grupo.', 'error');
+    } finally {
+      setCreating(false);
+    }
   };
 
   const canCreate = groupName.trim().length > 0 && selected.size >= 1;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <AppToast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+      />
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* ── Header ── */}
@@ -90,11 +144,11 @@ export default function CreateGroupScreen() {
         <Text style={styles.headerTitle}>New Group</Text>
         <TouchableOpacity
           style={[styles.createBtn, !canCreate && styles.createBtnDisabled]}
-          disabled={!canCreate}
+          disabled={!canCreate || creating}
           onPress={handleCreate}
         >
           <Text style={[styles.createBtnText, !canCreate && styles.createBtnTextDisabled]}>
-            Create
+            {creating ? 'Creating…' : 'Create'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -145,7 +199,7 @@ export default function CreateGroupScreen() {
           <View style={styles.selectedSection}>
             <Text style={styles.sectionLabel}>Selected ({selected.size})</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-              {CONTACTS.filter((c) => selected.has(c.id)).map((c) => (
+              {contacts.filter((c) => selected.has(c.id)).map((c) => (
                 <TouchableOpacity key={c.id} style={styles.chip} onPress={() => toggle(c.id)}>
                   <Image source={{ uri: c.avatar }} style={styles.chipAvatar} />
                   <Text style={styles.chipName}>{c.name.split(' ')[0]}</Text>
@@ -159,7 +213,16 @@ export default function CreateGroupScreen() {
         {/* ── Lista de contactos ── */}
         <View style={styles.contactsSection}>
           <Text style={styles.sectionLabel}>Add People</Text>
-          {CONTACTS.map((contact) => {
+          {loadingContacts ? (
+            <Text style={{ color: colors.textSecondary, paddingHorizontal: 16, paddingVertical: 10 }}>
+              Cargando...
+            </Text>
+          ) : contacts.length === 0 ? (
+            <Text style={{ color: colors.textSecondary, paddingHorizontal: 16, paddingVertical: 10 }}>
+              No tienes usuarios para agregar. Sigue a alguien para crear un grupo.
+            </Text>
+          ) : (
+          contacts.map((contact) => {
             const isSelected = selected.has(contact.id);
             return (
               <TouchableOpacity
@@ -170,7 +233,6 @@ export default function CreateGroupScreen() {
               >
                 <View style={styles.contactAvatarWrap}>
                   <Image source={{ uri: contact.avatar }} style={styles.contactAvatar} />
-                  {contact.isOnline && <View style={styles.onlineDot} />}
                 </View>
                 <Text style={styles.contactName}>{contact.name}</Text>
                 <View style={[styles.checkbox, isSelected && styles.checkboxChecked]}>
@@ -178,7 +240,7 @@ export default function CreateGroupScreen() {
                 </View>
               </TouchableOpacity>
             );
-          })}
+          }))}
         </View>
 
       </ScrollView>

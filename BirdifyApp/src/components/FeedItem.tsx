@@ -2,15 +2,18 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ReactionRepository } from '../repositories/reaction.repository';
 import { CommentRepository } from '../repositories/comment.repository';
+import { SightingRepository } from '../repositories/sighting.repository';
+import { UserBlockRepository } from '../repositories/user_block.repository';
 import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput, ScrollView, Modal, KeyboardAvoidingView, Platform, PanResponder, Animated, Dimensions, TouchableWithoutFeedback, Share, Alert, ActivityIndicator, Keyboard } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { Colors, Spacing } from '../theme';
+import { Colors, Spacing, Typography, Radius, Shadows } from '../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { createStyles } from '../styles/components/FeedItem.styles';
 import { useDynamicStyles } from '../hooks/useDynamicStyles';
 import PagerView from 'react-native-pager-view';
+import AppToast from './AppToast';
 
 export interface Comment {
   id: string;
@@ -35,16 +38,18 @@ export interface Post {
   isVerified?: boolean;
   commentsList?: Comment[];
   hasLiked?: boolean;
+  createdAt: string;
 }
 
 interface FeedItemProps {
   post: Post;
+  onPostDeleted?: () => void;
 }
 
 const CAPTION_LIMIT = 100;
 const INITIAL_COMMENTS_DISPLAY = 5;
 
-export default function FeedItem({ post }: FeedItemProps) {
+export default function FeedItem({ post, onPostDeleted }: FeedItemProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const { user } = useAuth();
@@ -70,6 +75,22 @@ export default function FeedItem({ post }: FeedItemProps) {
     parentId: string | null;
   } | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
+  const [showDeleteModal, setShowDeleteModal] = React.useState(false);
+  const [showBlockModal, setShowBlockModal] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [isBlocking, setIsBlocking] = React.useState(false);
+  const [toast, setToast] = React.useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
+
+  const showToast = React.useCallback((message: string, type: 'success' | 'error') => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    }, 4500);
+  }, []);
 
   const images = Array.isArray(post.image) ? post.image : [post.image];
   const currentImage = images[currentImageIndex];
@@ -392,25 +413,94 @@ export default function FeedItem({ post }: FeedItemProps) {
     }, 300);
   };
 
-  const handleSavePost = () => {
+  const handleDeleteSighting = async () => {
+    const createdAt = new Date(post.createdAt);
+    const now = new Date();
+    const diffMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
+
+    if (diffMinutes > 10) {
+      Alert.alert('Error', 'Solo puedes eliminar avistamientos dentro de 10 minutos después de publicarlos.');
+      return;
+    }
+
     resetOptionsModal();
+    setShowDeleteModal(true);
   };
 
-  const handleCopyLink = () => {
-    resetOptionsModal();
+  const confirmDeleteSighting = async () => {
+    setIsDeleting(true);
+    try {
+      await SightingRepository.delete(post.id);
+      setShowDeleteModal(false);
+      if (onPostDeleted) {
+        onPostDeleted();
+      }
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo eliminar el avistamiento. Intenta de nuevo.');
+      console.error('Error deleting sighting:', error);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
-  const handleNotInterested = () => {
+  const handleBlockUser = async () => {
+    if (!user) {
+      Alert.alert('Inicia Sesión', 'Debes iniciar sesión para bloquear usuarios.');
+      return;
+    }
+
+    if (!post.userId) {
+      Alert.alert('Error', 'No se puede bloquear este usuario.');
+      return;
+    }
+
+    if (user.id === post.userId) {
+      Alert.alert('Error', 'No puedes bloquearte a ti mismo.');
+      return;
+    }
+
     resetOptionsModal();
+    setShowBlockModal(true);
   };
 
-  const handleReport = () => {
-    resetOptionsModal();
+  const confirmBlockUser = async () => {
+    if (!post.userId || !user) return;
+
+    if (user.id === post.userId) {
+      setShowBlockModal(false);
+      showToast('No puedes bloquearte a ti mismo.', 'error');
+      return;
+    }
+
+    setIsBlocking(true);
+    try {
+      await UserBlockRepository.block(user.id, post.userId);
+      setShowBlockModal(false);
+      showToast(`Has bloqueado a @${post.username}.`, 'success');
+      if (onPostDeleted) {
+        onPostDeleted();
+      }
+    } catch (error) {
+      showToast('No se pudo bloquear al usuario. Intenta de nuevo.', 'error');
+      console.error('Error blocking user:', error);
+    } finally {
+      setIsBlocking(false);
+    }
   };
 
   const pagerRef = React.useRef<PagerView>(null);
   return (
     <View style={styles.container}>
+      {toast.visible && (
+        <AppToast
+          visible={toast.visible}
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+          topOffset={8}
+          containerStyle={{ left: 12, right: 12 }}
+        />
+      )}
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
@@ -714,23 +804,23 @@ export default function FeedItem({ post }: FeedItemProps) {
               { backgroundColor: '#000', opacity: optionsBackdropOpacity }
             ]}
           >
-            <TouchableOpacity 
-              style={{ flex: 1 }} 
-              activeOpacity={1} 
-              onPress={resetOptionsModal} 
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              activeOpacity={1}
+              onPress={resetOptionsModal}
             />
           </Animated.View>
-          
-          <Animated.View 
+
+          <Animated.View
             style={[
-              styles.optionsContent, 
+              styles.optionsContent,
               { transform: [{ translateY: optionsPanY }] }
             ]}
           >
             <View {...optionsPanResponder.panHandlers} style={{ width: '100%', alignItems: 'center', paddingVertical: 10 }}>
               <View style={styles.modalHandle} />
             </View>
-            
+
             <View style={styles.optionsList}>
               {isOwnPost && (
                 <>
@@ -738,33 +828,255 @@ export default function FeedItem({ post }: FeedItemProps) {
                     <Ionicons name="pencil-outline" size={22} color={Colors.textPrimary} />
                     <Text style={styles.optionText}>Editar publicación</Text>
                   </TouchableOpacity>
+                  <TouchableOpacity style={styles.optionItem} onPress={handleDeleteSighting}>
+                    <Ionicons name="trash-outline" size={22} color="#FF5252" />
+                    <Text style={[styles.optionText, { color: '#FF5252' }]}>Eliminar avistamiento</Text>
+                  </TouchableOpacity>
                   <View style={styles.optionDivider} />
                 </>
               )}
 
-              <TouchableOpacity style={styles.optionItem} onPress={handleSavePost}>
-                <Ionicons name="bookmark-outline" size={22} color={Colors.textPrimary} />
-                <Text style={styles.optionText}>Guardar publicación</Text>
-              </TouchableOpacity>
+              {!isOwnPost && (
+                <>
+                  <TouchableOpacity style={styles.optionItem} onPress={handleBlockUser}>
+                    <Ionicons name="ban-outline" size={22} color="#FF5252" />
+                    <Text style={[styles.optionText, { color: '#FF5252' }]}>Bloquear usuario</Text>
+                  </TouchableOpacity>
+                  <View style={styles.optionDivider} />
+                </>
+              )}
 
-              <TouchableOpacity style={styles.optionItem} onPress={handleCopyLink}>
-                <Ionicons name="link-outline" size={22} color={Colors.textPrimary} />
-                <Text style={styles.optionText}>Copiar enlace</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.optionItem} onPress={handleNotInterested}>
-                <Ionicons name="eye-off-outline" size={22} color={Colors.textPrimary} />
-                <Text style={styles.optionText}>No me interesa</Text>
-              </TouchableOpacity>
-
-              <View style={styles.optionDivider} />
-
-              <TouchableOpacity style={styles.optionItem} onPress={handleReport}>
-                <Ionicons name="alert-circle-outline" size={22} color="#FF5252" />
-                <Text style={[styles.optionText, { color: '#FF5252' }]}>Reportar</Text>
+              <TouchableOpacity style={styles.optionItem} onPress={resetOptionsModal}>
+                <Ionicons name="close-outline" size={22} color={Colors.textPrimary} />
+                <Text style={styles.optionText}>Cerrar</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={showDeleteModal}
+        animationType="fade"
+        transparent={true}
+        statusBarTranslucent={true}
+        onRequestClose={() => !isDeleting && setShowDeleteModal(false)}
+      >
+        <View style={[styles.optionsOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: '#000', opacity: 0.5 }
+            ]}
+          />
+
+          <View style={{
+            backgroundColor: colors.canvasPure,
+            borderRadius: 20,
+            padding: Spacing.lg,
+            width: '80%',
+            ...Shadows.modal
+          }}>
+            <View style={{ alignItems: 'center', marginBottom: Spacing.lg }}>
+              <View style={{
+                width: 80,
+                height: 80,
+                borderRadius: 40,
+                backgroundColor: '#FF5252',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginBottom: Spacing.md
+              }}>
+                <Ionicons name="trash-bin-outline" size={40} color={colors.canvasPure} />
+              </View>
+
+              <Text style={{
+                fontSize: Typography.fontSize.lg,
+                fontWeight: Typography.fontWeight.bold,
+                color: colors.textPrimary,
+                textAlign: 'center',
+                fontFamily: Typography.fontFamilyDisplay,
+                marginBottom: Spacing.sm
+              }}>
+                Eliminar avistamiento
+              </Text>
+
+              <Text style={{
+                fontSize: Typography.fontSize.md,
+                color: colors.textSecondary,
+                textAlign: 'center',
+                fontFamily: Typography.fontFamilyBody,
+                lineHeight: Typography.lineHeight.normal
+              }}>
+                ¿Estás seguro de que deseas eliminar este avistamiento? Esta acción no se puede deshacer.
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.lg }}>
+              <TouchableOpacity
+                disabled={isDeleting}
+                onPress={() => setShowDeleteModal(false)}
+                style={{
+                  flex: 1,
+                  paddingVertical: Spacing.md,
+                  borderRadius: Radius.md,
+                  backgroundColor: colors.componentBase,
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{
+                  fontSize: Typography.fontSize.md,
+                  fontWeight: Typography.fontWeight.semiBold,
+                  color: colors.textPrimary,
+                  fontFamily: Typography.fontFamilyDisplay
+                }}>
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                disabled={isDeleting}
+                onPress={confirmDeleteSighting}
+                style={{
+                  flex: 1,
+                  paddingVertical: Spacing.md,
+                  borderRadius: Radius.md,
+                  backgroundColor: '#FF5252',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  opacity: isDeleting ? 0.7 : 1
+                }}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color={colors.canvasPure} />
+                ) : (
+                  <Text style={{
+                    fontSize: Typography.fontSize.md,
+                    fontWeight: Typography.fontWeight.semiBold,
+                    color: colors.canvasPure,
+                    fontFamily: Typography.fontFamilyDisplay
+                  }}>
+                    Eliminar
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Block User Confirmation Modal */}
+      <Modal
+        visible={showBlockModal}
+        animationType="fade"
+        transparent={true}
+        statusBarTranslucent={true}
+        onRequestClose={() => !isBlocking && setShowBlockModal(false)}
+      >
+        <View style={[styles.optionsOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: '#000', opacity: 0.5 }
+            ]}
+          />
+
+          <View style={{
+            backgroundColor: colors.canvasPure,
+            borderRadius: 20,
+            padding: Spacing.lg,
+            width: '80%',
+            ...Shadows.modal
+          }}>
+            <View style={{ alignItems: 'center', marginBottom: Spacing.lg }}>
+              <View style={{
+                width: 80,
+                height: 80,
+                borderRadius: 40,
+                backgroundColor: '#FF5252',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginBottom: Spacing.md
+              }}>
+                <Ionicons name="ban-outline" size={40} color={colors.canvasPure} />
+              </View>
+
+              <Text style={{
+                fontSize: Typography.fontSize.lg,
+                fontWeight: Typography.fontWeight.bold,
+                color: colors.textPrimary,
+                textAlign: 'center',
+                fontFamily: Typography.fontFamilyDisplay,
+                marginBottom: Spacing.sm
+              }}>
+                Bloquear a @{post.username}
+              </Text>
+
+              <Text style={{
+                fontSize: Typography.fontSize.md,
+                color: colors.textSecondary,
+                textAlign: 'center',
+                fontFamily: Typography.fontFamilyBody,
+                lineHeight: Typography.lineHeight.normal,
+                marginBottom: Spacing.sm
+              }}>
+                No podrán ver tu perfil ni tu actividad. Puedes desbloquearlos en tu configuración.
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.lg }}>
+              <TouchableOpacity
+                disabled={isBlocking}
+                onPress={() => setShowBlockModal(false)}
+                style={{
+                  flex: 1,
+                  paddingVertical: Spacing.md,
+                  borderRadius: Radius.md,
+                  backgroundColor: colors.componentBase,
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{
+                  fontSize: Typography.fontSize.md,
+                  fontWeight: Typography.fontWeight.semiBold,
+                  color: colors.textPrimary,
+                  fontFamily: Typography.fontFamilyDisplay
+                }}>
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                disabled={isBlocking}
+                onPress={confirmBlockUser}
+                style={{
+                  flex: 1,
+                  paddingVertical: Spacing.md,
+                  borderRadius: Radius.md,
+                  backgroundColor: '#FF5252',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  opacity: isBlocking ? 0.7 : 1
+                }}
+              >
+                {isBlocking ? (
+                  <ActivityIndicator size="small" color={colors.canvasPure} />
+                ) : (
+                  <Text style={{
+                    fontSize: Typography.fontSize.md,
+                    fontWeight: Typography.fontWeight.semiBold,
+                    color: colors.canvasPure,
+                    fontFamily: Typography.fontFamilyDisplay
+                  }}>
+                    Bloquear
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
     </View>

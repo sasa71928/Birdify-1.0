@@ -92,5 +92,14 @@ export const FollowRepository = {
     }
 
     return data?.map((item: any) => item.following).filter(Boolean) || [];
+  },
+
+  async areMutualFollowers(userAId: string, userBId: string): Promise<boolean> {
+    const [aFollowsB, bFollowsA] = await Promise.all([
+      this.isFollowing(userAId, userBId),
+      this.isFollowing(userBId, userAId),
+    ]);
+
+    return aFollowsB && bFollowsA;
   }
 };

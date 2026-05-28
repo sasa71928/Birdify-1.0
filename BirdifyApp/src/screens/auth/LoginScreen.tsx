@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StatusBar,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, ScrollView, StatusBar, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -25,8 +19,8 @@ type LoginNavProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 
-import { Alert } from 'react-native';
 import { AuthService } from '../../services/auth.service';
+import AppToast from '../../components/AppToast';
 
 export default function LoginScreen() {
   const navigation = useNavigation<LoginNavProp>();
@@ -36,10 +30,22 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [remember, setRemember] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    }, 3600);
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Faltan datos', 'Por favor ingresa tu usuario o correo y contraseña.');
+      showToast('Por favor ingresa tu usuario o correo y contraseña.', 'error');
       return;
     }
     
@@ -49,7 +55,7 @@ export default function LoginScreen() {
       // No necesitamos hacer navigation.navigate aquí porque el AuthProvider 
       // automáticamente cambiará las pantallas al detectar la sesión.
     } catch (error: any) {
-      Alert.alert('Error al iniciar sesión', error.message);
+      showToast(error.message || 'Error al iniciar sesión.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -64,6 +70,12 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={shared.safe}>
+      <AppToast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+      />
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/*<ScreenHeader />*/}

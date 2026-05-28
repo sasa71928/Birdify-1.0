@@ -53,6 +53,7 @@ export default function ProfileScreen() {
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [isFollowingUser, setIsFollowingUser] = useState(false);
+  const [canViewPrivateContent, setCanViewPrivateContent] = useState(isMe);
   const [togglingFollow, setTogglingFollow] = useState(false);
   const [togglingModalUserId, setTogglingModalUserId] = useState<string | null>(null);
 
@@ -67,6 +68,28 @@ export default function ProfileScreen() {
   const handleSightingPress = (sighting: any) => {
     setSelectedSighting(sighting);
     setShowSightingModal(true);
+  };
+
+  const handlePostDeleted = async () => {
+    setShowSightingModal(false);
+    // Recargar los avistamientos del perfil
+    if (displayUserId) {
+      const { data: sightingsData } = await supabase
+        .from('sightings')
+        .select(`
+          id,
+          description,
+          photo_url,
+          created_at,
+          sighting_date,
+          is_location_private,
+          bird:birds (id, common_name, scientific_name)
+        `)
+        .eq('user_id', displayUserId)
+        .order('created_at', { ascending: false });
+
+      setSightings(sightingsData || []);
+    }
   };
 
   useEffect(() => {
@@ -84,6 +107,7 @@ export default function ProfileScreen() {
         setFollowersCount(0);
         setFollowingCount(0);
         setIsFollowingUser(false);
+        setCanViewPrivateContent(isMe);
         setLoadingProfile(true);
 
         // 1. Cargar Perfil
@@ -93,7 +117,49 @@ export default function ProfileScreen() {
           setProfile(data);
         }
 
-        // 2. Cargar Avistamientos Reales
+        // 2. Cargar Seguidores/Seguidos
+        const { count: fersCount } = await supabase
+          .from('follows')
+          .select('*', { count: 'exact', head: true })
+          .eq('following_id', displayUserId);
+
+        const { count: fingCount } = await supabase
+          .from('follows')
+          .select('*', { count: 'exact', head: true })
+          .eq('follower_id', displayUserId);
+
+        if (!isMounted) return;
+        setFollowersCount(fersCount || 0);
+        setFollowingCount(fingCount || 0);
+
+        // 3. Verificar si el usuario actual sigue a este perfil
+        if (authUser && displayUserId && !isMe) {
+          const isFollowing = await FollowRepository.isFollowing(authUser.id, displayUserId);
+          if (!isMounted) return;
+          setIsFollowingUser(isFollowing);
+        }
+
+        // 4. Determinar si se puede ver contenido privado (perfil privado requiere follow mutuo)
+        let canViewActivity = true;
+        if (data?.is_private && !isMe) {
+          if (!authUser) {
+            canViewActivity = false;
+          } else {
+            canViewActivity = await FollowRepository.areMutualFollowers(authUser.id, displayUserId);
+          }
+        }
+
+        if (!isMounted) return;
+        setCanViewPrivateContent(canViewActivity);
+
+        if (!canViewActivity) {
+          setSightings([]);
+          setSpecies([]);
+          setLikes([]);
+          return;
+        }
+
+        // 5. Cargar Avistamientos Reales
         const { data: sightingsData, error: sightingsError } = await supabase
           .from('sightings')
           .select(`
@@ -111,7 +177,7 @@ export default function ProfileScreen() {
         if (sightingsError) throw sightingsError;
         setSightings(sightingsData || []);
 
-        // 3. Procesar Especies (Logbook) a partir de los avistamientos reales
+        // 6. Procesar Especies (Logbook) a partir de los avistamientos reales
         const speciesMap = new Map<string, any>();
         (sightingsData || []).forEach((item: any) => {
           if (item.bird) {
@@ -135,7 +201,7 @@ export default function ProfileScreen() {
         if (!isMounted) return;
         setSpecies(Array.from(speciesMap.values()));
 
-        // 4. Cargar Likes (Reacciones)
+        // 7. Cargar Likes (Reacciones)
         const { data: reactionsData, error: reactionsError } = await supabase
           .from('reactions')
           .select(`
@@ -159,28 +225,6 @@ export default function ProfileScreen() {
             likes: 1
           }));
         setLikes(mappedLikes);
-
-        // 5. Cargar Seguidores/Seguidos
-        const { count: fersCount } = await supabase
-          .from('follows')
-          .select('*', { count: 'exact', head: true })
-          .eq('following_id', displayUserId);
-
-        const { count: fingCount } = await supabase
-          .from('follows')
-          .select('*', { count: 'exact', head: true })
-          .eq('follower_id', displayUserId);
-
-        if (!isMounted) return;
-        setFollowersCount(fersCount || 0);
-        setFollowingCount(fingCount || 0);
-
-        // 6. Verificar si el usuario actual sigue a este perfil
-        if (authUser && displayUserId && !isMe) {
-          const isFollowing = await FollowRepository.isFollowing(authUser.id, displayUserId);
-          if (!isMounted) return;
-          setIsFollowingUser(isFollowing);
-        }
 
       } catch (error) {
         if (!isMounted) return;
@@ -213,6 +257,10 @@ export default function ProfileScreen() {
         await FollowRepository.follow(authUser.id, displayUserId);
         setIsFollowingUser(true);
         setFollowersCount(prev => prev + 1);
+      }
+      if (profile?.is_private) {
+        const canView = await FollowRepository.areMutualFollowers(authUser.id, displayUserId);
+        setCanViewPrivateContent(canView);
       }
     } catch (error) {
       console.error('Error toggling follow:', error);
@@ -419,13 +467,13 @@ const userData = profile ? {
       </View>
 
 
-      {userData.isPrivate && !isMe ? (
+      {userData.isPrivate && !isMe && !canViewPrivateContent ? (
         <View style={styles.privateContainer}>
           <View style={styles.privateIconCircle}>
             <Ionicons name="lock-closed-outline" size={40} color={colors.textSecondary} />
           </View>
           <Text style={styles.privateTitle}>This Account is Private</Text>
-          <Text style={styles.privateSubtitle}>Follow this account to see their sightings and activity.</Text>
+          <Text style={styles.privateSubtitle}>Deben seguirse mutuamente para ver sightings, logbook y likes.</Text>
         </View>
       ) : (
         <View style={{ flex: 1 }}>
@@ -541,7 +589,7 @@ const userData = profile ? {
             onPress={() => setShowSightingModal(false)}
           >
             {selectedSighting && (
-              <FeedItem post={mapSightingToPost(selectedSighting, authUser?.id)} />
+              <FeedItem post={mapSightingToPost(selectedSighting, authUser?.id)} onPostDeleted={handlePostDeleted} />
             )}
           </TouchableOpacity>
           <TouchableOpacity
@@ -591,6 +639,7 @@ function mapSightingToPost(sighting: any, currentUserId?: string): Post {
     caption: sighting.description || '',
     timeAgo: timeAgoStr,
     hasLiked: false,
+    createdAt: sighting.created_at || sighting.sighting_date
   };
 }
 

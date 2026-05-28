@@ -69,6 +69,7 @@ function mapSightingToPost(sighting: any, currentUserId?: string): Post {
     isVerified: userData?.is_verified === true,
     commentsList: [],
     hasLiked,
+    createdAt: sighting.created_at
   };
 }
 
@@ -94,7 +95,7 @@ export default function BirdDetailScreen() {
     try {
       setLoading(true);
 
-      const sightings = await SightingRepository.getFeed();
+      const sightings = await SightingRepository.getFeed(user?.id);
 
       const filtered = sightings.filter(
         (item: any) => item.bird_id === bird?.id
@@ -110,6 +111,10 @@ export default function BirdDetailScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePostDeleted = async () => {
+    await loadBirdSightings();
   };
 
   if (!bird) {
@@ -245,7 +250,7 @@ export default function BirdDetailScreen() {
             </Text>
           ) : (
             posts.map((post) => (
-              <FeedItem key={post.id} post={post} />
+              <FeedItem key={post.id} post={post} onPostDeleted={handlePostDeleted} />
             ))
           )}
         </View>

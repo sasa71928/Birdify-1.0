@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,6 @@ import {
   TextInput,
   ActivityIndicator,
   StyleSheet,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,13 +19,16 @@ import { createStyles } from '../../styles/screens/settings/settingsSubScreens.s
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { ProfileRepository } from '../../repositories/profile.repository';
+import AppToast from '../../components/AppToast';
 
 export default function PrivacySettingsScreen() {
   const navigation = useNavigation();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const { user, signOut } = useAuth();
 
-  const [isPrivateProfile, setIsPrivateProfile] = useState(true);
+  const [isPrivateProfile, setIsPrivateProfile] = useState(false);
+  const [isSavingPrivacy, setIsSavingPrivacy] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Toast state
@@ -45,6 +47,49 @@ export default function PrivacySettingsScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  useEffect(() => {
+    const loadPrivacy = async () => {
+      if (!user) return;
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('is_private')
+          .eq('id', user.id)
+          .single();
+
+        if (error) throw error;
+        setIsPrivateProfile(Boolean(data?.is_private));
+      } catch (error) {
+        console.error('Error loading privacy settings:', error);
+      }
+    };
+
+    loadPrivacy();
+  }, [user]);
+
+  const handleTogglePrivateProfile = async (nextValue: boolean) => {
+    if (!user || isSavingPrivacy) return;
+    const previous = isPrivateProfile;
+    setIsPrivateProfile(nextValue);
+    setIsSavingPrivacy(true);
+
+    try {
+      await ProfileRepository.update(user.id, { is_private: nextValue });
+      showToast(
+        nextValue
+          ? 'Tu perfil ahora es privado. Solo usuarios que se siguen mutuamente podrán ver Sightings, Logbook y Likes.'
+          : 'Tu perfil ahora es público.',
+        'success'
+      );
+    } catch (error) {
+      console.error('Error updating private profile:', error);
+      setIsPrivateProfile(previous);
+      showToast('No se pudo actualizar la privacidad del perfil.', 'error');
+    } finally {
+      setIsSavingPrivacy(false);
+    }
+  };
 
   const handleChangePassword = async () => {
     if (!user || !user.email) {
@@ -224,33 +269,12 @@ export default function PrivacySettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {toast.visible && !passwordModalVisible && (
-        <View style={{
-          position: 'absolute',
-          top: Platform.OS === 'ios' ? 50 : 20,
-          left: 20,
-          right: 20,
-          backgroundColor: toast.type === 'success' ? '#2E7D32' : '#C62828',
-          padding: 16,
-          borderRadius: 12,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 10,
-          zIndex: 9999,
-          elevation: 10,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.15,
-          shadowRadius: 8
-        }}>
-          <Ionicons 
-            name={toast.type === 'success' ? "checkmark-circle" : "alert-circle"} 
-            size={22} 
-            color="#fff" 
-          />
-          <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600', flex: 1 }}>{toast.message}</Text>
-        </View>
-      )}
+      <AppToast
+        visible={toast.visible && !passwordModalVisible}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+      />
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       
       {/* Header */}
@@ -273,17 +297,22 @@ export default function PrivacySettingsScreen() {
           <View style={styles.settingRow}>
             <View style={styles.settingContent}>
               <Text style={styles.settingLabel}>Private Profile</Text>
-              <Text style={styles.settingSublabel}>Only approved followers can see your sightings.</Text>
+              <Text style={styles.settingSublabel}>Only mutual followers can see your sightings, logbook and likes.</Text>
             </View>
             <Switch
               value={isPrivateProfile}
-              onValueChange={setIsPrivateProfile}
+              onValueChange={handleTogglePrivateProfile}
+              disabled={isSavingPrivacy}
               trackColor={{ false: isDark ? '#444' : '#D1D1D1', true: colors.primary }}
               thumbColor={colors.canvasPure}
             />
           </View>
           <View style={styles.settingDivider} />
-          <TouchableOpacity style={styles.settingRow} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.settingRow}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('BlockedUsers' as never)}
+          >
             <Ionicons name="remove-circle-outline" size={22} color={colors.textPrimary} style={{marginRight: 12}} />
             <Text style={[styles.settingLabel, {flex: 1}]}>Blocked Users</Text>
             <Ionicons name="chevron-forward" size={20} color={colors.placeholder} />
@@ -371,24 +400,14 @@ export default function PrivacySettingsScreen() {
           <View style={localStyles.modalContainer}>
             <Text style={localStyles.modalTitle}>Cambiar Contraseña</Text>
 
-            {toast.visible && (
-              <View style={{
-                backgroundColor: toast.type === 'success' ? '#2E7D32' : '#C62828',
-                padding: 12,
-                borderRadius: 10,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 8,
-                marginBottom: 14,
-              }}>
-                <Ionicons 
-                  name={toast.type === 'success' ? "checkmark-circle" : "alert-circle"} 
-                  size={20} 
-                  color="#fff" 
-                />
-                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600', flex: 1 }}>{toast.message}</Text>
-              </View>
-            )}
+            <AppToast
+              visible={toast.visible}
+              message={toast.message}
+              type={toast.type}
+              onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+              floating={false}
+              containerStyle={{ marginBottom: 14, padding: 12, borderRadius: 10 }}
+            />
 
             <View style={localStyles.inputGroup}>
               <Text style={localStyles.inputLabel}>Contraseña Actual</Text>

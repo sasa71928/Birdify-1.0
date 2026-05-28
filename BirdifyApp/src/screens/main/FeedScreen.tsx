@@ -50,7 +50,8 @@ function mapSightingToPost(sighting: any, currentUserId?: string): Post {
     timeAgo: timeAgoStr,
     isVerified: userData?.is_verified === true,
     commentsList: [],
-    hasLiked
+    hasLiked,
+    createdAt: sighting.created_at
   };
 }
 
@@ -64,12 +65,16 @@ export default function FeedScreen() {
 
   const loadFeed = async () => {
     try {
-      const sightings = await SightingRepository.getFeed();
+      const sightings = await SightingRepository.getFeed(user?.id);
       const mappedPosts = sightings.map(item => mapSightingToPost(item, user?.id));
       setPosts(mappedPosts);
     } catch (error) {
       console.error('Error cargando el feed:', error);
     }
+  };
+
+  const handlePostDeleted = async () => {
+    await loadFeed();
   };
 
   const initialLoad = async () => {
@@ -106,7 +111,7 @@ export default function FeedScreen() {
       ) : (
         <FlatList
           data={posts}
-          renderItem={({ item }) => <FeedItem post={item} />}
+          renderItem={({ item }) => <FeedItem post={item} onPostDeleted={handlePostDeleted} />}
           keyExtractor={(item) => item.id}
           contentContainerStyle={screen.listContent}
           showsVerticalScrollIndicator={false}

@@ -25,8 +25,8 @@ export const SightingRepository = {
     return data;
   },
 
-  async getFeed(): Promise<any[]> {
-    const { data, error } = await supabase
+  async getFeed(currentUserId?: string): Promise<any[]> {
+    let query = supabase
       .from('sightings')
       .select(`
         *,
@@ -36,21 +36,42 @@ export const SightingRepository = {
         comments (id)
       `)
       .order('created_at', { ascending: false });
+
+    const { data, error } = await query;
+
     if (error) {
       console.error('Error in getFeed:', error);
       throw error;
     }
-    
-    // Formateamos los resultados para que coincidan con la interfaz de Sighting (user y bird en vez de users y birds)
-    const formattedData = data?.map(item => ({
+
+    // Si hay usuario actual, filtrar usuarios bloqueados en ambas direcciones.
+    let filteredData = data || [];
+    if (currentUserId) {
+      const { data: blockedData, error: blockError } = await supabase
+        .from('user_blocks')
+        .select('blocker_id, blocked_id')
+        .or(`blocker_id.eq.${currentUserId},blocked_id.eq.${currentUserId}`);
+
+      if (!blockError && blockedData) {
+        const excludedUserIds = new Set(
+          blockedData.map((block: any) =>
+            block.blocker_id === currentUserId ? block.blocked_id : block.blocker_id
+          )
+        );
+        filteredData = filteredData.filter(item => !excludedUserIds.has(item.user_id));
+      }
+    }
+
+    // Formatear resultados
+    const formattedData = filteredData.map(item => ({
       ...item,
-      user: item.users,
+      user: Array.isArray(item.users) ? item.users[0] : item.users,
       bird: item.birds,
       reactions: item.reactions || [],
       comments: item.comments || []
     }));
 
-    return formattedData || [];
+    return formattedData;
   },
 
   async getByUserId(userId: string): Promise<any[]> {
@@ -80,5 +101,14 @@ export const SightingRepository = {
     }));
 
     return formattedData || [];
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('sightings')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
   }
 };

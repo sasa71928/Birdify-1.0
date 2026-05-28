@@ -22,6 +22,11 @@ import { Typography, Spacing, Radius, Shadows } from '../../theme';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { createStyles } from '../../styles/screens/social/chatScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
+import { MessageRepository } from '../../repositories/message.repository';
+import { UserBlockRepository } from '../../repositories/user_block.repository';
+import AppToast from '../../components/AppToast';
 
 type ChatNavProp = NativeStackNavigationProp<RootStackParamList, 'Chat'>;
 type ChatRouteProp = RouteProp<RootStackParamList, 'Chat'>;
@@ -64,12 +69,109 @@ export default function ChatScreen() {
   const navigation = useNavigation<ChatNavProp>();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const route = useRoute<ChatRouteProp>();
-  const { thread } = route.params;
+  const { conversationId } = route.params;
+  const { user } = useAuth();
 
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const listRef = useRef<FlatList>(null);
+  const [loading, setLoading] = useState(true);
+  const [headerTitle, setHeaderTitle] = useState('Chat');
+  const [isGroup, setIsGroup] = useState(false);
+  const [headerAvatar, setHeaderAvatar] = useState<string | null>(null);
+  const [otherUserId, setOtherUserId] = useState<string | null>(null);
+  const [optionsVisible, setOptionsVisible] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3600);
+  };
+
+  React.useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (!user) return;
+      try {
+        setLoading(true);
+
+        const { data: conv, error: convError } = await supabase
+          .from('conversations')
+          .select(
+            `
+            id,
+            name,
+            avatar_url,
+            is_group,
+            members:conversation_members (
+              user_id,
+              user:users (id, username, fullname, profile_pic_url)
+            )
+          `
+          )
+          .eq('id', conversationId)
+          .single();
+
+        if (convError) throw convError;
+
+        const members = conv?.members || [];
+        const other = members.find((m: any) => m.user_id !== user.id)?.user;
+
+        if (mounted) {
+          setIsGroup(Boolean(conv?.is_group));
+          setHeaderTitle(conv?.is_group ? (conv?.name || 'Group') : (other?.fullname || other?.username || 'Chat'));
+          setHeaderAvatar(conv?.is_group ? (conv?.avatar_url || null) : (other?.profile_pic_url || null));
+          setOtherUserId(conv?.is_group ? null : (other?.id || null));
+        }
+
+        // If direct chat and blocked either direction, disable loading messages
+        if (!conv?.is_group && other?.id) {
+          const [iBlocked, theyBlocked] = await Promise.all([
+            UserBlockRepository.isBlocked(user.id, other.id),
+            UserBlockRepository.isBlocked(other.id, user.id),
+          ]);
+          if (iBlocked || theyBlocked) {
+            if (mounted) {
+              setMessages([]);
+              setLoading(false);
+            }
+            return;
+          }
+        }
+
+        const rows = await MessageRepository.list(conversationId);
+        const mapped: Message[] = rows.map((r) => ({
+          id: r.id,
+          text: r.content || '',
+          time: r.created_at
+            ? new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : '',
+          isMine: r.sender_id === user.id,
+          image: r.image_url || undefined,
+          senderName: r.sender?.username,
+          senderAvatar: r.sender?.profile_pic_url || undefined,
+          replyToId: r.reply_to_id || undefined,
+        }));
+
+        if (mounted) setMessages(mapped);
+      } catch (e) {
+        console.error('Error loading chat:', e);
+        showToast('No se pudo cargar el chat.', 'error');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [conversationId, user?.id]);
 
   React.useEffect(() => {
     const hasUnread = messages.some(m => !m.isMine && !m.isRead);
@@ -96,9 +198,20 @@ export default function ChatScreen() {
     };
   }, [messages]);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     const text = input.trim();
     if (!text) return;
+    if (!user) return;
+    if (otherUserId) {
+      const [iBlocked, theyBlocked] = await Promise.all([
+        UserBlockRepository.isBlocked(user.id, otherUserId),
+        UserBlockRepository.isBlocked(otherUserId, user.id),
+      ]);
+      if (iBlocked || theyBlocked) {
+        showToast('No puedes enviar mensajes a este usuario.', 'error');
+        return;
+      }
+    }
     const newMsg: Message = {
       id: Date.now().toString(),
       text,
@@ -106,13 +219,25 @@ export default function ChatScreen() {
       isMine: true,
       replyToId: replyingTo?.id,
       replyToText: replyingTo?.text,
-      replyToUser: replyingTo?.senderName || (replyingTo?.isMine ? 'Tú' : thread.name),
+      replyToUser: replyingTo?.senderName || (replyingTo?.isMine ? 'Tú' : headerTitle),
     };
     setMessages((prev) => [...prev, newMsg]);
     setInput('');
     setReplyingTo(null);
 
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+
+    try {
+      await MessageRepository.send({
+        conversationId,
+        senderId: user.id,
+        content: text,
+        replyToId: replyingTo?.id || null,
+      });
+    } catch (e) {
+      console.error('Error sending message:', e);
+      showToast('No se pudo enviar el mensaje.', 'error');
+    }
   };
 
   const pickImage = async () => {
@@ -132,6 +257,17 @@ export default function ChatScreen() {
 
     if (!result.canceled) {
       const imageUri = result.assets[0].uri;
+      if (!user) return;
+      if (otherUserId) {
+        const [iBlocked, theyBlocked] = await Promise.all([
+          UserBlockRepository.isBlocked(user.id, otherUserId),
+          UserBlockRepository.isBlocked(otherUserId, user.id),
+        ]);
+        if (iBlocked || theyBlocked) {
+          showToast('No puedes enviar mensajes a este usuario.', 'error');
+          return;
+        }
+      }
       const newMsg: Message = {
         id: Date.now().toString(),
         text: '',
@@ -140,11 +276,38 @@ export default function ChatScreen() {
         isMine: true,
         replyToId: replyingTo?.id,
         replyToText: replyingTo?.text,
-        replyToUser: replyingTo?.senderName || (replyingTo?.isMine ? 'Tú' : thread.name),
+        replyToUser: replyingTo?.senderName || (replyingTo?.isMine ? 'Tú' : headerTitle),
       };
       setMessages((prev) => [...prev, newMsg]);
       setReplyingTo(null);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+
+      try {
+        await MessageRepository.send({
+          conversationId,
+          senderId: user.id,
+          content: null,
+          imageUrl: imageUri,
+          replyToId: replyingTo?.id || null,
+        });
+      } catch (e) {
+        console.error('Error sending image:', e);
+        showToast('No se pudo enviar la imagen.', 'error');
+      }
+    }
+  };
+
+  const handleBlockFromChat = async () => {
+    if (!user || !otherUserId) return;
+    try {
+      await UserBlockRepository.block(user.id, otherUserId);
+      showToast('Usuario bloqueado. Ya no recibirás sus mensajes.', 'success');
+      setTimeout(() => navigation.goBack(), 700);
+    } catch (e) {
+      console.error('Error blocking from chat:', e);
+      showToast('No se pudo bloquear al usuario.', 'error');
+    } finally {
+      setOptionsVisible(false);
     }
   };
 
@@ -186,16 +349,16 @@ export default function ChatScreen() {
 
   const renderMessage = ({ item }: { item: Message }) => (
     <View style={[styles.msgRow, item.isMine && styles.msgRowMine]}>
-      {!item.isMine && thread.isGroup && (
+      {!item.isMine && isGroup && (
         <View style={styles.senderContainer}>
-          <Image source={{ uri: item.senderAvatar || thread.avatar }} style={styles.msgAvatarTop} />
+          <Image source={{ uri: item.senderAvatar || headerAvatar || '' }} style={styles.msgAvatarTop} />
           <Text style={styles.senderName}>{item.senderName}</Text>
         </View>
       )}
       
       <View style={[styles.bubbleWrapper, item.isMine && styles.bubbleWrapperMine]}>
-        {!item.isMine && !thread.isGroup && (
-          <Image source={{ uri: thread.avatar }} style={styles.msgAvatar} />
+        {!item.isMine && !isGroup && (
+          <Image source={{ uri: headerAvatar || '' }} style={styles.msgAvatar} />
         )}
         
         <View style={[styles.bubbleFlexContainer, item.isMine && styles.bubbleFlexContainerMine]}>
@@ -206,7 +369,7 @@ export default function ChatScreen() {
               style={[
                 styles.bubble, 
                 item.isMine ? styles.bubbleMine : styles.bubbleTheirs,
-                thread.isGroup && !item.isMine && styles.bubbleGroup
+                isGroup && !item.isMine && styles.bubbleGroup
               ]}
             >
               {item.replyToId && (
@@ -236,6 +399,12 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <AppToast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+      />
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* ── Header ── */}
@@ -245,22 +414,19 @@ export default function ChatScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerCenter}>
-          {thread.isGroup ? (
+          {isGroup ? (
             <View style={styles.headerGroupAvatar}>
               <Ionicons name="people" size={20} color={colors.secondaryBlue} />
             </View>
           ) : (
-            <Image source={{ uri: thread.avatar }} style={styles.headerAvatar} />
+            <Image source={{ uri: headerAvatar || 'https://gravatar.com/avatar/?d=mp' }} style={styles.headerAvatar} />
           )}
           <View>
-            <Text style={styles.headerName}>{thread.name}</Text>
-            {thread.isOnline && (
-              <Text style={styles.headerStatus}>● Online</Text>
-            )}
+            <Text style={styles.headerName}>{headerTitle}</Text>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.headerAction}>
+        <TouchableOpacity style={styles.headerAction} onPress={() => setOptionsVisible(true)}>
           <Ionicons name="ellipsis-vertical" size={20} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
@@ -271,6 +437,11 @@ export default function ChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
+        {loading ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={{ color: colors.textSecondary }}>Cargando...</Text>
+          </View>
+        ) : (
         <FlatList
           ref={listRef}
           data={messages}
@@ -282,6 +453,7 @@ export default function ChatScreen() {
             listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
           }}
         />
+        )}
 
         {/* ── Input bar ── */}
         <View style={styles.inputContainer}>
@@ -330,6 +502,51 @@ export default function ChatScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Simple options modal */}
+      {optionsVisible && (
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.35)',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setOptionsVisible(false)} />
+          <View
+            style={{
+              backgroundColor: colors.canvasPure,
+              borderTopLeftRadius: 18,
+              borderTopRightRadius: 18,
+              padding: 16,
+            }}
+          >
+            {!isGroup && otherUserId && (
+              <TouchableOpacity
+                onPress={handleBlockFromChat}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}
+              >
+                <Ionicons name="ban-outline" size={22} color="#FF5252" />
+                <Text style={{ marginLeft: 10, color: '#FF5252', fontWeight: '700' }}>Bloquear usuario</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              onPress={() => {
+                setOptionsVisible(false);
+              }}
+              style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}
+            >
+              <Ionicons name="close-outline" size={22} color={colors.textPrimary} />
+              <Text style={{ marginLeft: 10, color: colors.textPrimary, fontWeight: '700' }}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }

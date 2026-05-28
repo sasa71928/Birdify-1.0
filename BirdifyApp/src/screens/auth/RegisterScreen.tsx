@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -35,6 +34,7 @@ type RegisterNavProp = NativeStackNavigationProp<
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 
 import { AuthService } from '../../services/auth.service';
+import AppToast from '../../components/AppToast';
 
 export default function RegisterScreen() {
   const navigation = useNavigation<RegisterNavProp>();
@@ -55,6 +55,18 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    }, 3800);
+  };
 
   const handleRegister = async () => {
     if (
@@ -64,18 +76,12 @@ export default function RegisterScreen() {
       !password ||
       !confirmPassword
     ) {
-      Alert.alert(
-        'Faltan datos',
-        'Por favor ingresa todos los campos.'
-      );
+      showToast('Por favor ingresa todos los campos.', 'error');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert(
-        'Contraseñas no coinciden',
-        'La contraseña y su confirmación deben ser idénticas.'
-      );
+      showToast('La contraseña y su confirmación deben ser idénticas.', 'error');
       return;
     }
 
@@ -89,15 +95,9 @@ export default function RegisterScreen() {
         fullName
       );
 
-      Alert.alert(
-        '¡Registro exitoso!',
-        'Tu cuenta ha sido creada. Verifica tu correo electrónico si es requerido.'
-      );
+      showToast('Cuenta creada. Verifica tu correo electrónico si es requerido.', 'success');
     } catch (error: any) {
-      Alert.alert(
-        'Error al registrarse',
-        error.message
-      );
+      showToast(error.message || 'Error al registrarse.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -105,6 +105,12 @@ export default function RegisterScreen() {
 
   return (
     <SafeAreaView style={shared.safe}>
+      <AppToast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+      />
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={colors.background}

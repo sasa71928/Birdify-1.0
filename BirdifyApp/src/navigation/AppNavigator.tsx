@@ -26,6 +26,7 @@ import EditProfileScreen from '../screens/settings/EditProfileScreen';
 import ThemeSettingsScreen from '../screens/settings/ThemeSettingsScreen';
 import HelpSupportScreen from '../screens/settings/HelpSupportScreen';
 import AboutBirdifyScreen from '../screens/settings/AboutBirdifyScreen';
+import BlockedUsersScreen from '../screens/settings/BlockedUsersScreen';
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 export interface BirdSpeciesData {
@@ -71,13 +72,14 @@ export type RootStackParamList = {
   Explore: undefined;
   Search: undefined;
   BirdDetail: { bird: BirdSpeciesData };
-  Chat: { thread: ChatThread };
+  Chat: { conversationId: string };
   CreateGroup: undefined;
   SearchMessages: undefined;
   Settings: undefined;
   OfflineStorage: undefined;
   LanguageSettings: undefined;
   PrivacySettings: undefined;
+  BlockedUsers: undefined;
   NotificationSettings: undefined;
   EditProfile: undefined;
   ThemeSettings: undefined;
@@ -147,6 +149,7 @@ export default function AppNavigator() {
           <Stack.Screen name="OfflineStorage"   component={OfflineStorageScreen} />
           <Stack.Screen name="LanguageSettings" component={LanguageSettingsScreen} />
           <Stack.Screen name="PrivacySettings"  component={PrivacySettingsScreen} />
+          <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
           <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
           <Stack.Screen name="EditProfile"      component={EditProfileScreen} />
           <Stack.Screen name="ThemeSettings"    component={ThemeSettingsScreen} />

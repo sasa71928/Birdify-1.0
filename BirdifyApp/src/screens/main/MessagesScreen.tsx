@@ -19,61 +19,69 @@ import TopNavBar from '../../components/TopNavBar';
 import { RootStackParamList, ChatThread } from '../../navigation/AppNavigator';
 import { createStyles } from '../../styles/screens/main/messagesScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { useAuth } from '../../context/AuthContext';
+import { ConversationRepository } from '../../repositories/conversation.repository';
 
 type MessagesNavProp = NativeStackNavigationProp<RootStackParamList, 'Messages'>;
-
-const MOCK_THREADS: ChatThread[] = [
-  {
-    id: '1',
-    name: 'Sarah Jenkins',
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=100',
-    lastMessage: 'Did you see the Cardinal at the feeder today?',
-    time: '2m',
-    unreadCount: 2,
-    isOnline: true,
-  },
-  {
-    id: '2',
-    name: 'Mike Thompson',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=100',
-    lastMessage: 'Thanks for sharing the coordinates, headed there now.',
-    time: '1h',
-  },
-  {
-    id: '3',
-    name: 'Local Birders Group',
-    avatar: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=100',
-    lastMessage: 'Elena: Found a great spot for warblers near the old mill.',
-    time: 'Yesterday',
-    isGroup: true,
-  },
-  {
-    id: '4',
-    name: 'Anna K.',
-    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=100',
-    lastMessage: 'Yes, the lighting was perfect for those shots.',
-    time: 'Tue',
-  },
-];
-
 
 export default function MessagesScreen() {
   const navigation = useNavigation<MessagesNavProp>();
   const { shared, screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const [threads, setThreads] = useState<ChatThread[]>([]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 450);
-    return () => clearTimeout(timer);
+    let mounted = true;
+    const load = async () => {
+      if (!user) return;
+      try {
+        setLoading(true);
+        const items = await ConversationRepository.listForUser(user.id);
+
+        const mapped: ChatThread[] = items.map((item) => {
+          const c = item.conversation;
+          const members = c.members || [];
+          const other = members.find((m) => m.user_id !== user.id)?.user;
+
+          const title = c.is_group ? (c.name || 'Group') : (other?.fullname || other?.username || 'Chat');
+          const avatar =
+            c.is_group
+              ? (c.avatar_url || 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=100')
+              : (other?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp');
+
+          const lastMessageText = item.lastMessage?.content || (item.lastMessage?.image_url ? '📷 Foto' : '');
+
+          return {
+            id: c.id,
+            name: title,
+            avatar,
+            lastMessage: lastMessageText || '',
+            time: '',
+            isGroup: c.is_group,
+          };
+        });
+
+        if (!mounted) return;
+        setThreads(mapped);
+      } catch (e) {
+        console.error('Error loading conversations:', e);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const renderItem = ({ item }: { item: ChatThread }) => (
     <TouchableOpacity
       style={[styles.threadItem, item.unreadCount ? styles.unreadThread : null]}
       activeOpacity={0.75}
-      onPress={() => navigation.navigate('Chat', { thread: item })}
+      onPress={() => navigation.navigate('Chat', { conversationId: item.id })}
     >
       <View style={styles.avatarContainer}>
         {item.isGroup ? (
@@ -133,7 +141,7 @@ export default function MessagesScreen() {
           </View>
         ) : (
           <FlatList
-            data={MOCK_THREADS}
+            data={threads}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}
