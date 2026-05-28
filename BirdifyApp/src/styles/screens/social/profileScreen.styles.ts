@@ -422,10 +422,11 @@ export const createStyles = (colors: any) => StyleSheet.create({
   logbookModalContent: {
     backgroundColor: colors.surface,
     borderRadius: Radius.lg,
-    padding: Spacing.lg,
+    padding: Spacing.md,
     width: '100%',
     maxWidth: 400,
-    maxHeight: '80%',
+    height: 500,
+    overflow: 'hidden',
     ...Shadows.modal,
   },
   logbookModalHeader: {
@@ -440,17 +441,39 @@ export const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textPrimary,
   },
   logbookModalImagesContainer: {
-    flex: 1,
+    height: 400,
   },
   logbookModalImagesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.sm,
+    width: '100%',
+    justifyContent: 'center',
   },
   logbookModalImage: {
-    width: 100,
-    height: 100,
+    width: 90,
+    height: 90,
     borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: Radius.md,
+  },
+  fullImageOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullImage: {
+    width: '100%',
+    height: '100%',
   },
 });
 

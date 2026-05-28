@@ -190,19 +190,52 @@ export default function ProfileScreen() {
           if (item.bird) {
             const birdId = item.bird.id;
             const existing = speciesMap.get(birdId);
+            
+            // Parse photo_url to handle both single images and arrays
+            let photoUrls: string[] = [];
+            if (item.photo_url) {
+              if (typeof item.photo_url === 'string') {
+                try {
+                  const parsed = JSON.parse(item.photo_url);
+                  if (Array.isArray(parsed)) {
+                    photoUrls = parsed;
+                  } else {
+                    photoUrls = [item.photo_url];
+                  }
+                } catch {
+                  photoUrls = [item.photo_url];
+                }
+              } else if (Array.isArray(item.photo_url)) {
+                photoUrls = item.photo_url;
+              }
+            }
+            
+            const sightingDate = new Date(item.sighting_date).toLocaleDateString();
+            
             if (existing) {
               existing.count += 1;
-              existing.images.push(item.photo_url);
+              // Add images with their dates
+              photoUrls.forEach(url => {
+                existing.images.push({
+                  url,
+                  date: sightingDate,
+                  sightingId: item.id
+                });
+              });
             } else {
               speciesMap.set(birdId, {
                 id: birdId,
                 name: item.bird.common_name,
                 scientificName: item.bird.scientific_name,
-                image: item.bird.image || 'https://images.unsplash.com/photo-1444464666168-49d633b867ad?auto=format&fit=crop&q=80&w=200',
+                image: 'bird-icon', // Will use icon instead of user photo
                 count: 1,
-                date: new Date(item.sighting_date).toLocaleDateString(),
+                date: sightingDate,
                 rare: false,
-                images: [item.photo_url]
+                images: photoUrls.map(url => ({
+                  url,
+                  date: sightingDate,
+                  sightingId: item.id
+                }))
               });
             }
           }
@@ -217,6 +250,7 @@ export default function ProfileScreen() {
             sighting:sightings (
               id,
               photo_url,
+              bird:birds (id, common_name, scientific_name),
               users!sightings_user_id_fkey (username)
             )
           `)
@@ -230,6 +264,7 @@ export default function ProfileScreen() {
           .map((r: any) => ({
             id: r.sighting.id,
             image: r.sighting.photo_url,
+            bird: r.sighting.bird,
             user: r.sighting.user?.username || 'user',
             likes: 1
           }));
@@ -667,10 +702,23 @@ function SightingsGrid({ sightings, onItemPress }: { sightings: any[], onItemPre
 
   const getFirstImage = (photoUrl: string | string[] | null) => {
     if (!photoUrl) return 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300';
-    if (Array.isArray(photoUrl)) {
-      return photoUrl[0] || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300';
+    
+    let parsedUrl: string | string[] = photoUrl;
+    if (typeof photoUrl === 'string') {
+      try {
+        const parsed = JSON.parse(photoUrl);
+        if (Array.isArray(parsed)) {
+          parsedUrl = parsed;
+        }
+      } catch {
+        // Es una URL simple, no un JSON
+      }
     }
-    return photoUrl;
+    
+    if (Array.isArray(parsedUrl)) {
+      return parsedUrl[0] || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300';
+    }
+    return parsedUrl;
   };
 
   if (sightings.length === 0) {
@@ -703,8 +751,10 @@ function LogbookView({ species }: { species: any[] }) {
   const { screen: styles, colors } = useDynamicStyles(createStyles);
   const [selectedSpecies, setSelectedSpecies] = useState<any>(null);
   const [showImagesModal, setShowImagesModal] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [showFullImageModal, setShowFullImageModal] = useState(false);
   
-  const rareCount    = species.filter((e) => e.rare).length;
+  const totalSpecies = species.length;
   const totalSightings = species.reduce((sum, e) => sum + e.count, 0);
 
   const handleSpeciesPress = (entry: any) => {
@@ -712,12 +762,30 @@ function LogbookView({ species }: { species: any[] }) {
     setShowImagesModal(true);
   };
 
+  const handleImagePress = (imageUrl: string) => {
+    setSelectedImage(imageUrl);
+    setShowFullImageModal(true);
+  };
+
   const getFirstImage = (imageUrl: string | string[] | null) => {
     if (!imageUrl) return 'https://images.unsplash.com/photo-1444464666168-49d633b867ad?auto=format&fit=crop&q=80&w=200';
-    if (Array.isArray(imageUrl)) {
-      return imageUrl[0] || 'https://images.unsplash.com/photo-1444464666168-49d633b867ad?auto=format&fit=crop&q=80&w=200';
+    
+    let parsedUrl: string | string[] = imageUrl;
+    if (typeof imageUrl === 'string') {
+      try {
+        const parsed = JSON.parse(imageUrl);
+        if (Array.isArray(parsed)) {
+          parsedUrl = parsed;
+        }
+      } catch {
+        // Es una URL simple, no un JSON
+      }
     }
-    return imageUrl;
+    
+    if (Array.isArray(parsedUrl)) {
+      return parsedUrl[0] || 'https://images.unsplash.com/photo-1444464666168-49d633b867ad?auto=format&fit=crop&q=80&w=200';
+    }
+    return parsedUrl;
   };
 
   if (species.length === 0) {
@@ -737,9 +805,9 @@ function LogbookView({ species }: { species: any[] }) {
       {/* Summary bar */}
       <View style={styles.logbookSummary}>
         <View style={styles.logbookStat}>
-          <MaterialCommunityIcons name="star-outline" size={22} color={colors.tertiaryBrown} />
-          <Text style={styles.logbookStatValue}>{rareCount}</Text>
-          <Text style={styles.logbookStatLabel}>Raras</Text>
+          <MaterialCommunityIcons name="bird" size={22} color={colors.primary} />
+          <Text style={styles.logbookStatValue}>{totalSpecies}</Text>
+          <Text style={styles.logbookStatLabel}>Especies</Text>
         </View>
         <View style={styles.logbookStatDivider} />
         <View style={styles.logbookStat}>
@@ -756,7 +824,11 @@ function LogbookView({ species }: { species: any[] }) {
           <TouchableOpacity key={entry.id} style={styles.stampCard} activeOpacity={0.82} onPress={() => handleSpeciesPress(entry)}>
             {/* Stamp image */}
             <View style={[styles.stampImageWrap, entry.rare && styles.stampImageRare]}>
-              <Image source={{ uri: entry.image }} style={styles.stampImage} />
+              {entry.image === 'bird-icon' ? (
+                <MaterialCommunityIcons name="bird" size={50} color={colors.primary} />
+              ) : (
+                <Image source={{ uri: entry.image }} style={styles.stampImage} />
+              )}
               {entry.rare && (
                 <View style={styles.rareBadge}>
                   <MaterialCommunityIcons name="star" size={10} color={colors.canvasPure} />
@@ -803,15 +875,70 @@ function LogbookView({ species }: { species: any[] }) {
                 <Ionicons name="close" size={24} color={colors.textPrimary} />
               </TouchableOpacity>
             </View>
-            <ScrollView style={styles.logbookModalImagesContainer}>
-              <View style={styles.logbookModalImagesGrid}>
-                {selectedSpecies?.images?.map((img: any, index: number) => (
-                  <Image key={index} source={{ uri: getFirstImage(img) }} style={styles.logbookModalImage} />
-                ))}
-              </View>
+            <ScrollView style={styles.logbookModalImagesContainer} contentContainerStyle={{ paddingBottom: Spacing.md }}>
+              {!selectedSpecies?.images || selectedSpecies.images.length === 0 ? (
+                <View style={{ padding: 20, alignItems: 'center', justifyContent: 'center', minHeight: 100 }}>
+                  <Text style={{ color: colors.textSecondary }}>No hay imágenes disponibles</Text>
+                </View>
+              ) : (
+                (() => {
+                  // Group images by date
+                  const groupedByDate = selectedSpecies.images.reduce((acc: any, img: any) => {
+                    if (!acc[img.date]) {
+                      acc[img.date] = [];
+                    }
+                    acc[img.date].push(img);
+                    return acc;
+                  }, {});
+                  
+                  return Object.entries(groupedByDate).map(([date, images]: [string, any]) => (
+                    <View key={date} style={{ marginBottom: Spacing.lg }}>
+                      <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.textPrimary, marginBottom: Spacing.sm, marginLeft: 4 }}>
+                        {date}
+                      </Text>
+                      <View style={styles.logbookModalImagesGrid}>
+                        {images.map((img: any, index: number) => (
+                          <TouchableOpacity 
+                            key={`${img.sightingId}-${index}`} 
+                            onPress={() => handleImagePress(img.url)}
+                            activeOpacity={0.8}
+                            style={styles.logbookModalImage}
+                          >
+                            <Image 
+                              source={{ uri: img.url }} 
+                              style={styles.logbookModalImage}
+                              resizeMode="cover"
+                            />
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  ));
+                })()
+              )}
             </ScrollView>
           </View>
         </View>
+      </Modal>
+
+      {/* Full-size Image Modal */}
+      <Modal
+        visible={showFullImageModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFullImageModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.fullImageOverlay} 
+          activeOpacity={1}
+          onPress={() => setShowFullImageModal(false)}
+        >
+          <Image 
+            source={{ uri: selectedImage || '' }} 
+            style={styles.fullImage}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
       </Modal>
 
     </View>
@@ -824,10 +951,23 @@ function LikesView({ likes, onItemPress }: { likes: any[], onItemPress?: (post: 
 
   const getFirstImage = (imageUrl: string | string[] | null) => {
     if (!imageUrl) return 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300';
-    if (Array.isArray(imageUrl)) {
-      return imageUrl[0] || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300';
+    
+    let parsedUrl: string | string[] = imageUrl;
+    if (typeof imageUrl === 'string') {
+      try {
+        const parsed = JSON.parse(imageUrl);
+        if (Array.isArray(parsed)) {
+          parsedUrl = parsed;
+        }
+      } catch {
+        // Es una URL simple, no un JSON
+      }
     }
-    return imageUrl;
+    
+    if (Array.isArray(parsedUrl)) {
+      return parsedUrl[0] || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300';
+    }
+    return parsedUrl;
   };
 
   if (likes.length === 0) {
