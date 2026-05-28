@@ -12,7 +12,7 @@ import {
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Typography, Spacing, Radius, Shadows } from '../../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -55,13 +55,22 @@ export default function MessagesScreen() {
             ? (c.avatar_url || 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=100')
             : (other?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp');
 
+        if (c.is_group) {
+          console.log('Group conversation:', c.id, 'avatar_url:', c.avatar_url, 'final avatar:', avatar);
+        }
+
         const lastMessageText = item.lastMessage?.content || (item.lastMessage?.image_url ? '📷 Foto' : '');
+        
+        // For group chats, prepend sender name to message preview
+        const displayMessage = c.is_group && item.lastMessage?.sender 
+          ? `${item.lastMessage.sender.fullname || item.lastMessage.sender.username}: ${lastMessageText}`
+          : lastMessageText;
 
         return {
           id: c.id,
           name: title,
           avatar,
-          lastMessage: lastMessageText || '',
+          lastMessage: displayMessage || '',
           time: '',
           isGroup: c.is_group,
         };
@@ -130,6 +139,14 @@ export default function MessagesScreen() {
     };
   }, [user]);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user) {
+        load();
+      }
+    }, [user])
+  );
+
   const handleDeleteConversation = async (conversationId: string) => {
     setConversationToDelete(conversationId);
     setDeleteModalVisible(true);
@@ -161,9 +178,13 @@ export default function MessagesScreen() {
     >
       <View style={styles.avatarContainer}>
         {item.isGroup ? (
-            <View style={styles.groupAvatar}>
-                <Ionicons name="people" size={24} color={colors.secondaryBlue} />
-            </View>
+            item.avatar && item.avatar !== 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=100' ? (
+                <Image source={{ uri: item.avatar }} style={styles.avatar} />
+            ) : (
+                <View style={styles.groupAvatar}>
+                    <Ionicons name="people" size={24} color={colors.secondaryBlue} />
+                </View>
+            )
         ) : (
             <Image source={{ uri: item.avatar }} style={styles.avatar} />
         )}

@@ -33,6 +33,10 @@ export interface ConversationListItem {
     image_url: string | null;
     created_at?: string;
     sender_id: string;
+    sender?: {
+      username: string;
+      fullname: string | null;
+    };
   };
 }
 
@@ -94,7 +98,7 @@ export const ConversationRepository = {
     // Fetch last messages (best-effort)
     const { data: messages, error: msgError } = await supabase
       .from('messages')
-      .select('conversation_id, sender_id, content, image_url, created_at')
+      .select('conversation_id, sender_id, content, image_url, created_at, sender:users (username, fullname)')
       .in('conversation_id', conversationIds)
       .order('created_at', { ascending: false });
 
@@ -177,7 +181,14 @@ export const ConversationRepository = {
     let finalAvatarUrl = avatarUrl || null;
     if (avatarUrl && avatarUrl.startsWith('file://')) {
       try {
-        const fileName = `group-avatars/${creatorId}/${Date.now()}.jpg`;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.id) {
+          console.error('User not authenticated');
+          throw new Error('User not authenticated');
+        }
+        const fileName = `${user.id}/${Date.now()}.jpg`;
+        console.log('Uploading group avatar with fileName:', fileName);
+        console.log('User ID:', user.id);
         
         // Use FormData for React Native compatibility
         const formData = new FormData();
@@ -205,6 +216,8 @@ export const ConversationRepository = {
             .getPublicUrl(fileName);
           finalAvatarUrl = publicUrl;
           console.log('Group avatar uploaded successfully:', publicUrl);
+          console.log('File name used:', fileName);
+          console.log('Final avatar URL to save:', finalAvatarUrl);
         }
       } catch (error) {
         console.error('Error processing group avatar:', error);
@@ -221,10 +234,11 @@ export const ConversationRepository = {
         is_group: true,
         created_by: creatorId,
       })
-      .select('id')
+      .select('id, avatar_url')
       .single();
 
     if (convError) throw convError;
+    console.log('Conversation created with avatar_url:', conv.avatar_url);
     const conversationId = conv.id as string;
 
     const uniqueMemberIds = Array.from(new Set([creatorId, ...memberIds]));

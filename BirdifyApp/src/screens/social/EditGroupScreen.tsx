@@ -20,6 +20,7 @@ import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useAuth } from '../../context/AuthContext';
 import { ConversationRepository } from '../../repositories/conversation.repository';
 import { ProfileRepository } from '../../repositories/profile.repository';
+import { FollowRepository } from '../../repositories/follow.repository';
 import AppToast from '../../components/AppToast';
 
 type EditGroupNavProp = NativeStackNavigationProp<RootStackParamList, 'EditGroup'>;
@@ -37,6 +38,7 @@ export default function EditGroupScreen() {
   const [image, setImage] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [users, setUsers] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
@@ -70,8 +72,13 @@ export default function EditGroupScreen() {
   const loadUsers = async () => {
     try {
       const allUsers = await ProfileRepository.getAll();
-      // Filter out current user
-      const filteredUsers = allUsers.filter((u: any) => u.id !== user?.id);
+      const following = await FollowRepository.getFollowing(user?.id || '');
+      const followingIds = new Set(following.map((f: any) => f.following_id));
+      
+      // Filter to show only users that the current user follows
+      const filteredUsers = allUsers.filter((u: any) => 
+        u.id !== user?.id && followingIds.has(u.id)
+      );
       setUsers(filteredUsers);
     } catch (error) {
       console.error('Error loading users:', error);
@@ -101,10 +108,48 @@ export default function EditGroupScreen() {
     if (!canSave || !user || saving) return;
     try {
       setSaving(true);
+      
+      // Upload avatar to Supabase Storage if it's a local file
+      let finalAvatarUrl = image;
+      if (image && image.startsWith('file://')) {
+        const { supabase } = await import('../../lib/supabase');
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser?.id) {
+          console.error('User not authenticated');
+          throw new Error('User not authenticated');
+        }
+        const fileName = `${authUser.id}/${Date.now()}.jpg`;
+        
+        const formData = new FormData();
+        formData.append('file', {
+          uri: image,
+          type: 'image/jpeg',
+          name: fileName,
+        } as any);
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('group-avatars')
+          .upload(fileName, formData, {
+            contentType: 'image/jpeg',
+            upsert: true,
+          });
+
+        if (uploadError) {
+          console.error('Error uploading group avatar:', uploadError);
+        } else {
+          const { data: { publicUrl } } = supabase.storage
+            .from('group-avatars')
+            .getPublicUrl(fileName);
+          finalAvatarUrl = publicUrl;
+          console.log('Group avatar uploaded successfully:', publicUrl);
+        }
+      }
+
+      console.log('Updating conversation with avatar_url:', finalAvatarUrl);
       await ConversationRepository.updateConversation(conversationId, {
         name: groupName.trim(),
         description: description.trim() || undefined,
-        avatar_url: image,
+        avatar_url: finalAvatarUrl,
       });
 
       // Update members if changed
@@ -148,6 +193,14 @@ export default function EditGroupScreen() {
       return next;
     });
   };
+
+  const filteredUsers = users.filter((u) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      u.fullname?.toLowerCase().includes(query) ||
+      u.username?.toLowerCase().includes(query)
+    );
+  });
 
   const renderUser = ({ item }: { item: any }) => {
     const isSelected = selected.has(item.id);
@@ -253,8 +306,15 @@ export default function EditGroupScreen() {
       {/* ── Members ── */}
       <View style={styles.membersSection}>
         <Text style={styles.sectionTitle}>Miembros ({selected.size})</Text>
+        <TextInput
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Buscar usuarios..."
+          placeholderTextColor={colors.placeholder}
+        />
         <FlatList
-          data={users}
+          data={filteredUsers}
           renderItem={renderUser}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.usersList}

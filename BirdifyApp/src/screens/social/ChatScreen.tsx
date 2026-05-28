@@ -14,11 +14,10 @@ import {
   Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Typography, Spacing, Radius, Shadows } from '../../theme';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { createStyles } from '../../styles/screens/social/chatScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
@@ -43,26 +42,10 @@ interface Message {
   replyToId?: string;
   replyToText?: string;
   replyToUser?: string;
+  replyToImage?: string;
   isRead?: boolean;
+  createdAt?: string;
 }
-
-// ── Mensajes de ejemplo ────────────────────────────────────────────────────────
-const MOCK_MESSAGES: Message[] = [
-  { id: '1', text: 'Hey! Did you manage to spot any cardinals this morning?', time: '9:12 AM', isMine: false, senderName: 'Elena Rios', senderAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100', isRead: true },
-  { id: '2', text: 'Yes! There was a beautiful male at the feeder around 7am 🐦', time: '9:14 AM', isMine: true, isRead: true },
-  { id: '3', text: 'No way! I\'ve been trying to photograph one for weeks.', time: '9:15 AM', isMine: false, senderName: 'Alex W.', senderAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=100', isRead: true },
-  { id: '4', text: 'I\'ll share the coordinates of the spot, the feeder is right by the old oak.', time: '9:17 AM', isMine: true, isRead: true },
-  {
-    id: '5',
-    text: 'Check this out — got a great shot!',
-    image: 'https://images.unsplash.com/photo-1555169062-013468b47731?auto=format&fit=crop&q=80&w=400',
-    time: '9:18 AM',
-    isMine: true,
-    isRead: true,
-  },
-  { id: '6', text: 'That\'s stunning!! The red is so vivid. What lens are you using?', time: '9:20 AM', isMine: false, senderName: 'Sofia G.', senderAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=100', isRead: false },
-  { id: '7', text: 'Did you see the Cardinal at the feeder today?', time: '9:22 AM', isMine: false, senderName: 'Elena Rios', senderAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100', isRead: false },
-];
 
 // ── Componente ────────────────────────────────────────────────────────────────
 export default function ChatScreen() {
@@ -75,6 +58,7 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const listRef = useRef<FlatList>(null);
   const [loading, setLoading] = useState(true);
   const [headerTitle, setHeaderTitle] = useState('Chat');
@@ -83,6 +67,8 @@ export default function ChatScreen() {
   const [otherUserId, setOtherUserId] = useState<string | null>(null);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [conversationExists, setConversationExists] = useState(false);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const highlightOpacity = useRef(new Animated.Value(0)).current;
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
     message: '',
@@ -92,6 +78,27 @@ export default function ChatScreen() {
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ visible: true, message, type });
     setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3600);
+  };
+
+  const formatDateLabel = (dateString: string) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    // Reset time for comparison
+    today.setHours(0, 0, 0, 0);
+    yesterday.setHours(0, 0, 0, 0);
+    const messageDate = new Date(date);
+    messageDate.setHours(0, 0, 0, 0);
+
+    if (messageDate.getTime() === today.getTime()) {
+      return 'Hoy';
+    } else if (messageDate.getTime() === yesterday.getTime()) {
+      return 'Ayer';
+    } else {
+      return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
   };
 
   React.useEffect(() => {
@@ -167,6 +174,10 @@ export default function ChatScreen() {
           senderName: r.sender?.username,
           senderAvatar: r.sender?.profile_pic_url || undefined,
           replyToId: r.reply_to_id || undefined,
+          replyToText: r.reply_to?.content || undefined,
+          replyToUser: r.reply_to?.sender?.username || undefined,
+          replyToImage: r.reply_to?.image_url || undefined,
+          createdAt: r.created_at || undefined,
         }));
 
         if (mounted) setMessages(mapped);
@@ -184,6 +195,49 @@ export default function ChatScreen() {
       navigation.navigate('MainTabs', { screen: 'Messages' });
     };
   }, [conversationId, user?.id, navigation]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      // Refresh conversation data when screen gains focus
+      const refreshConversation = async () => {
+        if (!user) return;
+        try {
+          const { data: conv, error: convError } = await supabase
+            .from('conversations')
+            .select(
+              `
+              id,
+              name,
+              avatar_url,
+              is_group,
+              members:conversation_members (
+                user_id,
+                users (id, username, fullname, profile_pic_url)
+              )
+            `
+            )
+            .eq('id', conversationId)
+            .maybeSingle();
+
+          if (convError) throw convError;
+
+          if (conv) {
+            setConversationExists(true);
+            setIsGroup(Boolean(conv?.is_group));
+            const otherUser = conv.members?.find((m: any) => m.user_id !== user.id)?.users;
+            const userData = Array.isArray(otherUser) ? otherUser[0] : otherUser;
+            setHeaderTitle(conv?.is_group ? (conv?.name || 'Group') : (userData?.fullname || userData?.username || 'Usuario'));
+            setHeaderAvatar(conv?.is_group ? (conv?.avatar_url || null) : (userData?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp'));
+            setOtherUserId(conv?.is_group ? null : (userData?.id || null));
+          }
+        } catch (e) {
+          console.error('Error refreshing conversation:', e);
+        }
+      };
+
+      refreshConversation();
+    }, [conversationId, user?.id])
+  );
 
   React.useEffect(() => {
     const hasUnread = messages.some(m => !m.isMine && !m.isRead);
@@ -212,7 +266,7 @@ export default function ChatScreen() {
 
   const sendMessage = async () => {
     const text = input.trim();
-    if (!text) return;
+    if (!text && !selectedImage) return;
     if (!user) return;
     if (!conversationExists) {
       showToast('La conversación no existe.', 'error');
@@ -230,15 +284,18 @@ export default function ChatScreen() {
     }
     const newMsg: Message = {
       id: Date.now().toString(),
-      text,
+      text: text || '',
+      image: selectedImage || undefined,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       isMine: true,
       replyToId: replyingTo?.id,
       replyToText: replyingTo?.text,
       replyToUser: replyingTo?.senderName || (replyingTo?.isMine ? 'Tú' : headerTitle),
+      replyToImage: replyingTo?.image,
     };
     setMessages((prev) => [...prev, newMsg]);
     setInput('');
+    setSelectedImage(null);
     setReplyingTo(null);
 
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
@@ -247,7 +304,8 @@ export default function ChatScreen() {
       await MessageRepository.send({
         conversationId,
         senderId: user.id,
-        content: text,
+        content: text || null,
+        imageUrl: selectedImage || null,
         replyToId: replyingTo?.id || null,
       });
     } catch (e) {
@@ -272,48 +330,7 @@ export default function ChatScreen() {
     });
 
     if (!result.canceled) {
-      const imageUri = result.assets[0].uri;
-      if (!user) return;
-      if (!conversationExists) {
-        showToast('La conversación no existe.', 'error');
-        return;
-      }
-      if (otherUserId) {
-        const [iBlocked, theyBlocked] = await Promise.all([
-          UserBlockRepository.isBlocked(user.id, otherUserId),
-          UserBlockRepository.isBlocked(otherUserId, user.id),
-        ]);
-        if (iBlocked || theyBlocked) {
-          showToast('No puedes enviar mensajes a este usuario.', 'error');
-          return;
-        }
-      }
-      const newMsg: Message = {
-        id: Date.now().toString(),
-        text: '',
-        image: imageUri,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isMine: true,
-        replyToId: replyingTo?.id,
-        replyToText: replyingTo?.text,
-        replyToUser: replyingTo?.senderName || (replyingTo?.isMine ? 'Tú' : headerTitle),
-      };
-      setMessages((prev) => [...prev, newMsg]);
-      setReplyingTo(null);
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
-
-      try {
-        await MessageRepository.send({
-          conversationId,
-          senderId: user.id,
-          content: null,
-          imageUrl: imageUri,
-          replyToId: replyingTo?.id || null,
-        });
-      } catch (e) {
-        console.error('Error sending image:', e);
-        showToast('No se pudo enviar la imagen.', 'error');
-      }
+      setSelectedImage(result.assets[0].uri);
     }
   };
 
@@ -367,55 +384,120 @@ export default function ChatScreen() {
     );
   };
 
-  const renderMessage = ({ item }: { item: Message }) => (
-    <View style={[styles.msgRow, item.isMine && styles.msgRowMine]}>
-      {!item.isMine && isGroup && (
-        <View style={styles.senderContainer}>
-          <Image source={{ uri: item.senderAvatar || headerAvatar || '' }} style={styles.msgAvatarTop} />
-          <Text style={styles.senderName}>{item.senderName}</Text>
-        </View>
-      )}
+  const scrollToMessage = (replyToId: string) => {
+    const index = messages.findIndex((msg) => msg.id === replyToId);
+    if (index !== -1) {
+      setHighlightedMessageId(replyToId);
+      highlightOpacity.setValue(1);
       
-      <View style={[styles.bubbleWrapper, item.isMine && styles.bubbleWrapperMine]}>
-        {!item.isMine && !isGroup && (
-          <Image source={{ uri: headerAvatar || '' }} style={styles.msgAvatar} />
-        )}
-        
-        <View style={[styles.bubbleFlexContainer, item.isMine && styles.bubbleFlexContainerMine]}>
-          <SwipeableMessage isMine={item.isMine} onSwipe={() => setReplyingTo(item)}>
-            <TouchableOpacity 
-              onLongPress={() => setReplyingTo(item)}
-              activeOpacity={0.9}
-              style={[
-                styles.bubble, 
-                item.isMine ? styles.bubbleMine : styles.bubbleTheirs,
-                isGroup && !item.isMine && styles.bubbleGroup
-              ]}
-            >
-              {item.replyToId && (
-                <View style={[styles.replyQuote, item.isMine ? styles.replyQuoteMine : styles.replyQuoteTheirs]}>
-                  <Text style={styles.replyQuoteUser}>{item.replyToUser}</Text>
-                  <Text style={styles.replyQuoteText} numberOfLines={1}>{item.replyToText}</Text>
-                </View>
-              )}
+      // Fade out animation
+      Animated.sequence([
+        Animated.timing(highlightOpacity, {
+          toValue: 1,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+        Animated.timing(highlightOpacity, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setHighlightedMessageId(null);
+      });
+      
+      listRef.current?.scrollToIndex({
+        index,
+        animated: true,
+        viewPosition: 0.5,
+      });
+    }
+  };
 
-              {item.image && (
-                <Image source={{ uri: item.image }} style={styles.bubbleImage} />
-              )}
-              {item.text ? (
-                <Text style={[styles.bubbleText, item.isMine && styles.bubbleTextMine]}>
-                  {item.text}
-                </Text>
-              ) : null}
-              <Text style={[styles.bubbleTime, item.isMine && styles.bubbleTimeMine]}>
-                {item.time}
-              </Text>
-            </TouchableOpacity>
-          </SwipeableMessage>
+  const renderMessage = ({ item, index }: { item: Message; index: number }) => {
+    // Show date label if this is the first message or if date changed from previous message
+    const showDateLabel = index === 0 || (
+      item.createdAt && 
+      messages[index - 1]?.createdAt && 
+      formatDateLabel(item.createdAt) !== formatDateLabel(messages[index - 1].createdAt!)
+    );
+
+    return (
+      <>
+        {showDateLabel && item.createdAt && (
+          <View style={styles.dateLabelContainer}>
+            <Text style={styles.dateLabel}>{formatDateLabel(item.createdAt)}</Text>
+          </View>
+        )}
+        <View style={[styles.msgRow, item.isMine && styles.msgRowMine]}>
+          {!item.isMine && isGroup && (
+            <View style={styles.senderContainer}>
+              <Image source={{ uri: item.senderAvatar || headerAvatar || '' }} style={styles.msgAvatarTop} />
+              <Text style={styles.senderName}>{item.senderName}</Text>
+            </View>
+          )}
+          
+          <View style={[styles.bubbleWrapper, item.isMine && styles.bubbleWrapperMine]}>
+            {!item.isMine && !isGroup && (
+              <Image source={{ uri: headerAvatar || '' }} style={styles.msgAvatar} />
+            )}
+            
+            <View style={[styles.bubbleFlexContainer, item.isMine && styles.bubbleFlexContainerMine]}>
+              <SwipeableMessage isMine={item.isMine} onSwipe={() => setReplyingTo(item)}>
+                <Animated.View 
+                  style={[
+                    styles.bubble, 
+                    item.isMine ? styles.bubbleMine : styles.bubbleTheirs,
+                    isGroup && !item.isMine && styles.bubbleGroup,
+                    highlightedMessageId === item.id && {
+                      opacity: highlightOpacity,
+                      borderWidth: 2,
+                      borderColor: colors.primary,
+                    }
+                  ]}
+                >
+                  <TouchableOpacity 
+                    onLongPress={() => setReplyingTo(item)}
+                    activeOpacity={0.9}
+                  >
+                  {item.replyToId && (
+                    <TouchableOpacity onPress={() => item.replyToId && scrollToMessage(item.replyToId)} activeOpacity={0.7}>
+                      <View style={[styles.replyQuote, item.isMine ? styles.replyQuoteMine : styles.replyQuoteTheirs]}>
+                        <Text style={styles.replyQuoteUser}>{item.replyToUser}</Text>
+                        {item.replyToImage && (
+                          <Image source={{ uri: item.replyToImage }} style={styles.replyQuoteImage} />
+                        )}
+                        {item.replyToText && (
+                          <Text style={styles.replyQuoteText} numberOfLines={1}>{item.replyToText}</Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  )}
+
+                  {item.image && (
+                    <Image source={{ uri: item.image }} style={styles.bubbleImage} />
+                  )}
+                  <View style={styles.bubbleContentRow}>
+                    <View style={styles.bubbleTextColumn}>
+                      {item.text ? (
+                        <Text style={[styles.bubbleText, item.isMine && styles.bubbleTextMine]}>
+                          {item.text}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text style={[styles.bubbleTime, item.isMine && styles.bubbleTimeMine]}>
+                      {item.time}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+                </Animated.View>
+              </SwipeableMessage>
+            </View>
+          </View>
         </View>
-      </View>
-    </View>
-  );
+      </>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -434,7 +516,9 @@ export default function ChatScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerCenter}>
-          {isGroup ? (
+          {isGroup && headerAvatar ? (
+            <Image source={{ uri: headerAvatar }} style={styles.headerAvatar} />
+          ) : isGroup ? (
             <View style={styles.headerGroupAvatar}>
               <Ionicons name="people" size={20} color={colors.secondaryBlue} />
             </View>
@@ -446,15 +530,9 @@ export default function ChatScreen() {
           </View>
         </View>
 
-        {isGroup ? (
-          <TouchableOpacity style={styles.headerAction} onPress={() => navigation.navigate('EditGroup', { conversationId })}>
-            <Ionicons name="pencil-outline" size={20} color={colors.textPrimary} />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.headerAction} onPress={() => setOptionsVisible(true)}>
-            <Ionicons name="ellipsis-vertical" size={20} color={colors.textPrimary} />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity style={styles.headerAction} onPress={() => setOptionsVisible(true)}>
+          <Ionicons name="ellipsis-vertical" size={20} color={colors.textPrimary} />
+        </TouchableOpacity>
       </View>
 
       {/* ── Messages ── */}
@@ -490,12 +568,30 @@ export default function ChatScreen() {
                 <Text style={styles.replyPreviewUser}>
                   Respondiendo a {replyingTo.senderName || (replyingTo.isMine ? 'ti mismo' : headerTitle)}
                 </Text>
-                <Text style={styles.replyPreviewText} numberOfLines={1}>
-                  {replyingTo.text}
-                </Text>
+                {replyingTo.image ? (
+                  <View style={styles.replyPreviewImageContainer}>
+                    <Image source={{ uri: replyingTo.image }} style={styles.replyPreviewImage} />
+                  </View>
+                ) : (
+                  <Text style={styles.replyPreviewText} numberOfLines={1}>
+                    {replyingTo.text}
+                  </Text>
+                )}
               </View>
               <TouchableOpacity onPress={() => setReplyingTo(null)}>
                 <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {selectedImage && (
+            <View style={styles.selectedImagePreview}>
+              <Image source={{ uri: selectedImage }} style={styles.selectedImage} />
+              <TouchableOpacity 
+                style={styles.removeImageBtn} 
+                onPress={() => setSelectedImage(null)}
+              >
+                <Ionicons name="close-circle" size={20} color={colors.textPrimary} />
               </TouchableOpacity>
             </View>
           )}
@@ -519,9 +615,9 @@ export default function ChatScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.sendBtn, !input.trim() && styles.sendBtnDisabled]}
+              style={[styles.sendBtn, !input.trim() && !selectedImage && styles.sendBtnDisabled]}
               onPress={sendMessage}
-              disabled={!input.trim()}
+              disabled={!input.trim() && !selectedImage}
             >
               <Ionicons name="send" size={20} color={colors.canvasPure} />
             </TouchableOpacity>
@@ -551,7 +647,18 @@ export default function ChatScreen() {
               padding: 16,
             }}
           >
-            {!isGroup && otherUserId && (
+            {isGroup ? (
+              <TouchableOpacity
+                onPress={() => {
+                  setOptionsVisible(false);
+                  navigation.navigate('EditGroup', { conversationId });
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}
+              >
+                <Ionicons name="pencil-outline" size={22} color={colors.textPrimary} />
+                <Text style={{ marginLeft: 10, color: colors.textPrimary, fontWeight: '700' }}>Editar grupo</Text>
+              </TouchableOpacity>
+            ) : !isGroup && otherUserId ? (
               <TouchableOpacity
                 onPress={handleBlockFromChat}
                 style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}
@@ -559,7 +666,7 @@ export default function ChatScreen() {
                 <Ionicons name="ban-outline" size={22} color="#FF5252" />
                 <Text style={{ marginLeft: 10, color: '#FF5252', fontWeight: '700' }}>Bloquear usuario</Text>
               </TouchableOpacity>
-            )}
+            ) : null}
 
             <TouchableOpacity
               onPress={() => {

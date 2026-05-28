@@ -35,6 +35,7 @@ export default function CreateGroupScreen() {
   const [image, setImage] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [contacts, setContacts] = useState<{ id: string; name: string; avatar: string }[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loadingContacts, setLoadingContacts] = useState(true);
   const [creating, setCreating] = useState(false);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
@@ -80,6 +81,11 @@ export default function CreateGroupScreen() {
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+
+  const filteredContacts = contacts.filter((contact) => {
+    const query = searchQuery.toLowerCase();
+    return contact.name.toLowerCase().includes(query);
+  });
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -213,6 +219,13 @@ export default function CreateGroupScreen() {
         {/* ── Lista de contactos ── */}
         <View style={styles.contactsSection}>
           <Text style={styles.sectionLabel}>Add People</Text>
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Buscar usuarios..."
+            placeholderTextColor={colors.placeholder}
+          />
           {loadingContacts ? (
             <Text style={{ color: colors.textSecondary, paddingHorizontal: 16, paddingVertical: 10 }}>
               Cargando...
@@ -222,7 +235,7 @@ export default function CreateGroupScreen() {
               No tienes usuarios para agregar. Sigue a alguien para crear un grupo.
             </Text>
           ) : (
-          contacts.map((contact) => {
+          filteredContacts.map((contact) => {
             const isSelected = selected.has(contact.id);
             return (
               <TouchableOpacity

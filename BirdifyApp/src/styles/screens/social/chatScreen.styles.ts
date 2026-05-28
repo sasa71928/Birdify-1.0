@@ -61,6 +61,18 @@ export const createStyles = (colors: any) => StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingBottom: Spacing.lg,
   },
+  dateLabelContainer: {
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+  },
+  dateLabel: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    backgroundColor: colors.componentBase,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+  },
   msgRow: {
     marginBottom: Spacing.md,
     width: '100%',
@@ -91,6 +103,7 @@ export const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     width: '100%',
+    overflow: 'visible',
   },
   bubbleWrapperMine: {
     flexDirection: 'row-reverse',
@@ -98,6 +111,7 @@ export const createStyles = (colors: any) => StyleSheet.create({
   bubbleFlexContainer: {
     flexDirection: 'column',
     alignItems: 'flex-start',
+    overflow: 'visible',
     flex: 1,
   },
   bubbleFlexContainerMine: {
@@ -111,14 +125,15 @@ export const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.componentBase,
   },
   bubble: {
-    maxWidth: '75%',
+    maxWidth: '85%',
     borderRadius: Radius.lg,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    overflow: 'hidden',
+    overflow: 'visible',
+    alignSelf: 'flex-start',
   },
   bubbleTheirs: {
-    backgroundColor: colors.textSecondary + '20',
+    backgroundColor: colors.componentBase,
     borderTopLeftRadius: 4,
     borderBottomLeftRadius: Radius.lg,
   },
@@ -130,31 +145,41 @@ export const createStyles = (colors: any) => StyleSheet.create({
   bubbleGroup: {
     borderTopLeftRadius: 0,
   },
+  bubbleHighlighted: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
   
   // Reply Quotes in Bubbles
   replyQuote: {
-    padding: 6,
-    borderRadius: 6,
-    marginBottom: 6,
+    padding: Spacing.sm,
+    borderRadius: Radius.md,
+    marginBottom: Spacing.sm,
     borderLeftWidth: 3,
   },
   replyQuoteTheirs: {
-    backgroundColor: colors.surface + '80',
-    borderLeftColor: colors.textSecondary,
+    backgroundColor: colors.componentBase,
+    borderLeftColor: colors.primary,
   },
   replyQuoteMine: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderLeftColor: colors.canvasPure,
+    backgroundColor: colors.componentBase,
+    borderLeftColor: colors.primary,
   },
   replyQuoteUser: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: 'bold',
     color: colors.textPrimary,
     marginBottom: 2,
   },
   replyQuoteText: {
-    fontSize: 11,
-    color: colors.textSecondary,
+    fontSize: 12,
+    color: colors.textPrimary,
+  },
+  replyQuoteImage: {
+    width: 150,
+    height: 100,
+    borderRadius: Radius.sm,
+    marginTop: 4,
   },
 
   // Input area
@@ -175,7 +200,7 @@ export const createStyles = (colors: any) => StyleSheet.create({
   replyPreviewLine: {
     width: 3,
     height: '100%',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.textPrimary,
     borderRadius: 2,
   },
   replyPreviewContent: {
@@ -184,17 +209,63 @@ export const createStyles = (colors: any) => StyleSheet.create({
   replyPreviewUser: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: colors.textPrimary,
   },
   replyPreviewText: {
     fontSize: 11,
-    color: colors.textSecondary,
+    color: colors.primary,
+  },
+  replyPreviewImageContainer: {
+    marginTop: 4,
+    borderRadius: Radius.sm,
+    overflow: 'hidden',
+    width: 80,
+    height: 80,
+    backgroundColor: colors.componentBase,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  replyPreviewImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  selectedImagePreview: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    position: 'relative',
+  },
+  selectedImage: {
+    width: 60,
+    height: 60,
+    borderRadius: Radius.sm,
+  },
+  removeImageBtn: {
+    position: 'absolute',
+    top: 4,
+    right: Spacing.md + 4,
+    backgroundColor: colors.componentBase,
+    borderRadius: 10,
   },
   bubbleImage: {
     width: 200,
     height: 160,
     borderRadius: Radius.md,
     marginBottom: 6,
+    resizeMode: 'cover',
+  },
+  bubbleContentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+  },
+  bubbleTextColumn: {
+    width: 'auto',
+    maxWidth: '80%',
+  },
+  bubbleTextWrapper: {
+    flex: 1,
+    marginRight: Spacing.xs,
   },
   bubbleText: {
     fontSize: Typography.fontSize.sm,
@@ -202,7 +273,7 @@ export const createStyles = (colors: any) => StyleSheet.create({
     lineHeight: 20,
   },
   bubbleTextMine: {
-    color: colors.canvasPure,
+    color: '#FFFFFF',
   },
   bubbleTime: {
     fontSize: 10,

@@ -280,6 +280,15 @@ export const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: Spacing.md,
   },
+  searchInput: {
+    backgroundColor: colors.componentBase,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: Typography.fontSize.md,
+    color: colors.textPrimary,
+    marginBottom: Spacing.md,
+  },
   usersList: {
     paddingBottom: 20,
   },
