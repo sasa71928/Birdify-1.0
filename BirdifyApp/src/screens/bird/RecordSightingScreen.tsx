@@ -230,7 +230,8 @@ export default function RecordSightingScreen({ route }: { route: any }) {
   }, [editingSighting]);
 
   const isLocked = useMemo(() => {
-    if (!isEditMode || !createdAt) return false;
+    if (!createdAt) return false;
+    if (!isEditMode) return false;
     return Date.now() - createdAt.getTime() > EDIT_LIMIT_MINUTES * 60000;
   }, [isEditMode, createdAt]);
 
@@ -618,7 +619,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                       </View>
                     </View>
                   ))}
-                  {imageUris.length < 10 || isLocked && (
+                  {imageUris.length < 10 && !isLocked && (
                     <TouchableOpacity
                       style={{
                         width: '47%',
@@ -630,7 +631,6 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                         justifyContent: 'center',
                         alignItems: 'center',
                       }}
-                      disabled={isLocked}
                       onPress={() => setModalVisible(true)}
                     >
                       <Ionicons name="add" size={32} color={colors.primary + '60'} />

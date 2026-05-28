@@ -50,10 +50,10 @@ export const UserBlockRepository = {
   async isBlocked(blockerId: string, blockedId: string): Promise<boolean> {
     const { data, error } = await supabase
       .from('user_blocks')
-      .select('id')
+      .select('blocker_id')
       .eq('blocker_id', blockerId)
       .eq('blocked_id', blockedId)
-      .single();
+      .maybeSingle();
 
     if (error && error.code !== 'PGRST116') throw error;
     return !!data;

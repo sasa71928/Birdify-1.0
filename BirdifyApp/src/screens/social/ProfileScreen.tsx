@@ -11,6 +11,7 @@ import {
   FlatList,
   Modal,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp, useIsFocused } from '@react-navigation/native';
@@ -25,6 +26,7 @@ import { createStyles } from '../../styles/screens/social/profileScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useAuth } from '../../context/AuthContext';
 import { ProfileRepository } from '../../repositories/profile.repository';
+import { ConversationRepository } from '../../repositories/conversation.repository';
 import { User } from '../../types/models';
 import { supabase } from '../../lib/supabase';
 import { FollowRepository } from '../../repositories/follow.repository';
@@ -208,7 +210,7 @@ export default function ProfileScreen() {
             sighting:sightings (
               id,
               photo_url,
-              user (username)
+              users!sightings_user_id_fkey (username)
             )
           `)
           .eq('user_id', displayUserId);
@@ -458,7 +460,15 @@ const userData = profile ? {
                 </Text>
               )}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.messageMainBtn} onPress={() => navigation.navigate('Chat', { conversationId: displayUserId! })}>
+            <TouchableOpacity style={styles.messageMainBtn} onPress={async () => {
+              try {
+                const conversationId = await ConversationRepository.createDirectConversation(authUser!.id, displayUserId!);
+                navigation.navigate('Chat', { conversationId });
+              } catch (error) {
+                console.error('Error creating conversation:', error);
+                Alert.alert('Error', 'No se pudo crear la conversación.');
+              }
+            }}>
               <Ionicons name="chatbubble-outline" size={20} color={colors.primary} />
             </TouchableOpacity>
           </View>

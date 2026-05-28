@@ -82,6 +82,7 @@ export default function ChatScreen() {
   const [headerAvatar, setHeaderAvatar] = useState<string | null>(null);
   const [otherUserId, setOtherUserId] = useState<string | null>(null);
   const [optionsVisible, setOptionsVisible] = useState(false);
+  const [conversationExists, setConversationExists] = useState(false);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
     message: '',
@@ -115,18 +116,27 @@ export default function ChatScreen() {
           `
           )
           .eq('id', conversationId)
-          .single();
+          .maybeSingle();
 
         if (convError) throw convError;
 
+        if (!conv) {
+          if (mounted) {
+            setConversationExists(false);
+            setLoading(false);
+          }
+          return;
+        }
+
         const members = conv?.members || [];
         const otherMember = members.find((m: any) => m.user_id !== user.id);
-        const other = otherMember?.user?.[0];
+        const other = Array.isArray(otherMember?.users) ? otherMember?.users[0] : otherMember?.users;
 
         if (mounted) {
+          setConversationExists(true);
           setIsGroup(Boolean(conv?.is_group));
-          setHeaderTitle(conv?.is_group ? (conv?.name || 'Group') : (other?.fullname || other?.username || 'Chat'));
-          setHeaderAvatar(conv?.is_group ? (conv?.avatar_url || null) : (other?.profile_pic_url || null));
+          setHeaderTitle(conv?.is_group ? (conv?.name || 'Group') : (other?.fullname || other?.username || 'Usuario'));
+          setHeaderAvatar(conv?.is_group ? (conv?.avatar_url || null) : (other?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp'));
           setOtherUserId(conv?.is_group ? null : (other?.id || null));
         }
 
@@ -203,6 +213,10 @@ export default function ChatScreen() {
     const text = input.trim();
     if (!text) return;
     if (!user) return;
+    if (!conversationExists) {
+      showToast('La conversación no existe.', 'error');
+      return;
+    }
     if (otherUserId) {
       const [iBlocked, theyBlocked] = await Promise.all([
         UserBlockRepository.isBlocked(user.id, otherUserId),
@@ -259,6 +273,10 @@ export default function ChatScreen() {
     if (!result.canceled) {
       const imageUri = result.assets[0].uri;
       if (!user) return;
+      if (!conversationExists) {
+        showToast('La conversación no existe.', 'error');
+        return;
+      }
       if (otherUserId) {
         const [iBlocked, theyBlocked] = await Promise.all([
           UserBlockRepository.isBlocked(user.id, otherUserId),

@@ -44,7 +44,7 @@ export const FollowRepository = {
     const { data, error } = await supabase
       .from('follows')
       .select(`
-        follower (id, username, fullname, profile_pic_url)
+        follower:users!follows_follower_id_fkey (id, username, fullname, profile_pic_url)
       `)
       .eq('following_id', userId);
 
@@ -60,7 +60,7 @@ export const FollowRepository = {
     const { data, error } = await supabase
       .from('follows')
       .select(`
-        following (id, username, fullname, profile_pic_url)
+        following:users!follows_following_id_fkey (id, username, fullname, profile_pic_url)
       `)
       .eq('follower_id', userId);
 
