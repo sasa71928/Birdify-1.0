@@ -208,7 +208,7 @@ export default function ProfileScreen() {
             sighting:sightings (
               id,
               photo_url,
-              user:users!sightings_user_id_fkey (username)
+              user (username)
             )
           `)
           .eq('user_id', displayUserId);
@@ -305,11 +305,10 @@ export default function ProfileScreen() {
 
   // Get user data
   // Updated userData with verification flag
-  console.log('Profile data:', profile);
 const userData = profile ? {
-  name: profile.full_name || 'Usuario',
+  name: profile.fullname || 'Usuario',
   username: profile.username || 'user',
-  avatar: profile.avatar_url || 'https://gravatar.com/avatar/?d=mp',
+  avatar: profile.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
   bio: profile.bio || 'Sin biografía.',
   isPrivate: profile.is_private,
   is_verified: profile.is_verified ?? false,
@@ -356,9 +355,9 @@ const userData = profile ? {
         
         return {
           id: u.id,
-          name: u.full_name || u.username || 'Usuario',
+          name: u.fullname || u.username || 'Usuario',
           username: u.username || 'user',
-          avatar: u.avatar_url || 'https://gravatar.com/avatar/?d=mp',
+          avatar: u.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
           isFollowing
         };
       }));
@@ -632,7 +631,7 @@ function mapSightingToPost(sighting: any, currentUserId?: string): Post {
     id: sighting.id,
     userId: sighting.user_id,
     username: sighting.user?.username || 'Usuario',
-    userAvatar: sighting.user?.avatar_url || 'https://gravatar.com/avatar/?d=mp',
+    userAvatar: sighting.user?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
     location: sighting.is_location_private ? 'Ubicación privada' : 'Ubicación del mapa',
     image: photoUrl,
     tag: sighting.bird?.common_name || 'Ave desconocida',

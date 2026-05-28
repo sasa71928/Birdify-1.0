@@ -59,8 +59,7 @@ export const AuthService = {
         options: {
           data: {
             username,
-            fullname,
-            full_name: fullname, 
+            fullname: fullname,
             profile_pic_url: 'https://gravatar.com/avatar/?d=mp'
           }
         }

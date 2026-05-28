@@ -49,7 +49,7 @@ export default function NotificationSettingsScreen() {
     setPushNotifs(updated);
 
     await supabase
-      .from('profiles')
+      .from('users')
       .update({
         push_notifications: updated
       })
@@ -72,7 +72,7 @@ const toggleEmail = async (id: string) => {
     setEmailNotifs(updated);
 
     await supabase
-      .from('profiles')
+      .from('users')
       .update({
         email_notifications: updated
       })

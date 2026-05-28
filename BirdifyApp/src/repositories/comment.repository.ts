@@ -14,7 +14,7 @@ export const CommentRepository = {
       })
       .select(`
         *,
-        users!comments_user_id_fkey (username)
+        users (username)
       `)
       .single();
 
@@ -31,7 +31,7 @@ export const CommentRepository = {
       .from('comments')
       .select(`
         *,
-        users!comments_user_id_fkey (username)
+        users (username)
       `)
       .eq('sighting_id', sightingId)
       .order('created_at', { ascending: true });

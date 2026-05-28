@@ -280,7 +280,6 @@ export default function EditProfileScreen() {
         data: {
           username: sanitizedUsername,
           fullname: fullname.trim(),
-          full_name: fullname.trim(),
           profile_pic_url: finalAvatar
         }
       });

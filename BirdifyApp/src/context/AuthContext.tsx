@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Si no existe el perfil bajo este ID ni este Email, o si el ID del perfil existente es diferente (usuario recreado)
       if (!existing || existing.id !== authUser.id) {
         const rawUsername = authUser.user_metadata?.username || authUser.email?.split('@')[0] || `user_${authUser.id.substring(0, 8)}`;
-        const fullname = authUser.user_metadata?.fullname || authUser.user_metadata?.full_name || null;
+        const fullname = authUser.user_metadata?.fullname || null;
         const profilePicUrl = authUser.user_metadata?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp';
         
         // Sanitize username to match alphanumeric + underscores

@@ -2,13 +2,17 @@ export interface User {
   id: string;
   email: string;
   username: string;
-  full_name: string | null;
+  fullname: string | null;
   bio: string | null;
-  avatar_url: string | null;
+  profile_pic_url: string | null;
   is_private: boolean;
   is_verified: boolean;
   user_level: 'general' | 'admin' | 'moderator';
   created_at: string;
+  expo_push_token: string | null;
+  notification_settings: any | null;
+  push_notifications: boolean;
+  email_notifications: boolean;
 }
 
 export interface Bird {

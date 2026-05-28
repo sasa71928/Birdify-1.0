@@ -110,7 +110,7 @@ export default function ChatScreen() {
             is_group,
             members:conversation_members (
               user_id,
-              user:profiles!conversation_members_profile_id_fkey (id, username, full_name, avatar_url)
+              users (id, username, fullname, profile_pic_url)
             )
           `
           )
@@ -125,8 +125,8 @@ export default function ChatScreen() {
 
         if (mounted) {
           setIsGroup(Boolean(conv?.is_group));
-          setHeaderTitle(conv?.is_group ? (conv?.name || 'Group') : (other?.full_name || other?.username || 'Chat'));
-          setHeaderAvatar(conv?.is_group ? (conv?.avatar_url || null) : (other?.avatar_url || null));
+          setHeaderTitle(conv?.is_group ? (conv?.name || 'Group') : (other?.fullname || other?.username || 'Chat'));
+          setHeaderAvatar(conv?.is_group ? (conv?.avatar_url || null) : (other?.profile_pic_url || null));
           setOtherUserId(conv?.is_group ? null : (other?.id || null));
         }
 
