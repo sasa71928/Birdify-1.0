@@ -110,7 +110,7 @@ export default function ChatScreen() {
             is_group,
             members:conversation_members (
               user_id,
-              user:users (id, username, fullname, profile_pic_url)
+              user:profiles!conversation_members_profile_id_fkey (id, username, full_name, avatar_url)
             )
           `
           )
@@ -120,12 +120,13 @@ export default function ChatScreen() {
         if (convError) throw convError;
 
         const members = conv?.members || [];
-        const other = members.find((m: any) => m.user_id !== user.id)?.user;
+        const otherMember = members.find((m: any) => m.user_id !== user.id);
+        const other = otherMember?.user?.[0];
 
         if (mounted) {
           setIsGroup(Boolean(conv?.is_group));
-          setHeaderTitle(conv?.is_group ? (conv?.name || 'Group') : (other?.fullname || other?.username || 'Chat'));
-          setHeaderAvatar(conv?.is_group ? (conv?.avatar_url || null) : (other?.profile_pic_url || null));
+          setHeaderTitle(conv?.is_group ? (conv?.name || 'Group') : (other?.full_name || other?.username || 'Chat'));
+          setHeaderAvatar(conv?.is_group ? (conv?.avatar_url || null) : (other?.avatar_url || null));
           setOtherUserId(conv?.is_group ? null : (other?.id || null));
         }
 
@@ -176,7 +177,7 @@ export default function ChatScreen() {
   React.useEffect(() => {
     const hasUnread = messages.some(m => !m.isMine && !m.isRead);
 
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: ReturnType<typeof setTimeout>;
 
     if (hasUnread) {
       const firstUnreadIndex = messages.findIndex(m => !m.isMine && !m.isRead);
@@ -462,7 +463,7 @@ export default function ChatScreen() {
               <View style={styles.replyPreviewLine} />
               <View style={styles.replyPreviewContent}>
                 <Text style={styles.replyPreviewUser}>
-                  Respondiendo a {replyingTo.senderName || (replyingTo.isMine ? 'ti mismo' : thread.name)}
+                  Respondiendo a {replyingTo.senderName || (replyingTo.isMine ? 'ti mismo' : headerTitle)}
                 </Text>
                 <Text style={styles.replyPreviewText} numberOfLines={1}>
                   {replyingTo.text}

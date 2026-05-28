@@ -44,24 +44,13 @@ export const FollowRepository = {
     const { data, error } = await supabase
       .from('follows')
       .select(`
-        follower:users!follows_follower_id_fkey (id, username, fullname, profile_pic_url)
+        follower:profiles!follows_follower_id_fkey (id, username, full_name, avatar_url)
       `)
       .eq('following_id', userId);
 
     if (error) {
-      // Si la FK no se llama follows_follower_id_fkey, intentamos con la relación por columna
-      const { data: dataFallback, error: errorFallback } = await supabase
-        .from('follows')
-        .select(`
-          follower:users!follower_id (id, username, fullname, profile_pic_url)
-        `)
-        .eq('following_id', userId);
-
-      if (errorFallback) {
-        console.error('Error in getFollowers fallback:', errorFallback);
-        throw errorFallback;
-      }
-      return dataFallback?.map((item: any) => item.follower).filter(Boolean) || [];
+      console.error('Error in getFollowers:', error);
+      throw error;
     }
 
     return data?.map((item: any) => item.follower).filter(Boolean) || [];
@@ -71,24 +60,13 @@ export const FollowRepository = {
     const { data, error } = await supabase
       .from('follows')
       .select(`
-        following:users!follows_following_id_fkey (id, username, fullname, profile_pic_url)
+        following:profiles!follows_following_id_fkey (id, username, full_name, avatar_url)
       `)
       .eq('follower_id', userId);
 
     if (error) {
-      // Si la FK no se llama follows_following_id_fkey, intentamos con la relación por columna
-      const { data: dataFallback, error: errorFallback } = await supabase
-        .from('follows')
-        .select(`
-          following:users!following_id (id, username, fullname, profile_pic_url)
-        `)
-        .eq('follower_id', userId);
-
-      if (errorFallback) {
-        console.error('Error in getFollowing fallback:', errorFallback);
-        throw errorFallback;
-      }
-      return dataFallback?.map((item: any) => item.following).filter(Boolean) || [];
+      console.error('Error in getFollowing:', error);
+      throw error;
     }
 
     return data?.map((item: any) => item.following).filter(Boolean) || [];

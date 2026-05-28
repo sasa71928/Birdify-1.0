@@ -56,7 +56,7 @@ export const ConversationRepository = {
             user_id,
             joined_at,
             role,
-            user:users (id, username, fullname, profile_pic_url)
+            user:profiles!conversation_members_profile_id_fkey (id, username, full_name, avatar_url)
           )
         )
       `

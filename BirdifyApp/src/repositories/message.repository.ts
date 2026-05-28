@@ -28,7 +28,7 @@ export const MessageRepository = {
         image_url,
         reply_to_id,
         created_at,
-        sender:users (id, username, profile_pic_url)
+        sender:profiles!messages_sender_id_fkey (id, username, avatar_url)
       `
       )
       .eq('conversation_id', conversationId)

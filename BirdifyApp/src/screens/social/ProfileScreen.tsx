@@ -305,10 +305,11 @@ export default function ProfileScreen() {
 
   // Get user data
   // Updated userData with verification flag
+  console.log('Profile data:', profile);
 const userData = profile ? {
-  name: profile.fullname || 'Usuario',
+  name: profile.full_name || 'Usuario',
   username: profile.username || 'user',
-  avatar: profile.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
+  avatar: profile.avatar_url || 'https://gravatar.com/avatar/?d=mp',
   bio: profile.bio || 'Sin biografía.',
   isPrivate: profile.is_private,
   is_verified: profile.is_verified ?? false,
@@ -352,11 +353,12 @@ const userData = profile ? {
         if (authUser && u.id !== authUser.id) {
           isFollowing = await FollowRepository.isFollowing(authUser.id, u.id);
         }
+        
         return {
           id: u.id,
-          name: u.fullname || u.username || 'Usuario',
+          name: u.full_name || u.username || 'Usuario',
           username: u.username || 'user',
-          avatar: u.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
+          avatar: u.avatar_url || 'https://gravatar.com/avatar/?d=mp',
           isFollowing
         };
       }));
@@ -457,7 +459,7 @@ const userData = profile ? {
                 </Text>
               )}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.messageMainBtn} onPress={() => navigation.navigate('Chat', { thread: { id: displayUserId!, name: userData.name, avatar: userData.avatar, lastMessage: '', time: '' } })}>
+            <TouchableOpacity style={styles.messageMainBtn} onPress={() => navigation.navigate('Chat', { conversationId: displayUserId! })}>
               <Ionicons name="chatbubble-outline" size={20} color={colors.primary} />
             </TouchableOpacity>
           </View>
@@ -630,7 +632,7 @@ function mapSightingToPost(sighting: any, currentUserId?: string): Post {
     id: sighting.id,
     userId: sighting.user_id,
     username: sighting.user?.username || 'Usuario',
-    userAvatar: sighting.user?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
+    userAvatar: sighting.user?.avatar_url || 'https://gravatar.com/avatar/?d=mp',
     location: sighting.is_location_private ? 'Ubicación privada' : 'Ubicación del mapa',
     image: photoUrl,
     tag: sighting.bird?.common_name || 'Ave desconocida',

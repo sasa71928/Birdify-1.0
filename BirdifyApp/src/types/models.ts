@@ -2,9 +2,9 @@ export interface User {
   id: string;
   email: string;
   username: string;
-  fullname: string | null;
+  full_name: string | null;
   bio: string | null;
-  profile_pic_url: string | null;
+  avatar_url: string | null;
   is_private: boolean;
   is_verified: boolean;
   user_level: 'general' | 'admin' | 'moderator';

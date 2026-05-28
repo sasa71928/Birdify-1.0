@@ -7,19 +7,25 @@ export const UserBlockRepository = {
     }
 
     // Deseguir mutuamente (best-effort, sin necesidad de FK específicas)
-    await supabase
-      .from('follows')
-      .delete()
-      .eq('follower_id', blockerId)
-      .eq('following_id', blockedId)
-      .catch(() => {}); // Ignorar errores
+    try {
+      await supabase
+        .from('follows')
+        .delete()
+        .eq('follower_id', blockerId)
+        .eq('following_id', blockedId);
+    } catch {
+      // Ignorar errores
+    }
 
-    await supabase
-      .from('follows')
-      .delete()
-      .eq('follower_id', blockedId)
-      .eq('following_id', blockerId)
-      .catch(() => {}); // Ignorar errores
+    try {
+      await supabase
+        .from('follows')
+        .delete()
+        .eq('follower_id', blockedId)
+        .eq('following_id', blockerId);
+    } catch {
+      // Ignorar errores
+    }
 
     const { error } = await supabase
       .from('user_blocks')
