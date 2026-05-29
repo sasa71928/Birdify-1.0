@@ -2,7 +2,7 @@ export default {
   expo: {
     name: 'BirdifyApp',
     slug: 'BirdifyApp',
-    version: '1.0.3',
+    version: '1.0.4',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'automatic',
@@ -24,7 +24,7 @@ export default {
           apiKey: process.env.GOOGLE_MAPS_API_KEY || 'YOUR_GOOGLE_MAPS_API_KEY',
         },
       },
-      newArchEnabled: false,
+      newArchEnabled: true,
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       package: 'com.jcota_22.BirdifyApp',
