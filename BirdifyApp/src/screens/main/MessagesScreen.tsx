@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -10,171 +10,52 @@ import {
   StatusBar,
   ActivityIndicator,
   Modal,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Typography, Spacing, Radius, Shadows } from '../../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TopNavBar from '../../components/TopNavBar';
 import { RootStackParamList, ChatThread } from '../../navigation/AppNavigator';
 import { createStyles } from '../../styles/screens/main/messagesScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
-import { useAuth } from '../../context/AuthContext';
-import { ConversationRepository } from '../../repositories/conversation.repository';
-import { supabase } from '../../lib/supabase';
+import { useMessages } from '../../hooks/useMessages';
 import AppToast from '../../components/AppToast';
 
-type MessagesNavProp = NativeStackNavigationProp<RootStackParamList, 'Messages'>;
-
 export default function MessagesScreen() {
-  const navigation = useNavigation<MessagesNavProp>();
   const { shared, screen: styles, colors, isDark } = useDynamicStyles(createStyles);
-  const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
-  const [threads, setThreads] = useState<ChatThread[]>([]);
-  const subscription = useRef<any>(null);
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
-  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
-
-  const load = async () => {
-    if (!user) return;
-    try {
-      setLoading(true);
-      const items = await ConversationRepository.listForUser(user.id);
-
-      const mapped: ChatThread[] = items.map((item) => {
-        const c = item.conversation;
-        const members = c.members || [];
-        const other = members.find((m) => m.user_id !== user.id)?.users;
-
-        const title = c.is_group ? (c.name || 'Group') : (other?.fullname || other?.username || 'Usuario');
-        const avatar =
-          c.is_group
-            ? (c.avatar_url || 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=100')
-            : (other?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp');
-
-        if (c.is_group) {
-          console.log('Group conversation:', c.id, 'avatar_url:', c.avatar_url, 'final avatar:', avatar);
-        }
-
-        const lastMessageText = item.lastMessage?.content || (item.lastMessage?.image_url ? '📷 Foto' : '');
-        
-        // For group chats, prepend sender name to message preview
-        const displayMessage = c.is_group && item.lastMessage?.sender 
-          ? `${item.lastMessage.sender.fullname || item.lastMessage.sender.username}: ${lastMessageText}`
-          : lastMessageText;
-
-        return {
-          id: c.id,
-          name: title,
-          avatar,
-          lastMessage: displayMessage || '',
-          time: '',
-          isGroup: c.is_group,
-        };
-      });
-
-      setThreads(mapped);
-    } catch (e) {
-      console.error('Error loading conversations:', e);
-      showToast('Error al cargar conversaciones', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    let mounted = true;
-    load();
-
-    // Set up real-time subscription for messages
-    if (user) {
-      const channelName = `messages-changes-${user.id}-${Date.now()}`;
-      subscription.current = supabase
-        .channel(channelName)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'messages',
-          },
-          () => {
-            load();
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'conversation_members',
-            filter: `user_id=eq.${user.id}`,
-          },
-          () => {
-            load();
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'conversations',
-          },
-          () => {
-            load();
-          }
-        )
-        .subscribe();
-    }
-
-    return () => {
-      mounted = false;
-      if (subscription.current) {
-        supabase.removeChannel(subscription.current);
-      }
-    };
-  }, [user]);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      if (user) {
-        load();
-      }
-    }, [user])
-  );
-
-  const handleDeleteConversation = async (conversationId: string) => {
-    setConversationToDelete(conversationId);
-    setDeleteModalVisible(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!conversationToDelete) return;
-    try {
-      await ConversationRepository.deleteConversation(conversationToDelete);
-      setDeleteModalVisible(false);
-      setConversationToDelete(null);
-      showToast('Conversación eliminada correctamente', 'success');
-      load();
-    } catch (error) {
-      console.error('Error deleting conversation:', error);
-      showToast('No se pudo eliminar la conversación', 'error');
-    }
-  };
-
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ visible: true, message, type });
-  };
+  const {
+    loading,
+    threads,
+    deleteModalVisible,
+    conversationToDelete,
+    optionsVisible,
+    selectedConversation,
+    menuPosition,
+    showLeaveModal,
+    leaving,
+    toast,
+    navigation,
+    setDeleteModalVisible,
+    setConversationToDelete,
+    setOptionsVisible,
+    setSelectedConversation,
+    setMenuPosition,
+    setShowLeaveModal,
+    setToast,
+    load,
+    confirmDelete,
+    handleLongPress,
+    handleOptionPress,
+    handleLeaveGroup,
+    handleBlockUser,
+  } = useMessages();
 
   const renderItem = ({ item }: { item: ChatThread }) => (
     <TouchableOpacity
       style={[styles.threadItem, item.unreadCount ? styles.unreadThread : null]}
       activeOpacity={0.75}
       onPress={() => navigation.navigate('Chat', { conversationId: item.id })}
+      onLongPress={(event) => handleLongPress(item, event)}
     >
       <View style={styles.avatarContainer}>
         {item.isGroup ? (
@@ -204,12 +85,6 @@ export default function MessagesScreen() {
           ) : null}
         </View>
       </View>
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => handleDeleteConversation(item.id)}
-      >
-        <Ionicons name="trash-outline" size={20} color={colors.textSecondary} />
-      </TouchableOpacity>
     </TouchableOpacity>
   );
 
@@ -284,6 +159,120 @@ export default function MessagesScreen() {
                 onPress={confirmDelete}
               >
                 <Text style={styles.modalButtonTextDelete}>Eliminar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Options Modal */}
+      {optionsVisible && menuPosition && (
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.35)',
+          }}
+        >
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setOptionsVisible(false)} />
+          <View
+            style={{
+              position: 'absolute',
+              left: Math.max(10, Math.min(menuPosition.x - 100, Dimensions.get('window').width - 210)),
+              top: Math.min(menuPosition.y, Dimensions.get('window').height - 150),
+              backgroundColor: colors.canvasPure,
+              borderRadius: 12,
+              padding: 8,
+              width: 200,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+              elevation: 5,
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => handleOptionPress('open')}
+              style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12 }}
+            >
+              <Ionicons name="chatbubble-outline" size={20} color={colors.textPrimary} />
+              <Text style={{ marginLeft: 10, color: colors.textPrimary, fontWeight: '600', fontSize: 14 }}>Abrir chat</Text>
+            </TouchableOpacity>
+            {selectedConversation?.isGroup && (
+              <>
+                <TouchableOpacity
+                  onPress={() => handleOptionPress('editGroup')}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12 }}
+                >
+                  <Ionicons name="pencil-outline" size={20} color={colors.textPrimary} />
+                  <Text style={{ marginLeft: 10, color: colors.textPrimary, fontWeight: '600', fontSize: 14 }}>Editar grupo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleOptionPress('leaveGroup')}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12 }}
+                >
+                  <Ionicons name="exit-outline" size={20} color="#FF5252" />
+                  <Text style={{ marginLeft: 10, color: '#FF5252', fontWeight: '600', fontSize: 14 }}>Salir del grupo</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            {!selectedConversation?.isGroup && (
+              <TouchableOpacity
+                onPress={() => handleOptionPress('blockUser')}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12 }}
+              >
+                <Ionicons name="ban-outline" size={20} color="#FF5252" />
+                <Text style={{ marginLeft: 10, color: '#FF5252', fontWeight: '600', fontSize: 14 }}>Bloquear usuario</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={() => handleOptionPress('delete')}
+              style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12 }}
+            >
+              <Ionicons name="trash-outline" size={20} color="#FF5252" />
+              <Text style={{ marginLeft: 10, color: '#FF5252', fontWeight: '600', fontSize: 14 }}>Eliminar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Leave Group Confirmation Modal */}
+      <Modal
+        visible={showLeaveModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLeaveModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalIcon}>
+              <Ionicons name="exit-outline" size={48} color="#FF5252" />
+            </View>
+            <Text style={styles.modalTitle}>Salir del grupo</Text>
+            <Text style={styles.modalMessage}>
+              ¿Estás seguro de que quieres salir de este grupo? Ya no podrás ver ni enviar mensajes.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowLeaveModal(false)}
+                disabled={leaving}
+              >
+                <Text style={styles.modalButtonTextCancel}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonLeave]}
+                onPress={handleLeaveGroup}
+                disabled={leaving}
+              >
+                {leaving ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text style={styles.modalButtonTextLeave}>Salir</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>

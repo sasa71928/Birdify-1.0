@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { MessageReadRepository } from './message_read.repository';
 
 export type ConversationRole = 'admin' | 'member';
 
@@ -38,6 +39,7 @@ export interface ConversationListItem {
       fullname: string | null;
     };
   };
+  unread?: number;
 }
 
 export const ConversationRepository = {
@@ -111,10 +113,18 @@ export const ConversationRepository = {
       }
     }
 
-    return filteredConversations.map((conversation) => ({
-      conversation,
-      lastMessage: lastByConversation.get(conversation.id),
-    }));
+    const results = await Promise.all(
+      filteredConversations.map(async (conversation) => {
+        const unreadCount = await MessageReadRepository.getUnreadCount(conversation.id, userId);
+        return {
+          conversation,
+          lastMessage: lastByConversation.get(conversation.id),
+          unread: unreadCount,
+        };
+      })
+    );
+
+    return results;
   },
 
   async createDirectConversation(currentUserId: string, otherUserId: string): Promise<string> {

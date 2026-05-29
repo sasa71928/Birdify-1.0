@@ -292,5 +292,84 @@ export const createStyles = (colors: any) => StyleSheet.create({
   usersList: {
     paddingBottom: 20,
   },
+  leaveGroupSection: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border + '20',
+  },
+  leaveGroupBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.componentBase,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.md,
+    gap: Spacing.sm,
+  },
+  leaveGroupText: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: Typography.fontWeight.semiBold,
+    color: '#FF5252',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    width: '100%',
+    maxWidth: 400,
+    ...Shadows.modal,
+  },
+  modalIcon: {
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalTitle: {
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
+  },
+  modalMessage: {
+    fontSize: Typography.fontSize.md,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: Spacing.lg,
+    lineHeight: 22,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+  },
+  modalButtonCancel: {
+    backgroundColor: colors.componentBase,
+  },
+  modalButtonLeave: {
+    backgroundColor: '#FF5252',
+  },
+  modalButtonTextCancel: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: Typography.fontWeight.semiBold,
+    color: colors.textPrimary,
+  },
+  modalButtonTextLeave: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: Typography.fontWeight.semiBold,
+    color: colors.white,
+  },
 });
 

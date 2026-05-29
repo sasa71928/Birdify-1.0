@@ -60,13 +60,21 @@ export const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
     marginBottom: Spacing.sm,
+    backgroundColor: colors.border + '20',
+    borderRadius: Radius.lg,
+    borderColor: colors.border,
+    borderWidth: 0.5,
   },
   unreadThread: {
     backgroundColor: colors.springMoss + '20',
     borderRadius: Radius.lg,
-    paddingHorizontal: Spacing.sm,
-    marginHorizontal: -Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   avatarContainer: {
     position: 'relative',
@@ -199,6 +207,14 @@ export const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textPrimary,
   },
   modalButtonTextDelete: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: Typography.fontWeight.semiBold,
+    color: colors.white,
+  },
+  modalButtonLeave: {
+    backgroundColor: '#FF5252',
+  },
+  modalButtonTextLeave: {
     fontSize: Typography.fontSize.md,
     fontWeight: Typography.fontWeight.semiBold,
     color: colors.white,

@@ -29,7 +29,14 @@ export const SightingRepository = {
     let query = supabase
       .from('sightings')
       .select(`
-        *,
+        id,
+        user_id,
+        bird_id,
+        description,
+        photo_url,
+        is_location_private,
+        created_at,
+        updated_at,
         users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
         birds (id, common_name, scientific_name),
         reactions (user_id),
@@ -78,7 +85,14 @@ export const SightingRepository = {
     const { data, error } = await supabase
       .from('sightings')
       .select(`
-        *,
+        id,
+        user_id,
+        bird_id,
+        description,
+        photo_url,
+        is_location_private,
+        created_at,
+        updated_at,
         users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
         birds (id, common_name, scientific_name),
         reactions (user_id),

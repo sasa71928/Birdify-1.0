@@ -12,139 +12,31 @@ import {
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import TopNavBar from '../../components/TopNavBar';
-import { RootStackParamList, BirdSpeciesData } from '../../navigation/AppNavigator';
-
 import { createStyles } from '../../styles/screens/main/dictionaryScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
-
-import { BirdRepository } from '../../repositories/bird.repository';
-import { mapBird } from '../../utils/mapBird';
-
-
-type NavProp = NativeStackNavigationProp<RootStackParamList, 'Dictionary'>;
-
-const FILTERS = ['All', 'A-Z', 'Season', 'Habitat', 'Family'];
+import { useDictionary } from '../../hooks/useDictionary';
 
 export default function DictionaryScreen() {
-  const navigation = useNavigation<NavProp>();
-  const route = useRoute<RouteProp<RootStackParamList, 'Dictionary'>>();
-
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
-
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const [activeFilter, setActiveFilter] = React.useState('All');
-
-  const [allBirds, setAllBirds] = React.useState<BirdSpeciesData[]>([]);
-  const [filteredBirds, setFilteredBirds] = React.useState<BirdSpeciesData[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [loadingImages, setLoadingImages] = React.useState<Record<string, boolean>>({});
-
-  const loadBirds = async () => {
-    try {
-      setLoading(true);
-
-      const dbBirds = await BirdRepository.getAll();
-      const mapped = dbBirds.map((bird, index) => mapBird(bird, index));
-
-      setAllBirds(mapped);
-      setFilteredBirds(mapped);
-
-    } catch (err) {
-      console.error('Error loading birds:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  React.useEffect(() => {
-    loadBirds();
-  }, []);
-
-  const handleSearch = (text: string) => {
-    setSearchQuery(text);
-    applyFilterAndSearch(text, activeFilter, allBirds);
-  };
-
-  const handleFilterSelect = (filter: string) => {
-    setActiveFilter(filter);
-    applyFilterAndSearch(searchQuery, filter, allBirds);
-  };
-
-  const applyFilterAndSearch = (query: string, filter: string, source = allBirds) => {
-    let result = [...source];
-
-    if (query) {
-      result = result.filter(b =>
-        b.name?.toLowerCase().includes(query.toLowerCase()) ||
-        b.scientificName?.toLowerCase().includes(query.toLowerCase())
-      );
-    }
-
-    switch (filter) {
-      case 'A-Z':
-        result.sort((a, b) => a.name.localeCompare(b.name));
-        break;
-      case 'Season':
-        result.sort((a, b) => a.status.localeCompare(b.status));
-        break;
-      case 'Habitat':
-        result.sort((a, b) => a.habitat.localeCompare(b.habitat));
-        break;
-      case 'Family':
-        result.sort((a, b) =>
-          (a.classification?.family || '').localeCompare(
-            b.classification?.family || ''
-          )
-        );
-        break;
-    }
-
-    setFilteredBirds(result);
-  };
-
-  const getSections = () => {
-    if (activeFilter === 'All') {
-      return [{ title: '', data: filteredBirds }];
-    }
-
-    const groups: Record<string, BirdSpeciesData[]> = {};
-
-    filteredBirds.forEach(bird => {
-      let key = '';
-
-      switch (activeFilter) {
-        case 'A-Z':
-          key = bird.name?.charAt(0)?.toUpperCase() || '#';
-          break;
-        case 'Season':
-          key = bird.status || 'Unknown';
-          break;
-        case 'Habitat':
-          key = bird.habitat?.split(',')[0] || 'Unknown';
-          break;
-        case 'Family':
-          key = bird.classification?.family || 'Unknown';
-          break;
-      }
-
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(bird);
-    });
-
-    return Object.keys(groups).sort().map(k => ({
-      title: k,
-      data: groups[k],
-    }));
-  };
-
-  const openBird = (bird: BirdSpeciesData) => {
-    navigation.navigate('BirdDetail', { bird });
-  };
+  const {
+    searchQuery,
+    activeFilter,
+    filteredBirds,
+    loading,
+    loadingImages,
+    filters,
+    setSearchQuery,
+    setLoadingImages,
+    handleSearch,
+    handleFilterSelect,
+    getSections,
+    openBird,
+    handleImageLoadStart,
+    handleImageLoadEnd,
+  } = useDictionary();
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -173,7 +65,7 @@ export default function DictionaryScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filtersScroll}
           >
-            {FILTERS.map(f => (
+            {filters.map(f => (
               <TouchableOpacity
                 key={f}
                 onPress={() => handleFilterSelect(f)}
@@ -223,18 +115,8 @@ export default function DictionaryScreen() {
                     source={{ uri: item.image }}
                     style={styles.birdImage}
                     resizeMode="cover"
-                    onLoadStart={() =>
-                      setLoadingImages(prev => ({
-                        ...prev,
-                        [String(item.id)]: true
-                      }))
-                    }
-                    onLoadEnd={() =>
-                      setLoadingImages(prev => ({
-                        ...prev,
-                        [String(item.id)]: false
-                      }))
-                    }
+                    onLoadStart={() => handleImageLoadStart(String(item.id))}
+                    onLoadEnd={() => handleImageLoadEnd(String(item.id))}
                   />
                 </View>
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -10,112 +10,24 @@ import {
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { RootStackParamList } from '../../navigation/AppNavigator';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { createStyles } from '../../styles/screens/bird/birdDetailScreen.styles';
 
-import FeedItem, { Post } from '../../components/FeedItem';
-import { SightingRepository } from '../../repositories/sighting.repository';
-import { useAuth } from '../../context/AuthContext';
-
-type BirdDetailNavProp =
-  NativeStackNavigationProp<RootStackParamList, 'BirdDetail'>;
-
-type BirdDetailRouteProp =
-  RouteProp<RootStackParamList, 'BirdDetail'>;
-
-function mapSightingToPost(sighting: any, currentUserId?: string): Post {
-  const timeDiff = Date.now() - new Date(sighting.created_at).getTime();
-  const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60));
-
-  const timeAgoStr =
-    hoursAgo < 24
-      ? hoursAgo === 0
-        ? 'Hace un momento'
-        : `Hace ${hoursAgo} hora${hoursAgo === 1 ? '' : 's'}`
-      : `Hace ${Math.floor(hoursAgo / 24)} día${Math.floor(hoursAgo / 24) === 1 ? '' : 's'}`;
-
-  const reactionsList = sighting.reactions || [];
-  const likesCount = reactionsList.length;
-
-  const hasLiked = currentUserId
-    ? reactionsList.some((r: any) => r.user_id === currentUserId)
-    : false;
-
-  const userData = Array.isArray(sighting.user)
-    ? sighting.user[0]
-    : sighting.user;
-
-  return {
-    id: sighting.id,
-    userId: sighting.user_id,
-    username: userData?.username || 'Usuario',
-    userAvatar: userData?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
-    location: sighting.is_location_private
-      ? 'Ubicación Privada'
-      : 'En la Naturaleza',
-    image:
-      sighting.photo_url ||
-      'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=600',
-    tag: sighting.bird?.common_name || 'Ave',
-    likes: likesCount,
-    comments: sighting.comments?.length || 0,
-    caption: sighting.description || '',
-    timeAgo: timeAgoStr,
-    isVerified: userData?.is_verified === true,
-    commentsList: [],
-    hasLiked,
-    createdAt: sighting.created_at
-  };
-}
+import FeedItem from '../../components/FeedItem';
+import { useBirdDetail } from '../../hooks/useBirdDetail';
 
 export default function BirdDetailScreen() {
-  const navigation = useNavigation<BirdDetailNavProp>();
-  const route = useRoute<BirdDetailRouteProp>();
-
-  const bird = route.params?.bird;
-
-  const { user } = useAuth();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
-
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const classification = bird?.classification;
-
-  useEffect(() => {
-    if (bird?.id) loadBirdSightings();
-  }, [bird?.id]);
-
-  const loadBirdSightings = async () => {
-    try {
-      setLoading(true);
-
-      const sightings = await SightingRepository.getFeed(user?.id);
-
-      const filtered = sightings.filter(
-        (item: any) => item.bird_id === bird?.id
-      );
-
-      const mapped = filtered.map((item: any) =>
-        mapSightingToPost(item, user?.id)
-      );
-
-      setPosts(mapped);
-    } catch (error) {
-      console.error('Error loading sightings:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePostDeleted = async () => {
-    await loadBirdSightings();
-  };
+  const {
+    bird,
+    posts,
+    loading,
+    classification,
+    handlePostDeleted,
+    goBack,
+  } = useBirdDetail();
 
   if (!bird) {
     return (
@@ -147,7 +59,7 @@ export default function BirdDetailScreen() {
 
           <TouchableOpacity
             style={styles.backBtn}
-            onPress={() => navigation.goBack()}
+            onPress={goBack}
           >
             <Ionicons name="arrow-back" size={22} color={colors.primary} />
           </TouchableOpacity>

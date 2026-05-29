@@ -12,6 +12,9 @@ import {
   Platform,
   PanResponder,
   Animated,
+  Modal,
+  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
@@ -25,6 +28,8 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { MessageRepository } from '../../repositories/message.repository';
 import { UserBlockRepository } from '../../repositories/user_block.repository';
+import { MessageReadRepository } from '../../repositories/message_read.repository';
+import { ConversationRepository } from '../../repositories/conversation.repository';
 import AppToast from '../../components/AppToast';
 
 type ChatNavProp = NativeStackNavigationProp<RootStackParamList, 'Chat'>;
@@ -66,9 +71,12 @@ export default function ChatScreen() {
   const [headerAvatar, setHeaderAvatar] = useState<string | null>(null);
   const [otherUserId, setOtherUserId] = useState<string | null>(null);
   const [optionsVisible, setOptionsVisible] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const [conversationExists, setConversationExists] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
-  const highlightOpacity = useRef(new Animated.Value(0)).current;
+  const highlightBorderWidth = useRef(new Animated.Value(0)).current;
+  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
     message: '',
@@ -241,28 +249,49 @@ export default function ChatScreen() {
 
   React.useEffect(() => {
     const hasUnread = messages.some(m => !m.isMine && !m.isRead);
+    const lastMessage = messages[messages.length - 1];
 
     let timeoutId: ReturnType<typeof setTimeout>;
 
+    // Don't auto-scroll if the last message is mine (already handled in sendMessage)
+    if (lastMessage?.isMine) {
+      return;
+    }
+
     if (hasUnread) {
-      const firstUnreadIndex = messages.findIndex(m => !m.isMine && !m.isRead);
-      if (firstUnreadIndex !== -1) {
+      // Find the last unread message instead of the first
+      const unreadMessages = messages.filter(m => !m.isMine && !m.isRead);
+      const lastUnreadIndex = messages.findIndex(m => m.id === unreadMessages[unreadMessages.length - 1]?.id);
+      
+      if (lastUnreadIndex !== -1) {
         timeoutId = setTimeout(() => {
           listRef.current?.scrollToIndex({
-            index: firstUnreadIndex,
+            index: lastUnreadIndex,
             animated: true,
-            viewPosition: 0
+            viewPosition: 0.5
           });
         }, 500);
       }
+
+      // Mark unread messages as read
+      const unreadMessageIds = unreadMessages.map(m => m.id);
+      if (unreadMessageIds.length > 0 && user) {
+        MessageReadRepository.markMultipleAsRead(unreadMessageIds, user.id).catch(e => {
+          console.error('Error marking messages as read:', e);
+        });
+      }
     } else {
-      listRef.current?.scrollToEnd({ animated: false });
+      timeoutId = setTimeout(() => {
+        if (messages.length > 0) {
+          listRef.current?.scrollToEnd({ animated: true });
+        }
+      }, 300);
     }
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [messages]);
+  }, [messages, user?.id]);
 
   const sendMessage = async () => {
     const text = input.trim();
@@ -298,7 +327,10 @@ export default function ChatScreen() {
     setSelectedImage(null);
     setReplyingTo(null);
 
-    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+    // Scroll to end immediately after adding the message
+    setTimeout(() => {
+      listRef.current?.scrollToEnd({ animated: true });
+    }, 50);
 
     try {
       await MessageRepository.send({
@@ -348,6 +380,23 @@ export default function ChatScreen() {
     }
   };
 
+  const handleLeaveGroup = async () => {
+    if (!user || leaving) return;
+    try {
+      setLeaving(true);
+      await ConversationRepository.leaveConversation(conversationId, user.id);
+      showToast('Has salido del grupo.', 'success');
+      setTimeout(() => navigation.goBack(), 700);
+    } catch (e) {
+      console.error('Error leaving group:', e);
+      showToast('No se pudo salir del grupo.', 'error');
+    } finally {
+      setLeaving(false);
+      setShowLeaveModal(false);
+      setOptionsVisible(false);
+    }
+  };
+
   const SwipeableMessage = ({ children, onSwipe, isMine }: { children: React.ReactNode, onSwipe: () => void, isMine: boolean }) => {
     const translateX = useRef(new Animated.Value(0)).current;
     
@@ -388,19 +437,19 @@ export default function ChatScreen() {
     const index = messages.findIndex((msg) => msg.id === replyToId);
     if (index !== -1) {
       setHighlightedMessageId(replyToId);
-      highlightOpacity.setValue(1);
+      highlightBorderWidth.setValue(2);
       
-      // Fade out animation
+      // Border width fade out animation
       Animated.sequence([
-        Animated.timing(highlightOpacity, {
-          toValue: 1,
+        Animated.timing(highlightBorderWidth, {
+          toValue: 2,
           duration: 0,
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
-        Animated.timing(highlightOpacity, {
+        Animated.timing(highlightBorderWidth, {
           toValue: 0,
           duration: 2000,
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
       ]).start(() => {
         setHighlightedMessageId(null);
@@ -444,14 +493,13 @@ export default function ChatScreen() {
             
             <View style={[styles.bubbleFlexContainer, item.isMine && styles.bubbleFlexContainerMine]}>
               <SwipeableMessage isMine={item.isMine} onSwipe={() => setReplyingTo(item)}>
-                <Animated.View 
+                <Animated.View
                   style={[
-                    styles.bubble, 
+                    styles.bubble,
                     item.isMine ? styles.bubbleMine : styles.bubbleTheirs,
                     isGroup && !item.isMine && styles.bubbleGroup,
                     highlightedMessageId === item.id && {
-                      opacity: highlightOpacity,
-                      borderWidth: 2,
+                      borderWidth: highlightBorderWidth,
                       borderColor: colors.primary,
                     }
                   ]}
@@ -475,7 +523,9 @@ export default function ChatScreen() {
                   )}
 
                   {item.image && (
-                    <Image source={{ uri: item.image }} style={styles.bubbleImage} />
+                    <TouchableOpacity onPress={() => item.image && setFullScreenImage(item.image)} activeOpacity={0.8}>
+                      <Image source={{ uri: item.image }} style={styles.bubbleImage} />
+                    </TouchableOpacity>
                   )}
                   <View style={styles.bubbleContentRow}>
                     <View style={styles.bubbleTextColumn}>
@@ -648,16 +698,28 @@ export default function ChatScreen() {
             }}
           >
             {isGroup ? (
-              <TouchableOpacity
-                onPress={() => {
-                  setOptionsVisible(false);
-                  navigation.navigate('EditGroup', { conversationId });
-                }}
-                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}
-              >
-                <Ionicons name="pencil-outline" size={22} color={colors.textPrimary} />
-                <Text style={{ marginLeft: 10, color: colors.textPrimary, fontWeight: '700' }}>Editar grupo</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  onPress={() => {
+                    setOptionsVisible(false);
+                    navigation.navigate('EditGroup', { conversationId });
+                  }}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}
+                >
+                  <Ionicons name="pencil-outline" size={22} color={colors.textPrimary} />
+                  <Text style={{ marginLeft: 10, color: colors.textPrimary, fontWeight: '700' }}>Editar grupo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    setOptionsVisible(false);
+                    setShowLeaveModal(true);
+                  }}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}
+                >
+                  <Ionicons name="exit-outline" size={22} color="#FF5252" />
+                  <Text style={{ marginLeft: 10, color: '#FF5252', fontWeight: '700' }}>Salir del grupo</Text>
+                </TouchableOpacity>
+              </>
             ) : !isGroup && otherUserId ? (
               <TouchableOpacity
                 onPress={handleBlockFromChat}
@@ -680,6 +742,78 @@ export default function ChatScreen() {
           </View>
         </View>
       )}
+
+      {/* Leave Group Confirmation Modal */}
+      <Modal
+        visible={showLeaveModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLeaveModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 }}>
+          <View style={{ backgroundColor: colors.canvasPure, borderRadius: 16, padding: 20, width: '100%', maxWidth: 400 }}>
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <Ionicons name="exit-outline" size={48} color="#FF5252" />
+            </View>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.textPrimary, textAlign: 'center', marginBottom: 8 }}>Salir del grupo</Text>
+            <Text style={{ fontSize: 16, color: colors.textSecondary, textAlign: 'center', marginBottom: 20, lineHeight: 22 }}>
+              ¿Estás seguro de que quieres salir de este grupo? Ya no podrás ver ni enviar mensajes.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: colors.componentBase, alignItems: 'center' }}
+                onPress={() => setShowLeaveModal(false)}
+                disabled={leaving}
+              >
+                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.textPrimary }}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 8, backgroundColor: '#FF5252', alignItems: 'center' }}
+                onPress={handleLeaveGroup}
+                disabled={leaving}
+              >
+                {leaving ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: 'white' }}>Salir</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Full screen image modal */}
+      <Modal
+        visible={fullScreenImage !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setFullScreenImage(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.8)', justifyContent: 'center', alignItems: 'center' }}>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 50, right: 20, zIndex: 1 }}
+            onPress={() => setFullScreenImage(null)}
+          >
+            <Ionicons name="close" size={30} color="white" />
+          </TouchableOpacity>
+          {fullScreenImage && (
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => setFullScreenImage(null)}
+            >
+              <Image
+                source={{ uri: fullScreenImage }}
+                style={{ 
+                  width: Dimensions.get('window').width, 
+                  height: Dimensions.get('window').height * 0.6,
+                  resizeMode: 'contain' 
+                }}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

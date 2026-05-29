@@ -467,13 +467,13 @@ export const createStyles = (colors: any) => StyleSheet.create({
   },
   fullImageOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   fullImage: {
     width: '100%',
-    height: '100%',
+    height: '60%',
   },
 });
 

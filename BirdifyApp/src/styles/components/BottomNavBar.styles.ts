@@ -59,4 +59,25 @@ export const createStyles = (colors: any) => StyleSheet.create({
     shadowRadius: 4.65,
     elevation: 8,
   },
+  iconContainer: {
+    position: 'relative',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -8,
+    backgroundColor: '#FF5252',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  unreadText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+    lineHeight: 12,
+  },
 });
