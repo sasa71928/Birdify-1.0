@@ -48,12 +48,13 @@ interface FeedItemProps {
   post: Post;
   onPostDeleted?: () => void;
   onNavigateAway?: () => void;
+  isNew?: boolean;
 }
 
 const CAPTION_LIMIT = 100;
 const INITIAL_COMMENTS_DISPLAY = 5;
 
-function FeedItem({ post, onPostDeleted, onNavigateAway }: FeedItemProps) {
+function FeedItem({ post, onPostDeleted, onNavigateAway, isNew }: FeedItemProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const { user } = useAuth();
@@ -507,7 +508,7 @@ function FeedItem({ post, onPostDeleted, onNavigateAway }: FeedItemProps) {
 
   const pagerRef = React.useRef<PagerView>(null);
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isNew && { borderWidth: 2, borderColor: colors.primary }]}>
       {toast.visible && (
         <AppToast
           visible={toast.visible}

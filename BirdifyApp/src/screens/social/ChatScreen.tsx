@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { createStyles } from '../../styles/screens/social/chatScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { Shadows } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { MessageRepository } from '../../repositories/message.repository';
@@ -77,12 +78,25 @@ export default function ChatScreen() {
   const [conversationExists, setConversationExists] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const highlightBorderWidth = useRef(new Animated.Value(0)).current;
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const scrollButtonAnim = useRef(new Animated.Value(0)).current;
+  const initialScrollDone = useRef(false);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
     message: '',
     type: 'success',
   });
+
+  // Animación del botón scroll-to-bottom
+  React.useEffect(() => {
+    Animated.spring(scrollButtonAnim, {
+      toValue: showScrollButton ? 1 : 0,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 40,
+    }).start();
+  }, [showScrollButton]);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ visible: true, message, type });
@@ -248,50 +262,77 @@ export default function ChatScreen() {
   );
 
   React.useEffect(() => {
+    if (messages.length === 0) return;
+
     const hasUnread = messages.some(m => !m.isMine && !m.isRead);
     const lastMessage = messages[messages.length - 1];
 
     let timeoutId: ReturnType<typeof setTimeout>;
 
-    // Don't auto-scroll if the last message is mine (already handled in sendMessage)
-    if (lastMessage?.isMine) {
-      return;
-    }
+    // Primera carga: SIEMPRE scrollear al final, sin importar quién envió el último mensaje
+    if (!initialScrollDone.current) {
+      initialScrollDone.current = true;
+      timeoutId = setTimeout(() => {
+        listRef.current?.scrollToEnd({ animated: false });
+      }, 100);
 
-    if (hasUnread) {
-      // Find the last unread message instead of the first
-      const unreadMessages = messages.filter(m => !m.isMine && !m.isRead);
-      const lastUnreadIndex = messages.findIndex(m => m.id === unreadMessages[unreadMessages.length - 1]?.id);
-      
-      if (lastUnreadIndex !== -1) {
-        timeoutId = setTimeout(() => {
-          listRef.current?.scrollToIndex({
-            index: lastUnreadIndex,
-            animated: true,
-            viewPosition: 0.5
-          });
-        }, 500);
-      }
-
-      // Mark unread messages as read
-      const unreadMessageIds = unreadMessages.map(m => m.id);
-      if (unreadMessageIds.length > 0 && user) {
+      // Marcar no leídos como leídos si es necesario
+      if (hasUnread && user) {
+        const unreadMessages = messages.filter(m => !m.isMine && !m.isRead);
+        const unreadMessageIds = unreadMessages.map(m => m.id);
         MessageReadRepository.markMultipleAsRead(unreadMessageIds, user.id).catch(e => {
           handleError(e, setToast, 'Error marking messages as read');
         });
       }
     } else {
-      timeoutId = setTimeout(() => {
-        if (messages.length > 0) {
-          listRef.current?.scrollToEnd({ animated: true });
+      // No es primera carga: no scrollear si el último mensaje es mío
+      // (sendMessage ya se encarga de eso)
+      if (lastMessage?.isMine) {
+        return;
+      }
+
+      if (hasUnread) {
+        // Scrollear al último mensaje no leído
+        const unreadMessages = messages.filter(m => !m.isMine && !m.isRead);
+        const lastUnreadIndex = messages.findIndex(m => m.id === unreadMessages[unreadMessages.length - 1]?.id);
+
+        if (lastUnreadIndex !== -1) {
+          timeoutId = setTimeout(() => {
+            listRef.current?.scrollToIndex({
+              index: lastUnreadIndex,
+              animated: true,
+              viewPosition: 0.5
+            });
+          }, 500);
         }
-      }, 300);
+
+        // Marcar no leídos como leídos
+        const unreadMessageIds = unreadMessages.map(m => m.id);
+        if (unreadMessageIds.length > 0 && user) {
+          MessageReadRepository.markMultipleAsRead(unreadMessageIds, user.id).catch(e => {
+            handleError(e, setToast, 'Error marking messages as read');
+          });
+        }
+      } else {
+        timeoutId = setTimeout(() => {
+          listRef.current?.scrollToEnd({ animated: true });
+        }, 300);
+      }
     }
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
   }, [messages, user?.id]);
+
+  const checkScrollPosition = useCallback((offsetY: number, contentH: number, layoutH: number) => {
+    if (contentH <= layoutH) {
+      setShowScrollButton(false);
+      return;
+    }
+    const distanceFromBottom = contentH - offsetY - layoutH;
+    setShowScrollButton(distanceFromBottom > 200);
+  }, []);
 
   const sendMessage = async () => {
     const text = input.trim();
@@ -593,17 +634,71 @@ export default function ChatScreen() {
             <Text style={{ color: colors.textSecondary }}>Cargando...</Text>
           </View>
         ) : (
-        <FlatList
-          ref={listRef}
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.messageList}
-          showsVerticalScrollIndicator={false}
-          onScrollToIndexFailed={(info) => {
-            listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
-          }}
-        />
+          <View style={{ flex: 1 }}>
+            <FlatList
+              ref={listRef}
+              data={messages}
+              renderItem={renderMessage}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.messageList}
+              showsVerticalScrollIndicator={false}
+              onScroll={(event) => {
+                const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+                checkScrollPosition(contentOffset?.y ?? 0, contentSize?.height ?? 0, layoutMeasurement?.height ?? 0);
+              }}
+              onMomentumScrollEnd={(event) => {
+                const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+                checkScrollPosition(contentOffset?.y ?? 0, contentSize?.height ?? 0, layoutMeasurement?.height ?? 0);
+              }}
+              onScrollEndDrag={(event) => {
+                const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+                checkScrollPosition(contentOffset?.y ?? 0, contentSize?.height ?? 0, layoutMeasurement?.height ?? 0);
+              }}
+              scrollEventThrottle={16}
+              onScrollToIndexFailed={(info) => {
+                listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
+              }}
+            />
+
+            <Animated.View
+              pointerEvents={showScrollButton ? 'auto' : 'none'}
+              style={{
+                position: 'absolute',
+                bottom: 300,
+                right: 16,
+                width: 44,
+                height: 44,
+                zIndex: 50,
+                opacity: scrollButtonAnim,
+                transform: [{
+                  scale: scrollButtonAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.5, 1],
+                    extrapolate: 'clamp',
+                  }),
+                }],
+              }}
+            >
+              <TouchableOpacity
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: colors.primary,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  ...Shadows.active,
+                }}
+                activeOpacity={0.85}
+                onPress={() => {
+                  listRef.current?.scrollToEnd({ animated: true });
+                  setShowScrollButton(false);
+                }}
+              >
+                <Ionicons name="arrow-down" size={22} color={colors.white} />
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
         )}
 
         {/* ── Input bar ── */}
