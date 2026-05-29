@@ -77,6 +77,28 @@ Requiere Android Studio + JDK 17 instalados.
 
 ## Notas importantes
 
-- **Notificaciones push**: Funcionan solo en dispositivo fisico (no emulador) y requieren `EXPO_PUBLIC_EXPO_ACCESS_TOKEN`
-- **Icono de notificacion**: Opcional. Si quieres uno custom, crea `assets/notification-icon.png` (96x96, blanco sobre transparente) y configura el plugin `expo-notifications` en `app.json`
-- **Keystore**: EAS maneja el keystore automaticamente. Para produccion, puedes subir tu propio keystore si ya tienes uno
+- **Google Maps API Key (OBLIGATORIO — sin esto la app crashea al abrir Explore)**: `react-native-maps` en Android standalone **exige** una API key real. El placeholder `"YOUR_GOOGLE_MAPS_API_KEY"` en `app.json` **NO funciona** y provoca `java.lang.IllegalStateException: API key not found`. Obtén una gratis en [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials → Create API Key, habilita "Maps SDK for Android", y reemplázala en `app.json` → `android.config.googleMaps.apiKey`.
+- **Variables de entorno en EAS**: El archivo `.env` NO se sube automáticamente a EAS si está en `.gitignore`. Configúralas antes del build:
+  ```bash
+  eas env:create --name EXPO_PUBLIC_SUPABASE_URL --value "tu-url" --scope project --type string
+  eas env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "tu-key" --scope project --type string
+  eas env:create --name EXPO_PUBLIC_EXPO_ACCESS_TOKEN --value "tu-token" --scope project --type string
+  ```
+  O añádelas directamente en el dashboard de [Expo](https://expo.dev).
+- **Notificaciones push**: Funcionan solo en dispositivo físico (no emulador) y requieren `EXPO_PUBLIC_EXPO_ACCESS_TOKEN`.
+- **New Architecture**: Deshabilitada en `app.json` por incompatibilidad con `react-native-maps` y `react-native-pager-view` en release.
+- **Keystore**: EAS maneja el keystore automáticamente.
+
+## Si la APK crashea después del login
+
+1. Conecta el celular por USB y activa **USB Debugging**.
+2. Corre en tu PC:
+   ```bash
+   adb logcat -d | findstr "AndroidRuntime"
+   ```
+3. Eso te dará el error exacto de crash.
+
+Causas más comunes:
+- **Falta Google Maps API key** → crash inmediato al cargar Explore
+- **Variables de entorno vacías en EAS** → Supabase falla silenciosamente
+- **New Architecture activa en cache** → fuerza build limpio con version bump

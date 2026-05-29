@@ -16,10 +16,23 @@ import {
   BeVietnamPro_600SemiBold,
   BeVietnamPro_700Bold,
 } from '@expo-google-fonts/be-vietnam-pro';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import { Colors } from './src/theme';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { AuthProvider } from './src/context/AuthContext';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+// Configurar handler de notificaciones antes de que la app monte
+// Esto es requerido para que expo-notifications funcione correctamente en Android standalone
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -32,8 +45,6 @@ export default function App() {
     'BeVietnamPro-Medium': BeVietnamPro_500Medium,
     'BeVietnamPro-SemiBold': BeVietnamPro_600SemiBold,
     'BeVietnamPro-Bold': BeVietnamPro_700Bold,
-    ...Ionicons.font,
-    ...MaterialCommunityIcons.font,
   });
 
   if (!fontsLoaded) {
@@ -45,13 +56,14 @@ export default function App() {
   }
 
   return (
-    // @ts-ignore - React 19 type mismatch
-    <AuthProvider>
-      <ThemeProvider>
-        <NavigationContainer>
-          <AppNavigator />
-        </NavigationContainer>
-      </ThemeProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <ThemeProvider>
+          <NavigationContainer>
+            <AppNavigator />
+          </NavigationContainer>
+        </ThemeProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

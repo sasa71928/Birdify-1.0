@@ -29,16 +29,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 }, [user]);
 
   const registerPush = async (userId: string) => {
-    const token = await NotificationService.register();
+    try {
+      const token = await NotificationService.register();
 
-    if (!token) return;
+      if (!token) return;
 
-    await supabase
-      .from('users')
-      .update({
-        expo_push_token: token
-      })
-      .eq('id', userId);
+      await supabase
+        .from('users')
+        .update({
+          expo_push_token: token
+        })
+        .eq('id', userId);
+    } catch (e) {
+      console.error('Error registering push token:', e);
+    }
   };
 
   const signOut = async () => {

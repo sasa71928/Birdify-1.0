@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import MapView from 'react-native-maps';
@@ -30,6 +30,7 @@ const DEFAULT_REGION = {
 export function useExplore() {
   const navigation = useNavigation<ExploreNavProp>();
   const route = useRoute<ExploreRouteProp>();
+  const isFocused = useIsFocused();
   const mapRef = useRef<MapView>(null);
   
   const [loading, setLoading] = useState(true);
@@ -125,6 +126,7 @@ export function useExplore() {
     let isMounted = true;
 
     const initializeScreen = async () => {
+      if (!isFocused) return;
       await loadSightings();
       await loadUserLocation(isMounted);
     };
@@ -134,7 +136,7 @@ export function useExplore() {
     return () => {
       isMounted = false;
     };
-  }, [loadSightings]);
+  }, [loadSightings, isFocused]);
 
   // Navigate to target sighting if provided
   useEffect(() => {

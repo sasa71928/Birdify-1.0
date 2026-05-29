@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
 
 import MapView, { Marker } from 'react-native-maps';
 
@@ -93,6 +94,15 @@ const createMapStyle = (colors: any) => [
 export default function ExploreScreen() {
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const navigation = useNavigation<NavProp>();
+  const isFocused = useIsFocused();
+
+  // Evitar que MapView se monte hasta que la pestaña este activa
+  // (previene crash por falta de Google Maps API key al iniciar la app)
+  if (!isFocused) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.surface }]} />
+    );
+  }
 
   const MAP_STYLE = useMemo(() => createMapStyle(colors), [colors]);
 
@@ -189,22 +199,24 @@ export default function ExploreScreen() {
       />
       <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
 
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        showsUserLocation
-        showsCompass={false}
-        showsMyLocationButton={false}
-        moveOnMarkerPress={false}
-        toolbarEnabled={false}
-        pitchEnabled={false}
-        rotateEnabled={false}
-        customMapStyle={isDark ? MAP_STYLE : []}
-        initialRegion={DEFAULT_REGION}
-        onPress={closeSelection}
-      >
-        {markers}
-      </MapView>
+      {isFocused && (
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          showsUserLocation
+          showsCompass={false}
+          showsMyLocationButton={false}
+          moveOnMarkerPress={false}
+          toolbarEnabled={false}
+          pitchEnabled={false}
+          rotateEnabled={false}
+          customMapStyle={isDark ? MAP_STYLE : []}
+          initialRegion={DEFAULT_REGION}
+          onPress={closeSelection}
+        >
+          {markers}
+        </MapView>
+      )}
 
       {selectedSighting && (
         <TouchableOpacity
