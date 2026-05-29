@@ -100,6 +100,42 @@ export const createStyles = (colors: typeof Colors) =>
       fontWeight: Typography.fontWeight.medium,
     },
 
+    // Tabs
+    tabsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: Spacing.sm,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.sm,
+      backgroundColor: colors.surface,
+    },
+
+    tab: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: Radius.full,
+      backgroundColor: colors.componentBase,
+      borderWidth: 1,
+      borderColor: colors.border + '33',
+    },
+
+    activeTab: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+
+    tabText: {
+      fontSize: Typography.fontSize.sm,
+      fontWeight: Typography.fontWeight.semiBold,
+      color: colors.textSecondary,
+    },
+
+    activeTabText: {
+      color: colors.white,
+    },
+
     // Resultados
     resultCard: {
       flexDirection: 'row',
@@ -116,6 +152,13 @@ export const createStyles = (colors: typeof Colors) =>
       width: 60,
       height: 60,
       borderRadius: Radius.md,
+      marginRight: Spacing.md,
+    },
+
+    userAvatar: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
       marginRight: Spacing.md,
     },
 

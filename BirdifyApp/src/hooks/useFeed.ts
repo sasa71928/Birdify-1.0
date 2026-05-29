@@ -1,24 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SightingRepository } from '../repositories/sighting.repository';
 import { useAuth } from '../context/AuthContext';
 import FeedItem, { Post } from '../components/FeedItem';
-import * as Location from 'expo-location';
 import { handleError } from '../utils/errorHandler';
 
-async function getCityFromCoordinates(latitude: number, longitude: number): Promise<string | null> {
-  try {
-    const results = await Location.reverseGeocodeAsync({ latitude, longitude });
-    if (results && results.length > 0) {
-      const city = results[0].city || results[0].subregion || results[0].region;
-      return city || null;
-    }
-  } catch (error) {
-    console.error('Error getting city from coordinates:', error);
-  }
-  return null;
+const CACHE_TTL_MS = 60000;
+
+interface FeedCache {
+  posts: Post[];
+  timestamp: number;
+  userId?: string;
 }
 
-async function mapSightingToPost(sighting: any, currentUserId?: string): Promise<Post> {
+function mapSightingToPost(sighting: any, currentUserId?: string): Post {
   const timeDiff = Date.now() - new Date(sighting.created_at).getTime();
   const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60));
   const timeAgoStr = hoursAgo < 24
@@ -29,7 +23,9 @@ async function mapSightingToPost(sighting: any, currentUserId?: string): Promise
   const likesCount = reactionsList.length;
   const hasLiked = currentUserId ? reactionsList.some((r: any) => r.user_id === currentUserId) : false;
 
-  const userData = Array.isArray(sighting.user) ? sighting.user[0] : sighting.user;
+  // Supabase puede devolver 'users' (plural, nombre de tabla) o 'user' (singular)
+  const rawUser = sighting.users || sighting.user;
+  const userData = Array.isArray(rawUser) ? rawUser[0] : rawUser;
 
   let photoUrl: string | string[] = sighting.photo_url || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=600';
 
@@ -46,9 +42,7 @@ async function mapSightingToPost(sighting: any, currentUserId?: string): Promise
 
   let locationText = 'Ubicación Privada';
   if (!sighting.is_location_private && sighting.latitude && sighting.longitude) {
-    const city = await getCityFromCoordinates(sighting.latitude, sighting.longitude);
-    const coords = `${sighting.latitude.toFixed(4)}, ${sighting.longitude.toFixed(4)}`;
-    locationText = city ? `${city} (${coords})` : coords;
+    locationText = `${sighting.latitude.toFixed(4)}, ${sighting.longitude.toFixed(4)}`;
   }
 
   return {
@@ -74,6 +68,7 @@ async function mapSightingToPost(sighting: any, currentUserId?: string): Promise
 
 export function useFeed() {
   const { user } = useAuth();
+  const cacheRef = useRef<FeedCache | null>(null);
   
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -84,19 +79,29 @@ export function useFeed() {
     type: 'success',
   });
 
-  const loadFeed = async () => {
+  const loadFeed = useCallback(async (forceRefresh = false) => {
+    const now = Date.now();
+    const cached = cacheRef.current;
+
+    if (!forceRefresh && cached && cached.userId === user?.id && (now - cached.timestamp) < CACHE_TTL_MS) {
+      setPosts(cached.posts);
+      return;
+    }
+
     try {
       const sightings = await SightingRepository.getFeed(user?.id);
-      const mappedPosts = await Promise.all(sightings.map(item => mapSightingToPost(item, user?.id)));
+      const mappedPosts = sightings.map(item => mapSightingToPost(item, user?.id));
+      cacheRef.current = { posts: mappedPosts, timestamp: now, userId: user?.id };
       setPosts(mappedPosts);
     } catch (error) {
       handleError(error, setToast, 'Error cargando el feed');
     }
-  };
+  }, [user?.id]);
 
-  const handlePostDeleted = async () => {
-    await loadFeed();
-  };
+  const handlePostDeleted = useCallback(async () => {
+    cacheRef.current = null;
+    await loadFeed(true);
+  }, [loadFeed]);
 
   const initialLoad = async () => {
     setIsLoading(true);
@@ -106,7 +111,7 @@ export function useFeed() {
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    await loadFeed();
+    await loadFeed(true);
     setIsRefreshing(false);
   };
 

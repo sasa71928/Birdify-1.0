@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { Sighting } from '../types/models';
+import { PushNotificationSender } from '../services/push.sender';
+import { NotificationPreferencesService } from '../services/notification.preferences';
 
 export const SightingRepository = {
   async create(sighting: Omit<Sighting, 'id' | 'created_at' | 'updated_at'>): Promise<Sighting> {
@@ -10,7 +12,50 @@ export const SightingRepository = {
       .single();
 
     if (error) throw error;
+
+    // Notificar a followers del usuario
+    this.notifyFollowers(sighting.user_id, data.id).catch(() => {});
+
     return data;
+  },
+
+  async notifyFollowers(userId: string, sightingId: string): Promise<void> {
+    try {
+      // Obtener followers del usuario
+      const { data: followers } = await supabase
+        .from('follows')
+        .select('follower_id')
+        .eq('following_id', userId);
+
+      if (!followers || followers.length === 0) return;
+
+      const followerIds = followers.map((f: any) => f.follower_id);
+      const enabledIds: string[] = [];
+
+      for (const fid of followerIds) {
+        const enabled = await NotificationPreferencesService.isPushEnabled(fid, 'new_sighting');
+        if (enabled) enabledIds.push(fid);
+      }
+
+      if (enabledIds.length === 0) return;
+
+      // Obtener nombre del usuario
+      const { data: user } = await supabase
+        .from('users')
+        .select('username, fullname')
+        .eq('id', userId)
+        .single();
+
+      const name = user?.fullname || user?.username || 'Alguien';
+
+      await PushNotificationSender.sendToUsers(enabledIds, {
+        title: 'Nuevo avistamiento',
+        body: `${name} publicó un nuevo avistamiento`,
+        data: { type: 'new_sighting', sightingId },
+      });
+    } catch (e) {
+      console.error('Error notifying followers:', e);
+    }
   },
 
   async update(id: string, sighting: Partial<Omit<Sighting, 'id' | 'created_at' | 'updated_at'>>): Promise<Sighting> {
@@ -25,7 +70,10 @@ export const SightingRepository = {
     return data;
   },
 
-  async getFeed(currentUserId?: string): Promise<any[]> {
+  async getFeed(currentUserId?: string, page = 0, limit = 20): Promise<any[]> {
+    const from = page * limit;
+    const to = from + limit - 1;
+
     let query = supabase
       .from('sightings')
       .select(`
@@ -44,7 +92,8 @@ export const SightingRepository = {
         reactions (user_id),
         comments (id)
       `)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
     const { data, error } = await query;
 
@@ -83,7 +132,10 @@ export const SightingRepository = {
     return formattedData;
   },
 
-  async getByUserId(userId: string): Promise<any[]> {
+  async getByUserId(userId: string, page = 0, limit = 20): Promise<any[]> {
+    const from = page * limit;
+    const to = from + limit - 1;
+
     const { data, error } = await supabase
       .from('sightings')
       .select(`
@@ -103,7 +155,8 @@ export const SightingRepository = {
         comments (id)
       `)
       .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
     if (error) {
       console.error('Error in getByUserId:', error);

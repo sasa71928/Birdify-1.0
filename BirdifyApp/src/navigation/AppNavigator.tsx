@@ -1,32 +1,35 @@
-import React from 'react';
+import React, { Suspense } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import BottomNavBar from '../components/BottomNavBar';
+import { Colors } from '../theme';
 
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import LoginScreen    from '../screens/auth/LoginScreen';
 import FeedScreen     from '../screens/main/FeedScreen';
-import RecordSightingScreen from '../screens/bird/RecordSightingScreen';
-import ProfileScreen        from '../screens/social/ProfileScreen';
 import DictionaryScreen     from '../screens/main/DictionaryScreen';
 import MessagesScreen       from '../screens/main/MessagesScreen';
 import ExploreScreen        from '../screens/main/ExploreScreen';
 import WelcomeScreen        from '../screens/auth/WelcomeScreen';
-import SearchScreen         from '../screens/bird/SearchScreen';
-import BirdDetailScreen     from '../screens/bird/BirdDetailScreen';
-import ChatScreen           from '../screens/social/ChatScreen';
-import CreateGroupScreen    from '../screens/social/CreateGroupScreen';
-import EditGroupScreen      from '../screens/social/EditGroupScreen';
-import SearchMessagesScreen from '../screens/social/SearchMessagesScreen';
-import SettingsScreen       from '../screens/settings/SettingsScreen';
-import LanguageSettingsScreen from '../screens/settings/LanguageSettingsScreen';
-import PrivacySettingsScreen from '../screens/settings/PrivacySettingsScreen';
-import NotificationSettingsScreen from '../screens/settings/NotificationSettingsScreen';
-import EditProfileScreen from '../screens/settings/EditProfileScreen';
-import ThemeSettingsScreen from '../screens/settings/ThemeSettingsScreen';
-import HelpSupportScreen from '../screens/settings/HelpSupportScreen';
-import AboutBirdifyScreen from '../screens/settings/AboutBirdifyScreen';
-import BlockedUsersScreen from '../screens/settings/BlockedUsersScreen';
+
+const RecordSightingScreen = React.lazy(() => import('../screens/bird/RecordSightingScreen'));
+const ProfileScreen        = React.lazy(() => import('../screens/social/ProfileScreen'));
+const SearchScreen         = React.lazy(() => import('../screens/bird/SearchScreen'));
+const BirdDetailScreen     = React.lazy(() => import('../screens/bird/BirdDetailScreen'));
+const ChatScreen           = React.lazy(() => import('../screens/social/ChatScreen'));
+const CreateGroupScreen    = React.lazy(() => import('../screens/social/CreateGroupScreen'));
+const EditGroupScreen      = React.lazy(() => import('../screens/social/EditGroupScreen'));
+const SearchMessagesScreen = React.lazy(() => import('../screens/social/SearchMessagesScreen'));
+const SettingsScreen       = React.lazy(() => import('../screens/settings/SettingsScreen'));
+const LanguageSettingsScreen = React.lazy(() => import('../screens/settings/LanguageSettingsScreen'));
+const PrivacySettingsScreen = React.lazy(() => import('../screens/settings/PrivacySettingsScreen'));
+const NotificationSettingsScreen = React.lazy(() => import('../screens/settings/NotificationSettingsScreen'));
+const EditProfileScreen = React.lazy(() => import('../screens/settings/EditProfileScreen'));
+const ThemeSettingsScreen = React.lazy(() => import('../screens/settings/ThemeSettingsScreen'));
+const HelpSupportScreen = React.lazy(() => import('../screens/settings/HelpSupportScreen'));
+const AboutBirdifyScreen = React.lazy(() => import('../screens/settings/AboutBirdifyScreen'));
+const BlockedUsersScreen = React.lazy(() => import('../screens/settings/BlockedUsersScreen'));
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 export interface BirdSpeciesData {
@@ -108,8 +111,6 @@ function MainTabs() {
 }
 
 import { useAuth } from '../context/AuthContext';
-import { View, ActivityIndicator } from 'react-native';
-import { Colors } from '../theme';
 
 export default function AppNavigator() {
   const { session, isLoading } = useAuth();
@@ -124,6 +125,11 @@ export default function AppNavigator() {
 
   return (
     // @ts-ignore - React 19 type mismatch with React Navigation 7
+    <Suspense fallback={
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.surface }}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    }>
     <Stack.Navigator
       screenOptions={{ headerShown: false } as any}
     >
@@ -158,5 +164,6 @@ export default function AppNavigator() {
         </>
       )}
     </Stack.Navigator>
+    </Suspense>
   );
 }

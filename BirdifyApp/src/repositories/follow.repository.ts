@@ -1,4 +1,6 @@
 import { supabase } from '../lib/supabase';
+import { PushNotificationSender } from '../services/push.sender';
+import { NotificationPreferencesService } from '../services/notification.preferences';
 
 export const FollowRepository = {
   async isFollowing(followerId: string, followingId: string): Promise<boolean> {
@@ -24,6 +26,38 @@ export const FollowRepository = {
     if (error) {
       console.error('Error in follow:', error);
       throw error;
+    }
+
+    // Notificar al usuario seguido
+    this.notifyFollowed(followerId, followingId).catch(() => {});
+  },
+
+  async notifyFollowed(followerId: string, followingId: string): Promise<void> {
+    try {
+      const isEnabled = await NotificationPreferencesService.isPushEnabled(followingId, 'new_follower');
+      if (!isEnabled) return;
+
+      const token = await NotificationPreferencesService.getPushToken(followingId);
+      if (!token) return;
+
+      // Obtener nombre del seguidor
+      const { data: follower } = await supabase
+        .from('users')
+        .select('username, fullname')
+        .eq('id', followerId)
+        .single();
+
+      const name = follower?.fullname || follower?.username || 'Alguien';
+
+      await PushNotificationSender.send({
+        to: token,
+        sound: 'default',
+        title: 'Nuevo seguidor',
+        body: `${name} empezó a seguirte`,
+        data: { type: 'new_follower', followerId },
+      });
+    } catch (e) {
+      console.error('Error notifying followed user:', e);
     }
   },
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -33,12 +33,21 @@ export default function ThemeSettingsScreen() {
     message: '',
     type: 'success',
   });
+  const navTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSave = () => {
     setTheme(selectedTheme);
     handleError(`Birdify is now set to ${THEMES.find(t => t.id === selectedTheme)?.name}`, setToast, 'Theme Updated');
-    setTimeout(() => navigation.goBack(), 1000);
+    navTimerRef.current = setTimeout(() => navigation.goBack(), 1000);
   };
+
+  useEffect(() => {
+    return () => {
+      if (navTimerRef.current) {
+        clearTimeout(navTimerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

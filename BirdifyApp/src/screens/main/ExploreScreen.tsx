@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 
 import {
   View,
@@ -117,6 +117,39 @@ export default function ExploreScreen() {
     calculateDistance,
   } = useExplore();
 
+  const markers = useMemo(() => filteredSightings.map((item) => {
+    const isSelected = selectedMarker === item.id;
+
+    return (
+      <Marker
+        key={item.id}
+        coordinate={{
+          latitude: Number(item.latitude),
+          longitude: Number(item.longitude),
+        }}
+        onPress={() => {
+          handleMarkerPress(item.id);
+          mapRef.current?.animateToRegion({
+            latitude: Number(item.latitude),
+            longitude: Number(item.longitude),
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          }, 300);
+        }}
+      >
+        <Ionicons
+          name="location-sharp"
+          size={isSelected ? 36 : 28}
+          color={
+            isSelected
+              ? colors.secondaryBlue
+              : colors.primary
+          }
+        />
+      </Marker>
+    );
+  }), [filteredSightings, selectedMarker, colors.primary, colors.secondaryBlue, handleMarkerPress]);
+
   if (loading) {
     return (
       <View
@@ -162,43 +195,15 @@ export default function ExploreScreen() {
         showsUserLocation
         showsCompass={false}
         showsMyLocationButton={false}
+        moveOnMarkerPress={false}
+        toolbarEnabled={false}
+        pitchEnabled={false}
+        rotateEnabled={false}
         customMapStyle={isDark ? MAP_STYLE : []}
         initialRegion={DEFAULT_REGION}
         onPress={closeSelection}
       >
-        {filteredSightings.map((item) => {
-          const isSelected =
-            selectedMarker === item.id;
-
-          return (
-            <Marker
-              key={item.id}
-              coordinate={{
-                latitude: Number(item.latitude),
-                longitude: Number(item.longitude),
-              }}
-              onPress={() => {
-                handleMarkerPress(item.id);
-                mapRef.current?.animateToRegion({
-                  latitude: Number(item.latitude),
-                  longitude: Number(item.longitude),
-                  latitudeDelta: 0.01,
-                  longitudeDelta: 0.01,
-                });
-              }}
-            >
-              <MaterialCommunityIcons
-                name="bird"
-                size={42}
-                color={
-                  isSelected
-                    ? colors.primaryDark
-                    : colors.primary
-                }
-              />
-            </Marker>
-          );
-        })}
+        {markers}
       </MapView>
 
       {selectedSighting && (

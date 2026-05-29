@@ -11,8 +11,8 @@ export interface User {
   created_at: string;
   expo_push_token: string | null;
   notification_settings: any | null;
-  push_notifications: boolean;
-  email_notifications: boolean;
+  push_notifications: any | null;
+  email_notifications: any | null;
 }
 
 export interface Bird {

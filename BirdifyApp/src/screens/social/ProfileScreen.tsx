@@ -92,12 +92,18 @@ export default function ProfileScreen() {
         .from('sightings')
         .select(`
           id,
+          user_id,
           description,
           photo_url,
+          latitude,
+          longitude,
           created_at,
           sighting_date,
           is_location_private,
-          bird:birds (id, common_name, scientific_name)
+          users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
+          bird:birds (id, common_name, scientific_name),
+          reactions (user_id),
+          comments (id)
         `)
         .eq('user_id', displayUserId)
         .order('created_at', { ascending: false });
@@ -178,11 +184,18 @@ export default function ProfileScreen() {
           .from('sightings')
           .select(`
             id,
+            user_id,
             description,
             photo_url,
+            latitude,
+            longitude,
             sighting_date,
             is_location_private,
-            bird:birds (id, common_name, scientific_name)
+            created_at,
+            users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
+            bird:birds (id, common_name, scientific_name),
+            reactions (user_id),
+            comments (id)
           `)
           .eq('user_id', displayUserId)
           .order('created_at', { ascending: false });
@@ -256,9 +269,17 @@ export default function ProfileScreen() {
           .select(`
             sighting:sightings (
               id,
+              user_id,
+              description,
               photo_url,
+              latitude,
+              longitude,
+              is_location_private,
+              created_at,
+              users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
               bird:birds (id, common_name, scientific_name),
-              users!sightings_user_id_fkey (username)
+              reactions (user_id),
+              comments (id)
             )
           `)
           .eq('user_id', displayUserId);
@@ -268,13 +289,7 @@ export default function ProfileScreen() {
 
         const mappedLikes = (reactionsData || [])
           .filter((r: any) => r.sighting)
-          .map((r: any) => ({
-            id: r.sighting.id,
-            image: r.sighting.photo_url,
-            bird: r.sighting.bird,
-            user: r.sighting.user?.username || 'user',
-            likes: 1
-          }));
+          .map((r: any) => r.sighting);
         setLikes(mappedLikes);
 
       } catch (error) {
@@ -444,6 +459,7 @@ const userData = profile ? {
           <Image
             source={{ uri: userData.avatar }}
             style={styles.avatar}
+            fadeDuration={0}
           />
             {userData.is_verified === true && (
               <View style={styles.verifiedBadge}>
@@ -649,7 +665,11 @@ const userData = profile ? {
             onPress={() => setShowSightingModal(false)}
           >
             {selectedSighting && (
-              <FeedItem post={mapSightingToPost(selectedSighting, authUser?.id)} onPostDeleted={handlePostDeleted} />
+              <FeedItem 
+                post={mapSightingToPost(selectedSighting, authUser?.id)} 
+                onPostDeleted={handlePostDeleted}
+                onNavigateAway={() => setShowSightingModal(false)}
+              />
             )}
           </TouchableOpacity>
           <TouchableOpacity
@@ -663,7 +683,8 @@ const userData = profile ? {
 
       <BottomNavBar />
     </SafeAreaView>
-);
+  );
+}
 
 // ── mapSightingToPost ─────────────────────────────────────────────────────────
 function mapSightingToPost(sighting: any, currentUserId?: string): Post {
@@ -672,6 +693,14 @@ function mapSightingToPost(sighting: any, currentUserId?: string): Post {
   const timeAgoStr = hoursAgo < 24
     ? (hoursAgo === 0 ? 'Hace un momento' : `Hace ${hoursAgo} hora${hoursAgo === 1 ? '' : 's'}`)
     : `Hace ${Math.floor(hoursAgo/24)} día${Math.floor(hoursAgo/24) === 1 ? '' : 's'}`;
+
+  const reactionsList = sighting.reactions || [];
+  const likesCount = reactionsList.length;
+  const hasLiked = currentUserId ? reactionsList.some((r: any) => r.user_id === currentUserId) : false;
+
+  // Supabase puede devolver 'users' (plural, nombre de tabla) o 'user' (singular)
+  const rawUser = sighting.users || sighting.user;
+  const userData = Array.isArray(rawUser) ? rawUser[0] : rawUser;
 
   let photoUrl: string | string[] = sighting.photo_url || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=600';
 
@@ -686,20 +715,29 @@ function mapSightingToPost(sighting: any, currentUserId?: string): Post {
     }
   }
 
+  let locationText = 'Ubicación Privada';
+  if (!sighting.is_location_private && sighting.latitude && sighting.longitude) {
+    locationText = `${sighting.latitude.toFixed(4)}, ${sighting.longitude.toFixed(4)}`;
+  }
+
   return {
     id: sighting.id,
     userId: sighting.user_id,
-    username: sighting.user?.username || 'Usuario',
-    userAvatar: sighting.user?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
-    location: sighting.is_location_private ? 'Ubicación privada' : 'Ubicación del mapa',
+    username: userData?.username || 'Usuario',
+    userAvatar: userData?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
+    location: locationText,
     image: photoUrl,
-    tag: sighting.bird?.common_name || 'Ave desconocida',
-    likes: 0,
-    comments: 0,
+    tag: sighting.bird?.common_name || 'Ave Sin Identificar',
+    likes: likesCount,
+    comments: sighting.comments ? sighting.comments.length : 0,
     caption: sighting.description || '',
     timeAgo: timeAgoStr,
-    hasLiked: false,
-    createdAt: sighting.created_at || sighting.sighting_date
+    isVerified: userData?.is_verified === true,
+    commentsList: [],
+    hasLiked,
+    createdAt: sighting.created_at || sighting.sighting_date,
+    latitude: sighting.latitude,
+    longitude: sighting.longitude,
   };
 }
 
@@ -743,7 +781,7 @@ function SightingsGrid({ sightings, onItemPress }: { sightings: any[], onItemPre
     <View style={styles.grid}>
       {sightings.map((item) => (
         <TouchableOpacity key={item.id} style={styles.gridItem} activeOpacity={0.85} onPress={() => onItemPress?.(item)}>
-          <Image source={{ uri: getFirstImage(item.photo_url) }} style={styles.gridImage} />
+          <Image source={{ uri: getFirstImage(item.photo_url) }} style={styles.gridImage} fadeDuration={0} />
           <View style={styles.locationBadge}>
             <Ionicons name="location" size={11} color={colors.white} />
           </View>
@@ -956,13 +994,13 @@ function LogbookView({ species }: { species: any[] }) {
 function LikesView({ likes, onItemPress }: { likes: any[], onItemPress?: (post: any) => void }) {
   const { screen: styles, colors } = useDynamicStyles(createStyles);
 
-  const getFirstImage = (imageUrl: string | string[] | null) => {
-    if (!imageUrl) return 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300';
-    
-    let parsedUrl: string | string[] = imageUrl;
-    if (typeof imageUrl === 'string') {
+  const getFirstImage = (photoUrl: string | string[] | null) => {
+    if (!photoUrl) return 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300';
+
+    let parsedUrl: string | string[] = photoUrl;
+    if (typeof photoUrl === 'string') {
       try {
-        const parsed = JSON.parse(imageUrl);
+        const parsed = JSON.parse(photoUrl);
         if (Array.isArray(parsed)) {
           parsedUrl = parsed;
         }
@@ -970,7 +1008,7 @@ function LikesView({ likes, onItemPress }: { likes: any[], onItemPress?: (post: 
         // Es una URL simple, no un JSON
       }
     }
-    
+
     if (Array.isArray(parsedUrl)) {
       return parsedUrl[0] || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=300';
     }
@@ -992,14 +1030,13 @@ function LikesView({ likes, onItemPress }: { likes: any[], onItemPress?: (post: 
     <View style={styles.grid}>
       {likes.map((post) => (
         <TouchableOpacity key={post.id} style={styles.gridItem} activeOpacity={0.85} onPress={() => onItemPress?.(post)}>
-          <Image source={{ uri: getFirstImage(post.image) }} style={styles.gridImage} />
+          <Image source={{ uri: getFirstImage(post.photo_url) }} style={styles.gridImage} fadeDuration={0} />
           <View style={styles.likeHeartBadge}>
             <Ionicons name="heart" size={11} color={colors.errorRed} />
-            <Text style={styles.likeGridCount}>{post.likes}</Text>
+            <Text style={styles.likeGridCount}>{post.reactions?.length || 0}</Text>
           </View>
         </TouchableOpacity>
       ))}
     </View>
   );
-}
 }

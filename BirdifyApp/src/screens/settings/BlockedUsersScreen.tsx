@@ -31,13 +31,6 @@ export default function BlockedUsersScreen() {
     type: 'success',
   });
 
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ visible: true, message, type });
-    setTimeout(() => {
-      setToast(prev => ({ ...prev, visible: false }));
-    }, 3200);
-  };
-
   const loadBlockedUsers = useCallback(async () => {
     if (!user) return;
     try {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -60,13 +60,25 @@ export default function RegisterScreen() {
     message: '',
     type: 'success',
   });
+  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
     setToast({ visible: true, message, type });
-    setTimeout(() => {
+    toastTimerRef.current = setTimeout(() => {
       setToast(prev => ({ ...prev, visible: false }));
     }, 3800);
   };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleRegister = async () => {
     if (

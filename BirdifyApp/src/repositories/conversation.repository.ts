@@ -43,7 +43,10 @@ export interface ConversationListItem {
 }
 
 export const ConversationRepository = {
-  async listForUser(userId: string): Promise<ConversationListItem[]> {
+  async listForUser(userId: string, page = 0, limit = 30): Promise<ConversationListItem[]> {
+    const from = page * limit;
+    const to = from + limit - 1;
+
     // Fetch membership + conversation + members
     const { data, error } = await supabase
       .from('conversation_members')
@@ -67,7 +70,8 @@ export const ConversationRepository = {
         )
       `
       )
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .range(from, to);
 
     if (error) throw error;
 

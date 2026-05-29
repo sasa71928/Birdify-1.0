@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, ScrollView, StatusBar, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -35,13 +35,25 @@ export default function LoginScreen() {
     message: '',
     type: 'success',
   });
+  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
     setToast({ visible: true, message, type });
-    setTimeout(() => {
+    toastTimerRef.current = setTimeout(() => {
       setToast(prev => ({ ...prev, visible: false }));
     }, 3600);
   };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {

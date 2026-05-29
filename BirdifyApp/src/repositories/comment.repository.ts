@@ -1,4 +1,6 @@
 import { supabase } from '../lib/supabase';
+import { PushNotificationSender } from '../services/push.sender';
+import { NotificationPreferencesService } from '../services/notification.preferences';
 
 export const CommentRepository = {
   // Crear un comentario o respuesta (subcomentario)
@@ -22,7 +24,41 @@ export const CommentRepository = {
       console.error('Error creating comment:', error);
       throw error;
     }
+
+    // Notificar al owner del sighting
+    this.notifyOwner(sightingId, userId, content).catch(() => {});
+
     return data;
+  },
+
+  async notifyOwner(sightingId: string, commenterId: string, content: string): Promise<void> {
+    try {
+      // Obtener owner del sighting
+      const { data: sighting } = await supabase
+        .from('sightings')
+        .select('user_id')
+        .eq('id', sightingId)
+        .single();
+
+      if (!sighting || sighting.user_id === commenterId) return;
+
+      const ownerId = sighting.user_id;
+      const isEnabled = await NotificationPreferencesService.isPushEnabled(ownerId, 'new_comment');
+      if (!isEnabled) return;
+
+      const token = await NotificationPreferencesService.getPushToken(ownerId);
+      if (!token) return;
+
+      await PushNotificationSender.send({
+        to: token,
+        sound: 'default',
+        title: 'Nuevo comentario',
+        body: content.length > 60 ? content.substring(0, 60) + '...' : content,
+        data: { type: 'new_comment', sightingId },
+      });
+    } catch (e) {
+      console.error('Error notifying comment owner:', e);
+    }
   },
 
   // Obtener todos los comentarios de un avistamiento en un árbol jerárquico

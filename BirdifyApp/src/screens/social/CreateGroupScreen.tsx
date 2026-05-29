@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -44,11 +44,23 @@ export default function CreateGroupScreen() {
     message: '',
     type: 'success',
   });
+  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
     setToast({ visible: true, message, type });
-    setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3600);
+    toastTimerRef.current = setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3600);
   };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   React.useEffect(() => {
     let mounted = true;

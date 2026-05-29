@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
@@ -25,20 +25,31 @@ export default function BottomNavBar({ state }: any) {
   // If used as a custom tab bar, state is provided. Otherwise, fallback to standard route.name.
   const currentRoute = state ? state.routes[state.index].name : route.name;
 
+  const loadUnreadCount = useCallback(async () => {
+    if (!user) return;
+    try {
+      const conversations = await ConversationRepository.listForUser(user.id);
+      const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unread || 0), 0);
+      setUnreadCount(totalUnread);
+    } catch (e) {
+      console.error('Error loading unread count:', e);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadUnreadCount();
+  }, [loadUnreadCount, state?.index]);
+
+  useEffect(() => {
+    // Recargar al regresar del stack (ej. ChatScreen) al tab principal
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadUnreadCount();
+    });
+    return unsubscribe;
+  }, [navigation, loadUnreadCount]);
+
   useEffect(() => {
     if (!user) return;
-
-    const loadUnreadCount = async () => {
-      try {
-        const conversations = await ConversationRepository.listForUser(user.id);
-        const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unread || 0), 0);
-        setUnreadCount(totalUnread);
-      } catch (e) {
-        console.error('Error loading unread count:', e);
-      }
-    };
-
-    loadUnreadCount();
 
     // Set up real-time subscription for message_reads
     const channelName = `unread-count-${user.id}-${Date.now()}`;
@@ -71,7 +82,7 @@ export default function BottomNavBar({ state }: any) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id]);
+  }, [loadUnreadCount]);
 
   return (
     <View style={styles.container}>

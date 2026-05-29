@@ -1,4 +1,6 @@
 import { supabase } from '../lib/supabase';
+import { PushNotificationSender } from '../services/push.sender';
+import { NotificationPreferencesService } from '../services/notification.preferences';
 
 export interface MessageRow {
   id: string;
@@ -93,6 +95,43 @@ export const MessageRepository = {
       reply_to_id: replyToId ?? null,
     });
     if (error) throw error;
+
+    // Notificar a otros participantes
+    this.notifyRecipients(conversationId, senderId, content).catch(() => {});
+  },
+
+  async notifyRecipients(conversationId: string, senderId: string, content: string | null | undefined): Promise<void> {
+    try {
+      const { data: participants } = await supabase
+        .from('conversation_members')
+        .select('user_id')
+        .eq('conversation_id', conversationId)
+        .neq('user_id', senderId);
+
+      if (!participants || participants.length === 0) return;
+
+      const recipientIds = participants.map((p: any) => p.user_id);
+      const enabledIds: string[] = [];
+
+      for (const userId of recipientIds) {
+        const enabled = await NotificationPreferencesService.isPushEnabled(userId, 'direct_message');
+        if (enabled) enabledIds.push(userId);
+      }
+
+      if (enabledIds.length === 0) return;
+
+      const body = content && content.length > 0
+        ? (content.length > 60 ? content.substring(0, 60) + '...' : content)
+        : 'Te enviaron una imagen';
+
+      await PushNotificationSender.sendToUsers(enabledIds, {
+        title: 'Nuevo mensaje',
+        body,
+        data: { type: 'direct_message', conversationId },
+      });
+    } catch (e) {
+      console.error('Error notifying message recipients:', e);
+    }
   },
 
   async delete(messageId: string, senderId: string): Promise<void> {

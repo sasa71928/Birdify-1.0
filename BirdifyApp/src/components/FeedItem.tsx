@@ -47,12 +47,13 @@ export interface Post {
 interface FeedItemProps {
   post: Post;
   onPostDeleted?: () => void;
+  onNavigateAway?: () => void;
 }
 
 const CAPTION_LIMIT = 100;
 const INITIAL_COMMENTS_DISPLAY = 5;
 
-export default function FeedItem({ post, onPostDeleted }: FeedItemProps) {
+function FeedItem({ post, onPostDeleted, onNavigateAway }: FeedItemProps) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const { user } = useAuth();
@@ -87,12 +88,24 @@ export default function FeedItem({ post, onPostDeleted }: FeedItemProps) {
     message: '',
     type: 'success',
   });
+  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const showToast = React.useCallback((message: string, type: 'success' | 'error') => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
     setToast({ visible: true, message, type });
-    setTimeout(() => {
+    toastTimerRef.current = setTimeout(() => {
       setToast(prev => ({ ...prev, visible: false }));
     }, 4500);
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
   }, []);
 
   const images = Array.isArray(post.image) ? post.image : [post.image];
@@ -181,8 +194,9 @@ export default function FeedItem({ post, onPostDeleted }: FeedItemProps) {
       setCommentText('');
       setReplyingTo(null);
 
-      // Recargar comentarios
+      // Recargar comentarios y actualizar contador
       await loadComments();
+      setCommentsCount(prev => prev + 1);
       
     } catch (error) {
       Alert.alert('Error', 'No se pudo publicar tu comentario. Inténtalo de nuevo.');
@@ -508,9 +522,12 @@ export default function FeedItem({ post, onPostDeleted }: FeedItemProps) {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.userInfo}
-          onPress={() => navigation.navigate('Profile', { userId: post.userId })}
+          onPress={() => {
+            onNavigateAway?.();
+            navigation.navigate('Profile', { userId: post.userId });
+          }}
         >
-          <Image source={{ uri: post.userAvatar }} style={styles.avatar} />
+          <Image source={{ uri: post.userAvatar }} style={styles.avatar} fadeDuration={0} />
           <View style={styles.userText}>
             <View style={styles.nameRow}>
               <Text style={styles.username}>{post.username}</Text>
@@ -520,13 +537,18 @@ export default function FeedItem({ post, onPostDeleted }: FeedItemProps) {
             </View>
             <TouchableOpacity onPress={() => {
               if (post.latitude && post.longitude) {
-                navigation.navigate('Explore', { 
-                  targetSighting: {
-                    id: post.id,
-                    latitude: post.latitude,
-                    longitude: post.longitude,
-                  }
-                });
+                const targetSighting = {
+                  id: post.id,
+                  latitude: post.latitude,
+                  longitude: post.longitude,
+                };
+                // Si Explore está en el navigator actual (tab), navegar directamente.
+                // Si no (ej. desde modal de Profile en stack), navegar a MainTabs -> Explore.
+                if (navigation.getState().routeNames.includes('Explore')) {
+                  navigation.navigate('Explore', { targetSighting });
+                } else {
+                  (navigation as any).navigate('MainTabs', { screen: 'Explore', params: { targetSighting } });
+                }
               }
             }}>
               <Text style={styles.location}>{post.location}</Text>
@@ -560,7 +582,7 @@ export default function FeedItem({ post, onPostDeleted }: FeedItemProps) {
         {images.map((img, index) => (
           <View key={index} style={{ flex: 1 }}>
             <TouchableWithoutFeedback onPress={handleImageTap}>
-              <Image source={{ uri: img }} style={styles.postImage} />
+              <Image source={{ uri: img }} style={styles.postImage} fadeDuration={0} resizeMode="cover" />
             </TouchableWithoutFeedback>
           </View>
         ))}
@@ -696,6 +718,7 @@ export default function FeedItem({ post, onPostDeleted }: FeedItemProps) {
                       <TouchableOpacity onPress={() => {
                         if (comment.userId) {
                           setShowComments(false);
+                          onNavigateAway?.();
                           navigation.navigate('Profile', { userId: comment.userId });
                         }
                       }}>
@@ -732,6 +755,7 @@ export default function FeedItem({ post, onPostDeleted }: FeedItemProps) {
                                   <TouchableOpacity onPress={() => {
                                     if (reply.userId) {
                                       setShowComments(false);
+                                      onNavigateAway?.();
                                       navigation.navigate('Profile', { userId: reply.userId });
                                     }
                                   }}>
@@ -1097,3 +1121,5 @@ export default function FeedItem({ post, onPostDeleted }: FeedItemProps) {
     </View>
   );
 }
+
+export default React.memo(FeedItem);

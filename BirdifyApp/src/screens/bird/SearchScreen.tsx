@@ -21,6 +21,7 @@ import { createStyles } from '../../styles/screens/bird/searchScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 import { BirdRepository } from '../../repositories/bird.repository';
+import { ProfileRepository } from '../../repositories/profile.repository';
 import { mapBird } from '../../utils/mapBird';
 import { handleError } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
@@ -37,7 +38,10 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [birds, setBirds] = useState<BirdSpeciesData[]>([]);
-  const [results, setResults] = useState<BirdSpeciesData[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [birdResults, setBirdResults] = useState<BirdSpeciesData[]>([]);
+  const [userResults, setUserResults] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'birds' | 'users'>('birds');
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
     message: '',
@@ -49,18 +53,25 @@ export default function SearchScreen() {
   // ─────────────────────────────────────────────
   useEffect(() => {
     loadBirds();
+    loadUsers();
   }, []);
 
   const loadBirds = async () => {
     try {
       const dbBirds = await BirdRepository.getAll();
-
-      // ✔ MISMA FUENTE QUE DICTIONARY (SIN MOCKS)
       const mapped = dbBirds.map(mapBird);
-
       setBirds(mapped);
     } catch (error) {
       handleError(error, setToast, 'Error loading birds');
+    }
+  };
+
+  const loadUsers = async () => {
+    try {
+      const dbUsers = await ProfileRepository.getAll();
+      setUsers(dbUsers);
+    } catch (error) {
+      handleError(error, setToast, 'Error loading users');
     }
   };
 
@@ -71,21 +82,30 @@ export default function SearchScreen() {
     setQuery(text);
 
     if (!text.trim()) {
-      setResults([]);
+      setBirdResults([]);
+      setUserResults([]);
       return;
     }
 
-    const filtered = birds.filter(
-      bird =>
-        bird.name.toLowerCase().includes(text.toLowerCase()) ||
-        bird.scientificName.toLowerCase().includes(text.toLowerCase())
-    );
+    const lower = text.toLowerCase();
 
-    setResults(filtered);
+    const filteredBirds = birds.filter(
+      bird =>
+        bird.name.toLowerCase().includes(lower) ||
+        bird.scientificName.toLowerCase().includes(lower)
+    );
+    setBirdResults(filteredBirds);
+
+    const filteredUsers = users.filter(
+      user =>
+        user.username?.toLowerCase().includes(lower) ||
+        user.fullname?.toLowerCase().includes(lower)
+    );
+    setUserResults(filteredUsers);
   };
 
   // ─────────────────────────────────────────────
-  // OPEN BIRD
+  // OPEN BIRD / USER
   // ─────────────────────────────────────────────
   const openBird = (bird: BirdSpeciesData) => {
     if (!recentSearches.includes(bird.name)) {
@@ -93,6 +113,14 @@ export default function SearchScreen() {
     }
 
     navigation.navigate('BirdDetail', { bird });
+  };
+
+  const openUser = (user: any) => {
+    if (!recentSearches.includes(user.username)) {
+      setRecentSearches(prev => [user.username, ...prev.slice(0, 4)]);
+    }
+
+    navigation.navigate('Profile', { userId: user.id });
   };
 
   const removeRecent = (item: string) =>
@@ -134,7 +162,7 @@ export default function SearchScreen() {
             autoFocus
             value={query}
             onChangeText={handleSearch}
-            placeholder="Search birds..."
+            placeholder={activeTab === 'birds' ? 'Search birds...' : 'Search users...'}
             placeholderTextColor={colors.placeholder}
             style={styles.input}
             returnKeyType="search"
@@ -144,7 +172,8 @@ export default function SearchScreen() {
             <TouchableOpacity
               onPress={() => {
                 setQuery('');
-                setResults([]);
+                setBirdResults([]);
+                setUserResults([]);
               }}
             >
               <Ionicons
@@ -157,6 +186,41 @@ export default function SearchScreen() {
         </View>
       </View>
 
+      {/* TABS */}
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'birds' && styles.activeTab]}
+          onPress={() => setActiveTab('birds')}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name="bug-outline"
+            size={16}
+            color={activeTab === 'birds' ? colors.white : colors.textSecondary}
+            style={{ marginRight: 6 }}
+          />
+          <Text style={[styles.tabText, activeTab === 'birds' && styles.activeTabText]}>
+            Birds
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'users' && styles.activeTab]}
+          onPress={() => setActiveTab('users')}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name="people-outline"
+            size={16}
+            color={activeTab === 'users' ? colors.white : colors.textSecondary}
+            style={{ marginRight: 6 }}
+          />
+          <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>
+            Users
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* CONTENT */}
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -165,44 +229,81 @@ export default function SearchScreen() {
         {query.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
-              Search Results
+              {activeTab === 'birds' ? 'Birds' : 'Users'}
             </Text>
 
-            {results.length > 0 ? (
-              results.map(bird => (
-                <TouchableOpacity
-                  key={bird.id}
-                  style={styles.resultCard}
-                  activeOpacity={0.8}
-                  onPress={() => openBird(bird)}
-                >
-                  {/* ✔ IMAGEN 100% VIENE DE mapBird */}
-                  <Image
-                    source={{ uri: bird.image }}
-                    style={styles.resultImage}
-                  />
+            {activeTab === 'birds' ? (
+              birdResults.length > 0 ? (
+                birdResults.map(bird => (
+                  <TouchableOpacity
+                    key={bird.id}
+                    style={styles.resultCard}
+                    activeOpacity={0.8}
+                    onPress={() => openBird(bird)}
+                  >
+                    <Image
+                      source={{ uri: bird.image }}
+                      style={styles.resultImage}
+                    />
 
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.resultTitle}>
-                      {bird.name}
-                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.resultTitle}>
+                        {bird.name}
+                      </Text>
 
-                    <Text style={styles.resultSubtitle}>
-                      {bird.scientificName}
-                    </Text>
-                  </View>
+                      <Text style={styles.resultSubtitle}>
+                        {bird.scientificName}
+                      </Text>
+                    </View>
 
-                  <Ionicons
-                    name="chevron-forward"
-                    size={20}
-                    color={colors.textSecondary}
-                  />
-                </TouchableOpacity>
-              ))
+                    <Ionicons
+                      name="chevron-forward"
+                      size={20}
+                      color={colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <Text style={styles.emptyText}>
+                  No birds found.
+                </Text>
+              )
             ) : (
-              <Text style={styles.emptyText}>
-                No birds found.
-              </Text>
+              userResults.length > 0 ? (
+                userResults.map(user => (
+                  <TouchableOpacity
+                    key={user.id}
+                    style={styles.resultCard}
+                    activeOpacity={0.8}
+                    onPress={() => openUser(user)}
+                  >
+                    <Image
+                      source={{ uri: user.profile_pic_url || 'https://gravatar.com/avatar/?d=mp' }}
+                      style={styles.userAvatar}
+                    />
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.resultTitle}>
+                        {user.fullname || user.username}
+                      </Text>
+
+                      <Text style={styles.resultSubtitle}>
+                        @{user.username}
+                      </Text>
+                    </View>
+
+                    <Ionicons
+                      name="chevron-forward"
+                      size={20}
+                      color={colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <Text style={styles.emptyText}>
+                  No users found.
+                </Text>
+              )
             )}
           </View>
         ) : (

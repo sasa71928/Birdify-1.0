@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
   StatusBar,
-  Alert,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,14 +19,14 @@ import { useAuth } from '../../context/AuthContext';
 import { handleError } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
 
-const INITIAL_PUSH = [
+const DEFAULT_PUSH = [
   { id: '1', title: 'New Sighting', desc: 'Alerts for rare birds in your area', icon: 'eye-outline', active: false },
   { id: '2', title: 'New Comment', desc: 'When someone replies to your journal', icon: 'chatbubble-outline', active: false },
   { id: '3', title: 'New Follower', desc: 'Stay updated on your community', icon: 'person-add-outline', active: false },
   { id: '4', title: 'Direct Messages', desc: 'Private conversations', icon: 'mail-outline', active: false },
 ];
 
-const INITIAL_EMAIL = [
+const DEFAULT_EMAIL = [
   { id: '5', title: 'Weekly Digest', desc: 'Summary of activity and sightings', icon: 'book-outline', active: false },
   { id: '6', title: 'Account Security', desc: 'Login alerts and password changes', icon: 'shield-checkmark-outline', active: false },
 ];
@@ -35,8 +34,9 @@ const INITIAL_EMAIL = [
 export default function NotificationSettingsScreen() {
   const navigation = useNavigation();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
-  const [pushNotifs, setPushNotifs] = useState(INITIAL_PUSH);
-  const [emailNotifs, setEmailNotifs] = useState(INITIAL_EMAIL);
+  const [pushNotifs, setPushNotifs] = useState(DEFAULT_PUSH);
+  const [emailNotifs, setEmailNotifs] = useState(DEFAULT_EMAIL);
+  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
     message: '',
@@ -44,6 +44,43 @@ export default function NotificationSettingsScreen() {
   });
 
   const { user } = useAuth();
+
+  useEffect(() => {
+    loadSettings();
+  }, [user?.id]);
+
+  const loadSettings = async () => {
+    if (!user?.id) return;
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('push_notifications, email_notifications')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+
+      if (data?.push_notifications) {
+        const saved = Array.isArray(data.push_notifications) ? data.push_notifications : [];
+        setPushNotifs(prev => prev.map(item => {
+          const found = saved.find((s: any) => s.id === item.id);
+          return found ? { ...item, active: !!found.active } : item;
+        }));
+      }
+
+      if (data?.email_notifications) {
+        const saved = Array.isArray(data.email_notifications) ? data.email_notifications : [];
+        setEmailNotifs(prev => prev.map(item => {
+          const found = saved.find((s: any) => s.id === item.id);
+          return found ? { ...item, active: !!found.active } : item;
+        }));
+      }
+    } catch (e) {
+      handleError(e, setToast, 'Error loading settings');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const togglePush = async (id: string) => {
   try {

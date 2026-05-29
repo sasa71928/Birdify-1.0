@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { FlatList, StyleSheet, StatusBar, RefreshControl, ActivityIndicator, View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../../theme';
@@ -22,6 +22,12 @@ export default function FeedScreen() {
     onRefresh,
   } = useFeed();
 
+  const renderItem = useCallback(({ item }: { item: Post }) => (
+    <FeedItem post={item} onPostDeleted={handlePostDeleted} />
+  ), [handlePostDeleted]);
+
+  const keyExtractor = useCallback((item: Post) => item.id, []);
+
   return (
     <SafeAreaView style={shared.safe}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
@@ -41,8 +47,8 @@ export default function FeedScreen() {
       ) : (
         <FlatList
           data={posts}
-          renderItem={({ item }) => <FeedItem post={item} onPostDeleted={handlePostDeleted} />}
-          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
           contentContainerStyle={screen.listContent}
           showsVerticalScrollIndicator={false}
           initialNumToRender={3}
