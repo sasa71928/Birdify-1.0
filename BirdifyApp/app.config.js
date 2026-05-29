@@ -9,7 +9,12 @@ export default {
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
-      backgroundColor: '#ffffff',
+      backgroundColor: '#154212',
+      android: {
+        image: './assets/splash-icon.png',
+        resizeMode: 'contain',
+        backgroundColor: '#154212',
+      },
     },
     ios: {
       supportsTablet: true,
@@ -17,7 +22,7 @@ export default {
     android: {
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
-        backgroundColor: '#ffffff',
+        backgroundColor: '#154212',
       },
       config: {
         googleMaps: {
@@ -36,6 +41,7 @@ export default {
       'expo-font',
       'expo-notifications',
       'expo-mail-composer',
+      ['expo-system-ui', { backgroundColor: '#154212' }],
     ],
     extra: {
       eas: {
