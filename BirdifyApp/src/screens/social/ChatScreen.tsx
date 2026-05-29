@@ -81,6 +81,8 @@ export default function ChatScreen() {
   const [showScrollButton, setShowScrollButton] = useState(false);
   const scrollButtonAnim = useRef(new Animated.Value(0)).current;
   const initialScrollDone = useRef(false);
+  const scrollInitTimeoutRef = useRef<any>(null);
+  const [positioned, setPositioned] = useState(false);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
@@ -126,6 +128,8 @@ export default function ChatScreen() {
 
   React.useEffect(() => {
     let mounted = true;
+    initialScrollDone.current = false;
+
     const load = async () => {
       if (!user) return;
       try {
@@ -186,6 +190,17 @@ export default function ChatScreen() {
         }
 
         const rows = await MessageRepository.list(conversationId);
+
+        // Obtener estados de lectura para esta conversación
+        const messageIds = rows.map((r) => r.id);
+        const { data: readData } = await supabase
+          .from('message_reads')
+          .select('message_id')
+          .in('message_id', messageIds)
+          .eq('user_id', user.id);
+
+        const readIds = new Set((readData || []).map((r: any) => r.message_id));
+
         const mapped: Message[] = rows.map((r) => ({
           id: r.id,
           text: r.content || '',
@@ -201,6 +216,7 @@ export default function ChatScreen() {
           replyToUser: r.reply_to?.sender?.username || undefined,
           replyToImage: r.reply_to?.image_url || undefined,
           createdAt: r.created_at || undefined,
+          isRead: readIds.has(r.id),
         }));
 
         if (mounted) setMessages(mapped);
@@ -217,6 +233,11 @@ export default function ChatScreen() {
       navigation.navigate('MainTabs', { screen: 'Messages' });
     };
   }, [conversationId, user?.id, navigation]);
+
+  // Reset posicionamiento al cambiar de conversación
+  React.useEffect(() => {
+    setPositioned(false);
+  }, [conversationId]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -261,63 +282,88 @@ export default function ChatScreen() {
     }, [conversationId, user?.id])
   );
 
+  // Scroll inicial: se ejecuta cuando el FlatList ya tiene contenido renderizado
+  // Usa debounce porque onContentSizeChange se dispara varias veces durante el renderizado
+  const handleContentSizeChange = useCallback((w: number, h: number) => {
+    if (messages.length === 0 || initialScrollDone.current) return;
+
+    if (scrollInitTimeoutRef.current) {
+      clearTimeout(scrollInitTimeoutRef.current);
+    }
+
+    scrollInitTimeoutRef.current = setTimeout(() => {
+      if (initialScrollDone.current) return;
+      initialScrollDone.current = true;
+
+      const hasUnread = messages.some(m => !m.isMine && !m.isRead);
+
+      if (hasUnread) {
+        const firstUnreadIndex = messages.findIndex(m => !m.isMine && !m.isRead);
+        if (firstUnreadIndex !== -1) {
+          listRef.current?.scrollToIndex({
+            index: firstUnreadIndex,
+            animated: false,
+            viewPosition: 0,
+          });
+        }
+        // Marcar no leídos como leídos
+        if (user) {
+          const unreadMessages = messages.filter(m => !m.isMine && !m.isRead);
+          const unreadMessageIds = unreadMessages.map(m => m.id);
+          MessageReadRepository.markMultipleAsRead(unreadMessageIds, user.id).catch(e => {
+            handleError(e, setToast, 'Error marking messages as read');
+          });
+        }
+      } else {
+        // Sin animación, posición por defecto al fondo del scroll
+        listRef.current?.scrollToEnd({ animated: false });
+      }
+
+      setPositioned(true);
+    }, 250);
+  }, [messages, user?.id]);
+
+  // Actualizaciones posteriores (mensajes nuevos en tiempo real)
   React.useEffect(() => {
-    if (messages.length === 0) return;
+    if (messages.length === 0 || !initialScrollDone.current) return;
 
     const hasUnread = messages.some(m => !m.isMine && !m.isRead);
     const lastMessage = messages[messages.length - 1];
 
     let timeoutId: ReturnType<typeof setTimeout>;
 
-    // Primera carga: SIEMPRE scrollear al final, sin importar quién envió el último mensaje
-    if (!initialScrollDone.current) {
-      initialScrollDone.current = true;
-      timeoutId = setTimeout(() => {
-        listRef.current?.scrollToEnd({ animated: false });
-      }, 100);
+    // No es primera carga: no scrollear si el último mensaje es mío
+    // (sendMessage ya se encarga de eso)
+    if (lastMessage?.isMine) {
+      return;
+    }
 
-      // Marcar no leídos como leídos si es necesario
-      if (hasUnread && user) {
-        const unreadMessages = messages.filter(m => !m.isMine && !m.isRead);
-        const unreadMessageIds = unreadMessages.map(m => m.id);
+    if (hasUnread) {
+      // Scrollear al último mensaje no leído
+      const unreadMessages = messages.filter(m => !m.isMine && !m.isRead);
+      const lastUnreadIndex = messages.findIndex(m => m.id === unreadMessages[unreadMessages.length - 1]?.id);
+
+      if (lastUnreadIndex !== -1) {
+        timeoutId = setTimeout(() => {
+          listRef.current?.scrollToIndex({
+            index: lastUnreadIndex,
+            animated: true,
+            viewPosition: 0.5
+          });
+        }, 500);
+      }
+
+      // Marcar no leídos como leídos
+      const unreadMessageIds = unreadMessages.map(m => m.id);
+      if (unreadMessageIds.length > 0 && user) {
         MessageReadRepository.markMultipleAsRead(unreadMessageIds, user.id).catch(e => {
           handleError(e, setToast, 'Error marking messages as read');
         });
       }
     } else {
-      // No es primera carga: no scrollear si el último mensaje es mío
-      // (sendMessage ya se encarga de eso)
-      if (lastMessage?.isMine) {
-        return;
-      }
-
-      if (hasUnread) {
-        // Scrollear al último mensaje no leído
-        const unreadMessages = messages.filter(m => !m.isMine && !m.isRead);
-        const lastUnreadIndex = messages.findIndex(m => m.id === unreadMessages[unreadMessages.length - 1]?.id);
-
-        if (lastUnreadIndex !== -1) {
-          timeoutId = setTimeout(() => {
-            listRef.current?.scrollToIndex({
-              index: lastUnreadIndex,
-              animated: true,
-              viewPosition: 0.5
-            });
-          }, 500);
-        }
-
-        // Marcar no leídos como leídos
-        const unreadMessageIds = unreadMessages.map(m => m.id);
-        if (unreadMessageIds.length > 0 && user) {
-          MessageReadRepository.markMultipleAsRead(unreadMessageIds, user.id).catch(e => {
-            handleError(e, setToast, 'Error marking messages as read');
-          });
-        }
-      } else {
-        timeoutId = setTimeout(() => {
-          listRef.current?.scrollToEnd({ animated: true });
-        }, 300);
-      }
+      timeoutId = setTimeout(() => {
+        listRef.current?.scrollToEnd({ animated: true });
+      }, 300);
     }
 
     return () => {
@@ -629,13 +675,8 @@ export default function ChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        {loading ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={{ color: colors.textSecondary }}>Cargando...</Text>
-          </View>
-        ) : (
-          <View style={{ flex: 1 }}>
-            <FlatList
+        <View style={{ flex: 1 }}>
+          <FlatList
               ref={listRef}
               data={messages}
               renderItem={renderMessage}
@@ -655,10 +696,16 @@ export default function ChatScreen() {
                 checkScrollPosition(contentOffset?.y ?? 0, contentSize?.height ?? 0, layoutMeasurement?.height ?? 0);
               }}
               scrollEventThrottle={16}
+              onContentSizeChange={handleContentSizeChange}
               onScrollToIndexFailed={(info) => {
                 listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
               }}
             />
+            {!positioned && (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.canvasPure, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            )}
 
             <Animated.View
               pointerEvents={showScrollButton ? 'auto' : 'none'}
@@ -699,7 +746,6 @@ export default function ChatScreen() {
               </TouchableOpacity>
             </Animated.View>
           </View>
-        )}
 
         {/* ── Input bar ── */}
         <View style={styles.inputContainer}>

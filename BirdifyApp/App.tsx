@@ -20,6 +20,8 @@ import * as Notifications from 'expo-notifications';
 import { Colors } from './src/theme';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { AuthProvider } from './src/context/AuthContext';
+import { NewSightingsProvider } from './src/context/NewSightingsContext';
+import { UnreadMessagesProvider } from './src/context/UnreadMessagesContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Configurar handler de notificaciones antes de que la app monte
@@ -59,9 +61,13 @@ export default function App() {
     <SafeAreaProvider>
       <AuthProvider>
         <ThemeProvider>
-          <NavigationContainer>
-            <AppNavigator />
-          </NavigationContainer>
+          <NewSightingsProvider>
+            <UnreadMessagesProvider>
+              <NavigationContainer>
+                <AppNavigator />
+              </NavigationContainer>
+            </UnreadMessagesProvider>
+          </NewSightingsProvider>
         </ThemeProvider>
       </AuthProvider>
     </SafeAreaProvider>

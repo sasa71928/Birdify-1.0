@@ -60,6 +60,7 @@ export interface ChatThread {
   unreadCount?: number;
   isOnline?: boolean;
   isGroup?: boolean;
+  userRole?: string;
 }
 
 // ── Tipos de rutas de la app ──────────────────────────────────────────────────

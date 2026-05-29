@@ -80,4 +80,15 @@ export const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: 'bold',
     lineHeight: 12,
   },
+  newBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    backgroundColor: '#FF5252',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: colors.surface,
+  },
 });

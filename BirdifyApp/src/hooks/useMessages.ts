@@ -1,10 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { supabase } from '../lib/supabase';
 import { ConversationRepository } from '../repositories/conversation.repository';
 import { UserBlockRepository } from '../repositories/user_block.repository';
 import { useAuth } from '../context/AuthContext';
+import { useUnreadMessages } from '../context/UnreadMessagesContext';
 import { RootStackParamList, ChatThread } from '../navigation/AppNavigator';
 import { Dimensions } from 'react-native';
 import { handleError } from '../utils/errorHandler';
@@ -14,9 +14,8 @@ type MessagesNavProp = NativeStackNavigationProp<RootStackParamList, 'Messages'>
 export function useMessages() {
   const navigation = useNavigation<MessagesNavProp>();
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [threads, setThreads] = useState<ChatThread[]>([]);
-  const subscription = useRef<any>(null);
+  const { conversations, refreshConversations, conversationsLoading } = useUnreadMessages();
+
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   const [optionsVisible, setOptionsVisible] = useState(false);
@@ -26,124 +25,17 @@ export function useMessages() {
   const [leaving, setLeaving] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
 
-  const load = async () => {
-    if (!user) return;
-    try {
-      setLoading(true);
-      const items = await ConversationRepository.listForUser(user.id);
+  const load = useCallback(async (_silent = false) => {
+    await refreshConversations();
+  }, [refreshConversations]);
 
-      const mapped: ChatThread[] = items.map((item) => {
-        const c = item.conversation;
-        const members = c.members || [];
-        const other = members.find((m: any) => m.user_id !== user.id)?.users;
-
-        const title = c.is_group ? (c.name || 'Group') : (other?.fullname || other?.username || 'Usuario');
-        const avatar =
-          c.is_group
-            ? (c.avatar_url || 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=100')
-            : (other?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp');
-
-        if (c.is_group) {
-          console.log('Group conversation:', c.id, 'avatar_url:', c.avatar_url, 'final avatar:', avatar);
-        }
-
-        const lastMessageText = item.lastMessage?.content || (item.lastMessage?.image_url ? '📷 Foto' : '');
-        
-        // For group chats, prepend sender name to message preview
-        const displayMessage = c.is_group && item.lastMessage?.sender 
-          ? `${item.lastMessage.sender.fullname || item.lastMessage.sender.username}: ${lastMessageText}`
-          : lastMessageText;
-
-        // Calculate unread count (messages not sent by current user and not read)
-        const unreadCount = item.unread || 0;
-
-        return {
-          id: c.id,
-          name: title,
-          avatar,
-          lastMessage: displayMessage || '',
-          time: '',
-          unreadCount,
-          isGroup: c.is_group,
-        };
-      });
-
-      setThreads(mapped);
-    } catch (error) {
-      handleError(error, setToast, 'Error loading conversations');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!user) return;
-
-    const channelName = `messages-changes-${user.id}-${Date.now()}`;
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'messages',
-        },
-        () => {
-          load();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'conversation_members',
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          load();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'conversations',
-        },
-        () => {
-          load();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'message_reads',
-        },
-        () => {
-          load();
-        }
-      )
-      .subscribe();
-
-    subscription.current = channel;
-
-    return () => {
-      if (subscription.current) {
-        supabase.removeChannel(subscription.current);
-      }
-    };
-  }, [user]);
-
+  // Refrescar silenciosamente al entrar a la pantalla
   useFocusEffect(
     React.useCallback(() => {
       if (user) {
-        load();
+        refreshConversations();
       }
-    }, [user])
+    }, [user, refreshConversations])
   );
 
   const handleDeleteConversation = async (conversationId: string) => {
@@ -153,11 +45,19 @@ export function useMessages() {
 
   const confirmDelete = async () => {
     if (!conversationToDelete) return;
+    const thread = conversations.find((t) => t.id === conversationToDelete);
+    if (!thread) return;
+    if (thread.userRole !== 'admin') {
+      setDeleteModalVisible(false);
+      setConversationToDelete(null);
+      showToast('Solo el administrador puede eliminar esta conversación.', 'error');
+      return;
+    }
     try {
       await ConversationRepository.deleteConversation(conversationToDelete);
       setDeleteModalVisible(false);
       setConversationToDelete(null);
-      load();
+      refreshConversations();
     } catch (error) {
       handleError(error, setToast, 'Error deleting conversation');
     }
@@ -192,7 +92,7 @@ export function useMessages() {
       setLeaving(true);
       await ConversationRepository.leaveConversation(selectedConversation.id, user.id);
       showToast('Has salido del grupo.', 'success');
-      load();
+      refreshConversations();
     } catch (e) {
       handleError(e, setToast, 'No se pudo salir del grupo.');
     } finally {
@@ -214,7 +114,7 @@ export function useMessages() {
 
       await UserBlockRepository.block(user.id, otherMember.user_id);
       showToast('Usuario bloqueado.', 'success');
-      load();
+      refreshConversations();
     } catch (e) {
       handleError(e, setToast, 'No se pudo bloquear al usuario.');
     }
@@ -226,8 +126,8 @@ export function useMessages() {
 
   return {
     // State
-    loading,
-    threads,
+    loading: conversationsLoading,
+    threads: conversations,
     deleteModalVisible,
     conversationToDelete,
     optionsVisible,

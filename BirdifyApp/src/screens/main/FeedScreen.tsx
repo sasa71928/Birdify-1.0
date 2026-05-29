@@ -1,6 +1,7 @@
-import React, { useCallback, useState, useRef } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { FlatList, StyleSheet, StatusBar, RefreshControl, ActivityIndicator, View, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Shadows } from '../../theme';
 import { Ionicons } from '@expo/vector-icons';
 import FeedItem, { Post } from '../../components/FeedItem';
@@ -9,6 +10,7 @@ import AppToast from '../../components/AppToast';
 import { createStyles } from '../../styles/screens/main/feedScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useFeed } from '../../hooks/useFeed';
+import { useNewSightings } from '../../context/NewSightingsContext';
 
 export default function FeedScreen() {
   const { shared, screen, isDark, colors } = useDynamicStyles(createStyles);
@@ -17,16 +19,31 @@ export default function FeedScreen() {
     posts,
     isLoading,
     isRefreshing,
-    hasNewPosts,
-    newPostIds,
     toast,
     setToast,
     handlePostDeleted,
     onRefresh,
   } = useFeed();
 
+  const { hasNewPosts, newPostIds, clearNewPosts } = useNewSightings();
   const [showNewBanner, setShowNewBanner] = useState(false);
   const listRef = useRef<FlatList>(null);
+
+  // Mostrar banner instantáneamente cuando llegue un nuevo avistamiento
+  useEffect(() => {
+    if (hasNewPosts) {
+      setShowNewBanner(true);
+    }
+  }, [hasNewPosts]);
+
+  // Al entrar a Feed, verificar si hay nuevos avistamientos pendientes
+  useFocusEffect(
+    useCallback(() => {
+      if (hasNewPosts) {
+        setShowNewBanner(true);
+      }
+    }, [hasNewPosts])
+  );
 
   const renderItem = useCallback(({ item }: { item: Post }) => (
     <FeedItem post={item} onPostDeleted={handlePostDeleted} isNew={newPostIds.has(item.id)} />
@@ -34,20 +51,9 @@ export default function FeedScreen() {
 
   const keyExtractor = useCallback((item: Post) => item.id, []);
 
-  const handleScroll = useCallback((event: any) => {
-    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-    const isNearTop = contentOffset.y < 20;
-    const isScrolling = contentOffset.y > 100;
-    // Mostrar banner si hay nuevos posts y el usuario scrolleó lejos del top
-    if (hasNewPosts && isScrolling && !isNearTop) {
-      setShowNewBanner(true);
-    } else if (isNearTop) {
-      setShowNewBanner(false);
-    }
-  }, [hasNewPosts]);
-
   const handleBannerPress = () => {
     setShowNewBanner(false);
+    clearNewPosts();
     onRefresh();
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
@@ -81,8 +87,6 @@ export default function FeedScreen() {
             maxToRenderPerBatch={3}
             windowSize={5}
             removeClippedSubviews={true}
-            onScroll={handleScroll}
-            scrollEventThrottle={300}
             refreshControl={
               <RefreshControl 
                 refreshing={isRefreshing} 

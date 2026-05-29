@@ -1,14 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Colors, Typography, Spacing, Radius } from '../theme';
-import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+import React, { useEffect } from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { useAuth } from '../context/AuthContext';
-import { MessageReadRepository } from '../repositories/message_read.repository';
-import { ConversationRepository } from '../repositories/conversation.repository';
-import { supabase } from '../lib/supabase';
+import { useNewSightings } from '../context/NewSightingsContext';
+import { useUnreadMessages } from '../context/UnreadMessagesContext';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -19,79 +16,38 @@ export default function BottomNavBar({ state }: any) {
   const navigation = useNavigation<NavigationProp>();
   const { screen: styles, colors } = useDynamicStyles(createStyles);
   const route = useRoute();
-  const { user } = useAuth();
-  const [unreadCount, setUnreadCount] = useState(0);
-  
+  const { hasNewPosts } = useNewSightings();
+  const { unreadCount, refreshUnread } = useUnreadMessages();
+
   // If used as a custom tab bar, state is provided. Otherwise, fallback to standard route.name.
   const currentRoute = state ? state.routes[state.index].name : route.name;
 
-  const loadUnreadCount = useCallback(async () => {
-    if (!user) return;
-    try {
-      const conversations = await ConversationRepository.listForUser(user.id);
-      const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unread || 0), 0);
-      setUnreadCount(totalUnread);
-    } catch (e) {
-      console.error('Error loading unread count:', e);
-    }
-  }, [user?.id]);
-
+  // Refrescar contador al cambiar de tab (fallback si realtime falla)
   useEffect(() => {
-    loadUnreadCount();
-  }, [loadUnreadCount, state?.index]);
+    refreshUnread();
+  }, [state?.index, refreshUnread]);
 
+  // Refrescar contador al regresar al tab principal (fallback)
   useEffect(() => {
-    // Recargar al regresar del stack (ej. ChatScreen) al tab principal
     const unsubscribe = navigation.addListener('focus', () => {
-      loadUnreadCount();
+      refreshUnread();
     });
     return unsubscribe;
-  }, [navigation, loadUnreadCount]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    // Set up real-time subscription for message_reads
-    const channelName = `unread-count-${user.id}-${Date.now()}`;
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'message_reads',
-        },
-        () => {
-          loadUnreadCount();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'messages',
-        },
-        () => {
-          loadUnreadCount();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [loadUnreadCount]);
+  }, [navigation, refreshUnread]);
 
   return (
     <View style={styles.container}>
       <View style={styles.innerContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.navItem, currentRoute === 'Feed' && styles.activeItem]}
           onPress={() => navigation.navigate('MainTabs', { screen: 'Feed' })}
         >
-          <Ionicons name="home-outline" size={currentRoute === 'Feed' ? 26 : 24} color={currentRoute === 'Feed' ? colors.primary : colors.textSecondary} />
+          <View style={styles.iconContainer}>
+            <Ionicons name="home-outline" size={currentRoute === 'Feed' ? 26 : 24} color={currentRoute === 'Feed' ? colors.primary : colors.textSecondary} />
+            {hasNewPosts && (
+              <View style={styles.newBadge} />
+            )}
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity 

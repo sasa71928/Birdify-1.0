@@ -114,18 +114,21 @@ export default function MessagesScreen() {
           <Text style={styles.searchPlaceholder}>Search messages...</Text>
         </TouchableOpacity>
 
-        {loading ? (
+        {loading && threads.length === 0 ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : (
-          <FlatList
-            data={threads}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-          />
+          <View style={{ flex: 1 }}>
+            <FlatList
+              data={threads}
+              renderItem={renderItem}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+            />
+
+          </View>
         )}
       </View>
 
@@ -229,13 +232,15 @@ export default function MessagesScreen() {
                 <Text style={{ marginLeft: 10, color: '#FF5252', fontWeight: '600', fontSize: 14 }}>Bloquear usuario</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity
-              onPress={() => handleOptionPress('delete')}
-              style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12 }}
-            >
-              <Ionicons name="trash-outline" size={20} color="#FF5252" />
-              <Text style={{ marginLeft: 10, color: '#FF5252', fontWeight: '600', fontSize: 14 }}>Eliminar</Text>
-            </TouchableOpacity>
+            {selectedConversation?.userRole === 'admin' && (
+              <TouchableOpacity
+                onPress={() => handleOptionPress('delete')}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12 }}
+              >
+                <Ionicons name="trash-outline" size={20} color="#FF5252" />
+                <Text style={{ marginLeft: 10, color: '#FF5252', fontWeight: '600', fontSize: 14 }}>Eliminar</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       )}

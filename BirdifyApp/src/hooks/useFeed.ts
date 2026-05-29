@@ -3,7 +3,7 @@ import { SightingRepository } from '../repositories/sighting.repository';
 import { useAuth } from '../context/AuthContext';
 import FeedItem, { Post } from '../components/FeedItem';
 import { handleError } from '../utils/errorHandler';
-import { supabase } from '../lib/supabase';
+import { useNewSightings } from '../context/NewSightingsContext';
 
 const CACHE_TTL_MS = 60000;
 
@@ -69,14 +69,12 @@ function mapSightingToPost(sighting: any, currentUserId?: string): Post {
 
 export function useFeed() {
   const { user } = useAuth();
+  const { clearNewPosts } = useNewSightings();
   const cacheRef = useRef<FeedCache | null>(null);
   
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [newPostIds, setNewPostIds] = useState<Set<string>>(new Set());
-  const [hasNewPosts, setHasNewPosts] = useState(false);
-  const subscriptionRef = useRef<any>(null);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
     message: '',
@@ -98,12 +96,11 @@ export function useFeed() {
       cacheRef.current = { posts: mappedPosts, timestamp: now, userId: user?.id };
       setPosts(mappedPosts);
       // Limpiar nuevos posts al recargar manualmente
-      setNewPostIds(new Set());
-      setHasNewPosts(false);
+      clearNewPosts();
     } catch (error) {
       handleError(error, setToast, 'Error cargando el feed');
     }
-  }, [user?.id]);
+  }, [user?.id, clearNewPosts]);
 
   const handlePostDeleted = useCallback(async () => {
     cacheRef.current = null;
@@ -122,45 +119,6 @@ export function useFeed() {
     setIsRefreshing(false);
   };
 
-  // Escuchar nuevos avistamientos en tiempo real
-  useEffect(() => {
-    const channel = supabase
-      .channel('sightings-feed')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'sightings',
-        },
-        (payload) => {
-          const newId = payload.new?.id;
-          if (!newId) return;
-          // Evitar notificar si el post ya está cargado
-          setPosts((prev) => {
-            if (prev.some((p) => p.id === newId)) return prev;
-            // Post nuevo que no está en la lista actual
-            setNewPostIds((prevIds) => {
-              const next = new Set(prevIds);
-              next.add(newId);
-              return next;
-            });
-            setHasNewPosts(true);
-            return prev;
-          });
-        }
-      )
-      .subscribe();
-
-    subscriptionRef.current = channel;
-
-    return () => {
-      if (subscriptionRef.current) {
-        supabase.removeChannel(subscriptionRef.current);
-      }
-    };
-  }, []);
-
   useEffect(() => {
     initialLoad();
   }, []);
@@ -169,8 +127,6 @@ export function useFeed() {
     posts,
     isLoading,
     isRefreshing,
-    hasNewPosts,
-    newPostIds,
     toast,
     setToast,
     loadFeed,
