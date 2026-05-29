@@ -2,7 +2,7 @@
   "expo": {
     "name": "BirdifyApp",
     "slug": "BirdifyApp",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -24,6 +24,7 @@
           "apiKey": "AIzaSyDpgt99g-2FunCwqfG0rIxKM1UqUSCVA6w"
         }
       },
+      "newArchEnabled": false,
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.jcota_22.BirdifyApp"
