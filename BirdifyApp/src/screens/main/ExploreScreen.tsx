@@ -96,14 +96,6 @@ export default function ExploreScreen() {
   const navigation = useNavigation<NavProp>();
   const isFocused = useIsFocused();
 
-  // Evitar que MapView se monte hasta que la pestaña este activa
-  // (previene crash por falta de Google Maps API key al iniciar la app)
-  if (!isFocused) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.surface }]} />
-    );
-  }
-
   const MAP_STYLE = useMemo(() => createMapStyle(colors), [colors]);
 
   const {
@@ -159,6 +151,14 @@ export default function ExploreScreen() {
       </Marker>
     );
   }), [filteredSightings, selectedMarker, colors.primary, colors.secondaryBlue, handleMarkerPress]);
+
+  // Evitar que MapView se monte hasta que la pestaña este activa
+  // (previene crash por falta de Google Maps API key al iniciar la app)
+  if (!isFocused) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.surface }]} />
+    );
+  }
 
   if (loading) {
     return (
