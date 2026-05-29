@@ -1,0 +1,7 @@
+android/.gradle
+android/build
+node_modules/.cache
+node_modules
+.git
+android
+ios
