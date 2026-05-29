@@ -17,6 +17,8 @@ import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { handleError } from '../../utils/errorHandler';
+import AppToast from '../../components/AppToast';
 
 const INITIAL_PUSH = [
   { id: '1', title: 'New Sighting', desc: 'Alerts for rare birds in your area', icon: 'eye-outline', active: false },
@@ -35,6 +37,11 @@ export default function NotificationSettingsScreen() {
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const [pushNotifs, setPushNotifs] = useState(INITIAL_PUSH);
   const [emailNotifs, setEmailNotifs] = useState(INITIAL_EMAIL);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
 
   const { user } = useAuth();
 
@@ -56,8 +63,7 @@ export default function NotificationSettingsScreen() {
       .eq('id', user?.id);
 
   } catch (error) {
-    console.error(error);
-    Alert.alert('Error', 'No se pudieron guardar las notificaciones.');
+    handleError(error, setToast, 'No se pudieron guardar las notificaciones');
   }
 };
 
@@ -79,14 +85,14 @@ const toggleEmail = async (id: string) => {
       .eq('id', user?.id);
 
   } catch (error) {
-    console.error(error);
-    Alert.alert('Error', 'No se pudieron guardar las notificaciones.');
+    handleError(error, setToast, 'No se pudieron guardar las notificaciones');
   }
 };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
       
       {/* Header */}
       <View style={styles.header}>

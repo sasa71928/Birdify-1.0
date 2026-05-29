@@ -39,6 +39,9 @@ export interface Post {
   commentsList?: Comment[];
   hasLiked?: boolean;
   createdAt: string;
+  latitude?: number;
+  longitude?: number;
+  city?: string;
 }
 
 interface FeedItemProps {
@@ -515,7 +518,19 @@ export default function FeedItem({ post, onPostDeleted }: FeedItemProps) {
                 <Ionicons name="checkmark-circle" size={16} color={colors.primary} style={styles.verifiedIcon} />
               )}
             </View>
-            <Text style={styles.location}>{post.location}</Text>
+            <TouchableOpacity onPress={() => {
+              if (post.latitude && post.longitude) {
+                navigation.navigate('Explore', { 
+                  targetSighting: {
+                    id: post.id,
+                    latitude: post.latitude,
+                    longitude: post.longitude,
+                  }
+                });
+              }
+            }}>
+              <Text style={styles.location}>{post.location}</Text>
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setShowOptionsMenu(true)}>

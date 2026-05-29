@@ -19,7 +19,6 @@ import CreateGroupScreen    from '../screens/social/CreateGroupScreen';
 import EditGroupScreen      from '../screens/social/EditGroupScreen';
 import SearchMessagesScreen from '../screens/social/SearchMessagesScreen';
 import SettingsScreen       from '../screens/settings/SettingsScreen';
-import OfflineStorageScreen from '../screens/settings/OfflineStorageScreen';
 import LanguageSettingsScreen from '../screens/settings/LanguageSettingsScreen';
 import PrivacySettingsScreen from '../screens/settings/PrivacySettingsScreen';
 import NotificationSettingsScreen from '../screens/settings/NotificationSettingsScreen';
@@ -70,7 +69,7 @@ export type RootStackParamList = {
   Profile: { userId?: string };
   Dictionary: { searchQuery?: string };
   Messages: undefined;
-  Explore: undefined;
+  Explore: { targetSighting?: { id: string; latitude: number; longitude: number } };
   Search: undefined;
   BirdDetail: { bird: BirdSpeciesData };
   Chat: { conversationId: string };
@@ -78,7 +77,6 @@ export type RootStackParamList = {
   EditGroup: { conversationId: string };
   SearchMessages: undefined;
   Settings: undefined;
-  OfflineStorage: undefined;
   LanguageSettings: undefined;
   PrivacySettings: undefined;
   BlockedUsers: undefined;
@@ -149,7 +147,6 @@ export default function AppNavigator() {
           <Stack.Screen name="EditGroup"        component={EditGroupScreen} />
           <Stack.Screen name="SearchMessages"   component={SearchMessagesScreen} />
           <Stack.Screen name="Settings"         component={SettingsScreen} />
-          <Stack.Screen name="OfflineStorage"   component={OfflineStorageScreen} />
           <Stack.Screen name="LanguageSettings" component={LanguageSettingsScreen} />
           <Stack.Screen name="PrivacySettings"  component={PrivacySettingsScreen} />
           <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />

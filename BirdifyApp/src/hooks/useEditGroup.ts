@@ -8,6 +8,7 @@ import { FollowRepository } from '../repositories/follow.repository';
 import { useAuth } from '../context/AuthContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import * as ImagePicker from 'expo-image-picker';
+import { handleError } from '../utils/errorHandler';
 
 type EditGroupNavProp = NativeStackNavigationProp<RootStackParamList, 'EditGroup'>;
 type EditGroupRouteProp = RouteProp<RootStackParamList, 'EditGroup'>;
@@ -47,7 +48,7 @@ export function useEditGroup() {
         setSelected(new Set(memberIds));
       }
     } catch (error) {
-      console.error('Error loading group data:', error);
+      handleError(error, setToast, 'Error loading group data');
     } finally {
       setLoading(false);
     }
@@ -64,14 +65,14 @@ export function useEditGroup() {
       );
       setUsers(filteredUsers);
     } catch (error) {
-      console.error('Error loading users:', error);
+      handleError(error, setToast, 'Error loading users');
     }
   };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      alert('Se necesita permiso para acceder a la galería.');
+      handleError('Permiso denegado', setToast, 'Se necesita permiso para acceder a la galería.');
       return;
     }
 
@@ -96,7 +97,7 @@ export function useEditGroup() {
       if (image && image.startsWith('file://')) {
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (!authUser?.id) {
-          console.error('User not authenticated');
+          handleError('User not authenticated', setToast, 'User not authenticated');
           throw new Error('User not authenticated');
         }
         const fileName = `${authUser.id}/${Date.now()}.jpg`;
@@ -116,7 +117,7 @@ export function useEditGroup() {
           });
 
         if (uploadError) {
-          console.error('Error uploading group avatar:', uploadError);
+          handleError(uploadError, setToast, 'Error uploading group avatar');
         } else {
           const { data: { publicUrl } } = supabase.storage
             .from('group-avatars')
@@ -151,8 +152,7 @@ export function useEditGroup() {
         navigation.goBack();
       }, 500);
     } catch (e) {
-      console.error('Error updating group:', e);
-      showToast('No se pudo actualizar el grupo.', 'error');
+      handleError(e, setToast, 'No se pudo actualizar el grupo.');
     } finally {
       setSaving(false);
     }

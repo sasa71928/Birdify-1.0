@@ -17,6 +17,8 @@ import { ConversationRepository } from '../../repositories/conversation.reposito
 import { useAuth } from '../../context/AuthContext';
 import { createStyles } from '../../styles/screens/social/searchMessagesScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { handleError } from '../../utils/errorHandler';
+import AppToast from '../../components/AppToast';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'SearchMessages'>;
 
@@ -30,6 +32,11 @@ export default function SearchMessagesScreen() {
   const [query, setQuery] = useState('');
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
 
   useEffect(() => {
     loadConversations();
@@ -42,7 +49,7 @@ export default function SearchMessagesScreen() {
       const items = await ConversationRepository.listForUser(user.id);
       setConversations(items);
     } catch (error) {
-      console.error('Error loading conversations:', error);
+      handleError(error, setToast, 'Error loading conversations');
     } finally {
       setLoading(false);
     }
@@ -116,6 +123,7 @@ export default function SearchMessagesScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
 
       {/* ── Search bar ── */}
       <View style={styles.searchBar}>

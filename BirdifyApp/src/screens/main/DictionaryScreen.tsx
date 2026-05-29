@@ -18,6 +18,7 @@ import TopNavBar from '../../components/TopNavBar';
 import { createStyles } from '../../styles/screens/main/dictionaryScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useDictionary } from '../../hooks/useDictionary';
+import AppToast from '../../components/AppToast';
 
 export default function DictionaryScreen() {
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
@@ -28,8 +29,10 @@ export default function DictionaryScreen() {
     loading,
     loadingImages,
     filters,
+    toast,
     setSearchQuery,
     setLoadingImages,
+    setToast,
     handleSearch,
     handleFilterSelect,
     getSections,
@@ -41,6 +44,7 @@ export default function DictionaryScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
 
       <TopNavBar />
 

@@ -22,6 +22,8 @@ import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 import { BirdRepository } from '../../repositories/bird.repository';
 import { mapBird } from '../../utils/mapBird';
+import { handleError } from '../../utils/errorHandler';
+import AppToast from '../../components/AppToast';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -36,6 +38,11 @@ export default function SearchScreen() {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [birds, setBirds] = useState<BirdSpeciesData[]>([]);
   const [results, setResults] = useState<BirdSpeciesData[]>([]);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
 
   // ─────────────────────────────────────────────
   // LOAD DATA
@@ -53,7 +60,7 @@ export default function SearchScreen() {
 
       setBirds(mapped);
     } catch (error) {
-      console.error('Error loading birds:', error);
+      handleError(error, setToast, 'Error loading birds');
     }
   };
 
@@ -99,6 +106,7 @@ export default function SearchScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
 
       {/* SEARCH BAR */}
       <View style={styles.searchBar}>

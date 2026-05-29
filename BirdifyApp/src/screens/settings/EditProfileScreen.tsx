@@ -24,6 +24,8 @@ import { useAuth } from '../../context/AuthContext';
 import { ProfileRepository } from '../../repositories/profile.repository';
 import { supabase } from '../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
+import { handleError } from '../../utils/errorHandler';
+import AppToast from '../../components/AppToast';
 
 function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -75,6 +77,11 @@ export default function EditProfileScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
 
   const screenHeight = Dimensions.get('window').height;
   const panY = useRef(new Animated.Value(screenHeight)).current;
@@ -139,13 +146,13 @@ export default function EditProfileScreen() {
       if (source === 'gallery') {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Permiso denegado', 'Necesitamos acceso a tus fotos para que puedas elegir tu imagen.');
+          handleError('Permiso denegado', setToast, 'Necesitamos acceso a tus fotos para que puedas elegir tu imagen.');
           return;
         }
       } else {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Permiso denegado', 'Necesitamos acceso a tu cámara para tomar la foto.');
+          handleError('Permiso denegado', setToast, 'Necesitamos acceso a tu cámara para tomar la foto.');
           return;
         }
       }
@@ -205,12 +212,9 @@ export default function EditProfileScreen() {
         .getPublicUrl(fileName);
 
       setAvatar(publicUrl);
-      Alert.alert('¡Éxito!', 'Foto de perfil cargada correctamente.');
+      handleError('Foto de perfil cargada correctamente', setToast, '¡Éxito!');
     } catch (error: any) {
-      Alert.alert(
-        'Error al subir imagen', 
-        `Detalle técnico: ${error.message || error.error_description || 'Problema de red o de permisos del bucket.'}`
-      );
+      handleError(error, setToast, `Detalle técnico: ${error.message || error.error_description || 'Problema de red o de permisos del bucket.'}`);
     } finally {
       setIsSaving(false);
     }
@@ -230,8 +234,7 @@ export default function EditProfileScreen() {
           setAvatar(data.profile_pic_url || '');
         }
       } catch (error) {
-        console.error('Error al cargar perfil:', error);
-        Alert.alert('Error', 'No se pudieron cargar los datos del perfil.');
+        handleError(error, setToast, 'No se pudieron cargar los datos del perfil');
       } finally {
         setIsLoading(false);
       }
@@ -242,7 +245,7 @@ export default function EditProfileScreen() {
   const handleSave = async () => {
     if (!user) return;
     if (!username.trim()) {
-      Alert.alert('Faltan datos', 'El nombre de usuario es obligatorio.');
+      handleError('El nombre de usuario es obligatorio', setToast, 'Faltan datos');
       return;
     }
 
@@ -260,7 +263,7 @@ export default function EditProfileScreen() {
 
       if (checkError) throw checkError;
       if (existingUser) {
-        Alert.alert('Nombre ocupado', 'Este nombre de usuario ya está siendo usado por otra persona.');
+        handleError('Este nombre de usuario ya está siendo usado por otra persona', setToast, 'Nombre ocupado');
         setIsSaving(false);
         return;
       }
@@ -286,11 +289,10 @@ export default function EditProfileScreen() {
 
       if (authError) throw authError;
 
-      Alert.alert('¡Éxito!', 'Tu perfil ha sido actualizado correctamente.');
+      handleError('Tu perfil ha sido actualizado correctamente', setToast, '¡Éxito!');
       navigation.goBack();
     } catch (error: any) {
-      console.error('Error al guardar:', error);
-      Alert.alert('Error al guardar', error.message || 'Ocurrió un problema guardando los cambios.');
+      handleError(error, setToast, error.message || 'Ocurrió un problema guardando los cambios');
     } finally {
       setIsSaving(false);
     }
@@ -370,6 +372,7 @@ export default function EditProfileScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
       
       {/* Header */}
       <View style={styles.header}>

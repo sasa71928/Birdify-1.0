@@ -4,6 +4,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BirdRepository } from '../repositories/bird.repository';
 import { mapBird } from '../utils/mapBird';
 import { RootStackParamList, BirdSpeciesData } from '../navigation/AppNavigator';
+import { handleError } from '../utils/errorHandler';
 
 type DictionaryNavProp = NativeStackNavigationProp<RootStackParamList, 'Dictionary'>;
 
@@ -18,6 +19,11 @@ export function useDictionary() {
   const [filteredBirds, setFilteredBirds] = useState<BirdSpeciesData[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingImages, setLoadingImages] = useState<Record<string, boolean>>({});
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
 
   const loadBirds = async () => {
     try {
@@ -27,7 +33,7 @@ export function useDictionary() {
       setAllBirds(mapped);
       setFilteredBirds(mapped);
     } catch (err) {
-      console.error('Error loading birds:', err);
+      handleError(err, setToast, 'Error loading birds');
     } finally {
       setLoading(false);
     }
@@ -141,11 +147,13 @@ export function useDictionary() {
     loading,
     loadingImages,
     filters: FILTERS,
+    toast,
     
     // Setters
     setSearchQuery,
     setActiveFilter,
     setLoadingImages,
+    setToast,
     
     // Actions
     loadBirds,

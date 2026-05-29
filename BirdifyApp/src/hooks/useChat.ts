@@ -10,6 +10,7 @@ import { ConversationRepository } from '../repositories/conversation.repository'
 import { useAuth } from '../context/AuthContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import * as ImagePicker from 'expo-image-picker';
+import { handleError } from '../utils/errorHandler';
 
 type ChatNavProp = NativeStackNavigationProp<RootStackParamList, 'Chat'>;
 type ChatRouteProp = RouteProp<RootStackParamList, 'Chat'>;
@@ -80,7 +81,7 @@ export function useChat() {
         setOtherUserId(otherMember.user_id);
       }
     } catch (error) {
-      console.error('Error loading conversation:', error);
+      handleError(error, setToast, 'Error loading conversation');
     }
   };
 
@@ -102,7 +103,7 @@ export function useChat() {
       }));
       setMessages(mapped);
     } catch (error) {
-      console.error('Error loading messages:', error);
+      handleError(error, setToast, 'Error loading messages');
     } finally {
       setLoading(false);
     }
@@ -209,14 +210,14 @@ export function useChat() {
         listRef.current?.scrollToEnd({ animated: true });
       }, 50);
     } catch (error) {
-      console.error('Error sending message:', error);
+      handleError(error, setToast, 'Error sending message');
     }
   };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      alert('Se necesita permiso para acceder a la galería.');
+      handleError('Permiso denegado', setToast, 'Se necesita permiso para acceder a la galería.');
       return;
     }
 
@@ -260,8 +261,7 @@ export function useChat() {
       showToast('Usuario bloqueado. Ya no recibirás sus mensajes.', 'success');
       setTimeout(() => navigation.goBack(), 700);
     } catch (e) {
-      console.error('Error blocking from chat:', e);
-      showToast('No se pudo bloquear al usuario.', 'error');
+      handleError(e, setToast, 'No se pudo bloquear al usuario.');
     } finally {
       setOptionsVisible(false);
     }
@@ -275,8 +275,7 @@ export function useChat() {
       showToast('Has salido del grupo.', 'success');
       setTimeout(() => navigation.goBack(), 700);
     } catch (e) {
-      console.error('Error leaving group:', e);
-      showToast('No se pudo salir del grupo.', 'error');
+      handleError(e, setToast, 'No se pudo salir del grupo.');
     } finally {
       setLeaving(false);
       setShowLeaveModal(false);

@@ -7,6 +7,7 @@ import { UserBlockRepository } from '../repositories/user_block.repository';
 import { useAuth } from '../context/AuthContext';
 import { RootStackParamList, ChatThread } from '../navigation/AppNavigator';
 import { Dimensions } from 'react-native';
+import { handleError } from '../utils/errorHandler';
 
 type MessagesNavProp = NativeStackNavigationProp<RootStackParamList, 'Messages'>;
 
@@ -69,8 +70,7 @@ export function useMessages() {
 
       setThreads(mapped);
     } catch (error) {
-      console.error('Error loading conversations:', error);
-      showToast('Error al cargar conversaciones', 'error');
+      handleError(error, setToast, 'Error loading conversations');
     } finally {
       setLoading(false);
     }
@@ -159,7 +159,7 @@ export function useMessages() {
       setConversationToDelete(null);
       load();
     } catch (error) {
-      console.error('Error deleting conversation:', error);
+      handleError(error, setToast, 'Error deleting conversation');
     }
   };
 
@@ -194,8 +194,7 @@ export function useMessages() {
       showToast('Has salido del grupo.', 'success');
       load();
     } catch (e) {
-      console.error('Error leaving group:', e);
-      showToast('No se pudo salir del grupo.', 'error');
+      handleError(e, setToast, 'No se pudo salir del grupo.');
     } finally {
       setLeaving(false);
       setShowLeaveModal(false);
@@ -217,8 +216,7 @@ export function useMessages() {
       showToast('Usuario bloqueado.', 'success');
       load();
     } catch (e) {
-      console.error('Error blocking user:', e);
-      showToast('No se pudo bloquear al usuario.', 'error');
+      handleError(e, setToast, 'No se pudo bloquear al usuario.');
     }
   };
 

@@ -15,6 +15,8 @@ import { Spacing } from '../../theme';
 
 import { Linking, Alert } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { handleError } from '../../utils/errorHandler';
+import AppToast from '../../components/AppToast';
 
 const FAQS = [
   {
@@ -38,6 +40,11 @@ export default function HelpSupportScreen() {
   const navigation = useNavigation();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
 
   const { user } = useAuth();
 
@@ -64,16 +71,14 @@ export default function HelpSupportScreen() {
   if (supported) {
     await Linking.openURL(emailUrl);
   } else {
-    Alert.alert(
-      'Error',
-      'No se encontró una aplicación de correo disponible.'
-    );
+    handleError('No se encontró una aplicación de correo disponible', setToast, 'Error');
   }
 };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
       
       {/* Header */}
       <View style={styles.header}>

@@ -10,6 +10,8 @@ import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useAuth } from '../../context/AuthContext';
 import * as DocumentPicker from 'expo-document-picker';
 import * as MailComposer from 'expo-mail-composer';
+import { handleError } from '../../utils/errorHandler';
+import AppToast from '../../components/AppToast';
 type SettingsNavProp = NativeStackNavigationProp<RootStackParamList, 'Settings'>;
 
 interface SettingItem {
@@ -40,10 +42,6 @@ const SETTING_SECTIONS: SettingSection[] = [
       { id: '4', icon: 'globe-outline', label: 'Language' },
       { id: '5', icon: 'moon-outline', label: 'Theme' },
     ],
-  },
-  {
-    title: 'Data & Storage',
-    data: [{ id: 'offline', icon: 'cloud-offline-outline', label: 'Offline Storage' }],
   },
   {
     title: 'Support & About',
@@ -101,10 +99,15 @@ export default function SettingsScreen() {
 
   const [verificationModalVisible, setVerificationModalVisible] = useState(false);
   const [selectedFile, setSelectedFile] = useState<{ uri: string; name: string } | null>(null);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
 
   const handlePress = (item: SettingItem) => {
     if (item.danger) {
-      signOut().catch(err => console.error('Logout failed', err));
+      signOut().catch(err => handleError(err, setToast, 'Logout failed'));
     } else if (item.id === '1') {
       navigation.navigate('EditProfile' as any);
     } else if (item.id === '2') {
@@ -119,8 +122,6 @@ export default function SettingsScreen() {
       navigation.navigate('HelpSupport' as any);
     } else if (item.id === '7') {
       navigation.navigate('AboutBirdify' as any);
-    } else if (item.id === 'offline') {
-      navigation.navigate('OfflineStorage' as any);
     } else if (item.id === 'verify') {
       setVerificationModalVisible(true);
     } else {
@@ -131,6 +132,7 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
@@ -187,7 +189,7 @@ export default function SettingsScreen() {
                       setSelectedFile({ uri: result.assets[0].uri, name: result.assets[0].name });
                     }
                   } catch (e) {
-                    console.error(e);
+                    handleError(e, setToast, 'Error selecting file');
                   }
                 }}
               >
@@ -224,9 +226,13 @@ export default function SettingsScreen() {
                             body: `Adjunto mi documento de verificación (${selectedFile.name}).`,
                             attachments: [selectedFile.uri],
                           });
-                          Alert.alert('Solicitud enviada', status === 'sent' ? 'Correo enviado correctamente.' : 'El correo no se pudo enviar.');
+                          if (status === 'sent') {
+                            handleError('Correo enviado correctamente', setToast, 'Solicitud enviada');
+                          } else {
+                            handleError('El correo no se pudo enviar', setToast, 'Error');
+                          }
                         } catch (e) {
-                          Alert.alert('Error', 'No se pudo enviar la solicitud.');
+                          handleError(e, setToast, 'No se pudo enviar la solicitud');
                         }
                         setVerificationModalVisible(false);
                         setSelectedFile(null);

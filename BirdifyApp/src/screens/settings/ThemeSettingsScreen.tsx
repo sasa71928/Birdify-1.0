@@ -13,6 +13,8 @@ import { useNavigation } from '@react-navigation/native';
 import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useTheme } from '../../context/ThemeContext';
+import { handleError } from '../../utils/errorHandler';
+import AppToast from '../../components/AppToast';
 
 const THEMES = [
   { id: 'light', name: 'Light Mode', icon: 'sunny-outline' },
@@ -26,19 +28,22 @@ export default function ThemeSettingsScreen() {
   const { theme, setTheme } = useTheme();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const [selectedTheme, setSelectedTheme] = useState(theme);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
 
   const handleSave = () => {
     setTheme(selectedTheme);
-    Alert.alert(
-      'Theme Updated',
-      `Birdify is now set to ${THEMES.find(t => t.id === selectedTheme)?.name}.`,
-      [{ text: 'Great!', onPress: () => navigation.goBack() }]
-    );
+    handleError(`Birdify is now set to ${THEMES.find(t => t.id === selectedTheme)?.name}`, setToast, 'Theme Updated');
+    setTimeout(() => navigation.goBack(), 1000);
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
       
       {/* Header */}
       <View style={styles.header}>

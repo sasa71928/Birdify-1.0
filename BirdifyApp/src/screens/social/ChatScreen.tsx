@@ -30,6 +30,7 @@ import { MessageRepository } from '../../repositories/message.repository';
 import { UserBlockRepository } from '../../repositories/user_block.repository';
 import { MessageReadRepository } from '../../repositories/message_read.repository';
 import { ConversationRepository } from '../../repositories/conversation.repository';
+import { handleError } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
 
 type ChatNavProp = NativeStackNavigationProp<RootStackParamList, 'Chat'>;
@@ -190,8 +191,7 @@ export default function ChatScreen() {
 
         if (mounted) setMessages(mapped);
       } catch (e) {
-        console.error('Error loading chat:', e);
-        showToast('No se pudo cargar el chat.', 'error');
+        handleError(e, setToast, 'No se pudo cargar el chat');
       } finally {
         if (mounted) setLoading(false);
       }
@@ -239,7 +239,7 @@ export default function ChatScreen() {
             setOtherUserId(conv?.is_group ? null : (userData?.id || null));
           }
         } catch (e) {
-          console.error('Error refreshing conversation:', e);
+          handleError(e, setToast, 'Error refreshing conversation');
         }
       };
 
@@ -277,7 +277,7 @@ export default function ChatScreen() {
       const unreadMessageIds = unreadMessages.map(m => m.id);
       if (unreadMessageIds.length > 0 && user) {
         MessageReadRepository.markMultipleAsRead(unreadMessageIds, user.id).catch(e => {
-          console.error('Error marking messages as read:', e);
+          handleError(e, setToast, 'Error marking messages as read');
         });
       }
     } else {
@@ -341,8 +341,7 @@ export default function ChatScreen() {
         replyToId: replyingTo?.id || null,
       });
     } catch (e) {
-      console.error('Error sending message:', e);
-      showToast('No se pudo enviar el mensaje.', 'error');
+      handleError(e, setToast, 'No se pudo enviar el mensaje');
     }
   };
 
@@ -351,7 +350,7 @@ export default function ChatScreen() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
     if (status !== 'granted') {
-      alert('Se necesita permiso para acceder a la galería.');
+      handleError('Permiso denegado', setToast, 'Se necesita permiso para acceder a la galería.');
       return;
     }
 
@@ -373,8 +372,7 @@ export default function ChatScreen() {
       showToast('Usuario bloqueado. Ya no recibirás sus mensajes.', 'success');
       setTimeout(() => navigation.goBack(), 700);
     } catch (e) {
-      console.error('Error blocking from chat:', e);
-      showToast('No se pudo bloquear al usuario.', 'error');
+      handleError(e, setToast, 'No se pudo bloquear al usuario.');
     } finally {
       setOptionsVisible(false);
     }
@@ -388,8 +386,7 @@ export default function ChatScreen() {
       showToast('Has salido del grupo.', 'success');
       setTimeout(() => navigation.goBack(), 700);
     } catch (e) {
-      console.error('Error leaving group:', e);
-      showToast('No se pudo salir del grupo.', 'error');
+      handleError(e, setToast, 'No se pudo salir del grupo.');
     } finally {
       setLeaving(false);
       setShowLeaveModal(false);

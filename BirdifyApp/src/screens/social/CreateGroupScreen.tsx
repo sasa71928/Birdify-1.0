@@ -22,6 +22,7 @@ import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useAuth } from '../../context/AuthContext';
 import { FollowRepository } from '../../repositories/follow.repository';
 import { ConversationRepository } from '../../repositories/conversation.repository';
+import { handleError } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'CreateGroup'>;
@@ -63,8 +64,7 @@ export default function CreateGroupScreen() {
         }));
         if (mounted) setContacts(mapped);
       } catch (e) {
-        console.error('Error loading contacts:', e);
-        showToast('No se pudo cargar tu lista de contactos.', 'error');
+        handleError(e, setToast, 'No se pudo cargar tu lista de contactos');
       } finally {
         if (mounted) setLoadingContacts(false);
       }
@@ -90,7 +90,7 @@ export default function CreateGroupScreen() {
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      alert('Se necesita permiso para acceder a la galería.');
+      handleError('Permiso denegado', setToast, 'Se necesita permiso para acceder a la galería.');
       return;
     }
 
@@ -123,8 +123,7 @@ export default function CreateGroupScreen() {
         navigation.navigate('MainTabs', { screen: 'Messages' });
       }, 500);
     } catch (e) {
-      console.error('Error creating group:', e);
-      showToast('No se pudo crear el grupo.', 'error');
+      handleError(e, setToast, 'No se pudo crear el grupo');
     } finally {
       setCreating(false);
     }

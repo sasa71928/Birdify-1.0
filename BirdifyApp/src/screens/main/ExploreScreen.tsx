@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-} from 'react';
+import React, { useMemo } from 'react';
 
 import {
   View,
@@ -26,34 +20,18 @@ import {
 } from '@expo/vector-icons';
 
 import { useNavigation } from '@react-navigation/native';
-
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-
 import { RootStackParamList } from '../../navigation/AppNavigator';
 
 import { createStyles } from '../../styles/screens/main/exploreScreen.styles';
 
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
-import { SightingRepository } from '../../repositories/sighting.repository';
-
+import { useExplore } from '../../hooks/useExplore';
 import { mapBird } from '../../utils/mapBird';
+import AppToast from '../../components/AppToast';
 
-import * as Location from 'expo-location';
-
-type NavProp = NativeStackNavigationProp<
-  RootStackParamList,
-  'Explore'
->;
-
-type MapSighting = {
-  id: string;
-  latitude: number | string;
-  longitude: number | string;
-  created_at: string;
-  is_location_private?: boolean;
-  bird?: any;
-};
+type NavProp = NativeStackNavigationProp<RootStackParamList, 'Explore'>;
 
 const createMapStyle = (colors: any) => [
   {
@@ -113,231 +91,31 @@ const createMapStyle = (colors: any) => [
 ];
 
 export default function ExploreScreen() {
-  const { screen: styles, colors, isDark } =
-    useDynamicStyles(createStyles);
-
+  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const navigation = useNavigation<NavProp>();
 
-  const mapRef = useRef<MapView>(null);
+  const MAP_STYLE = useMemo(() => createMapStyle(colors), [colors]);
 
-  const MAP_STYLE = useMemo(
-    () => createMapStyle(colors),
-    [colors]
-  );
-
-  const [loading, setLoading] = useState(true);
-
-  const [selectedMarker, setSelectedMarker] =
-    useState<string | null>(null);
-
-  const [sightings, setSightings] = useState<
-    MapSighting[]
-  >([]);
-
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const [filteredSightings, setFilteredSightings] =
-    useState<MapSighting[]>([]);
-
-  const [userLocation, setUserLocation] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
-
-  const DEFAULT_REGION = {
-    latitude: 24.1426,
-    longitude: -110.3128,
-    latitudeDelta: 0.08,
-    longitudeDelta: 0.08,
-  };
-
-  const getTimeAgo = (dateString: string) => {
-    const now = new Date();
-
-    const date = new Date(dateString);
-
-    const seconds = Math.floor(
-      (now.getTime() - date.getTime()) / 1000
-    );
-
-    const minutes = Math.floor(seconds / 60);
-
-    const hours = Math.floor(minutes / 60);
-
-    const days = Math.floor(hours / 24);
-
-    if (seconds < 60) return 'Just now';
-
-    if (minutes < 60) {
-      return `${minutes}m ago`;
-    }
-
-    if (hours < 24) {
-      return `${hours}h ago`;
-    }
-
-    return `${days}d ago`;
-  };
-
-  const calculateDistance = (
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number
-  ) => {
-    const R = 6371;
-
-    const dLat =
-      ((lat2 - lat1) * Math.PI) / 180;
-
-    const dLon =
-      ((lon2 - lon1) * Math.PI) / 180;
-
-    const a =
-      Math.sin(dLat / 2) *
-        Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-
-    const c =
-      2 * Math.atan2(
-        Math.sqrt(a),
-        Math.sqrt(1 - a)
-      );
-
-    return (R * c).toFixed(1);
-  };
-
-  const loadSightings = useCallback(async () => {
-    try {
-      setLoading(true);
-
-      const data =
-        await SightingRepository.getFeed();
-
-      const validSightings = data.filter(
-        (item) =>
-          item.latitude != null &&
-          item.longitude != null &&
-          !item.is_location_private
-      );
-
-      setSightings(validSightings);
-
-    } catch (error) {
-      console.error(
-        'Error loading sightings:',
-        error
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const loadUserLocation = async (isMounted: boolean) => {
-    try {
-      const { status } =
-        await Location.requestForegroundPermissionsAsync();
-
-      if (status !== 'granted') {
-        return;
-      }
-
-      const location =
-        await Location.getCurrentPositionAsync({
-          accuracy:
-            Location.Accuracy.High,
-        });
-
-      if (!isMounted) return;
-
-      setUserLocation({
-        latitude:
-          location.coords.latitude,
-        longitude:
-          location.coords.longitude,
-      });
-
-    } catch (error) {
-      if (!isMounted) return;
-      console.error(
-        'Error getting location:',
-        error
-      );
-    }
-  };
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const initializeScreen = async () => {
-      await loadSightings();
-      await loadUserLocation(isMounted);
-    };
-
-    initializeScreen();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [loadSightings]);
-
-  useEffect(() => {
-    setFilteredSightings(sightings);
-  }, [sightings]);
-
-  const selectedSighting = useMemo(() => {
-    return (
-      sightings.find(
-        (s) => s.id === selectedMarker
-      ) ?? null
-    );
-  }, [sightings, selectedMarker]);
-
-  const closeSelection = useCallback(() => {
-    if (!selectedSighting) {
-      setSelectedMarker(null);
-      return;
-    }
-
-    mapRef.current?.animateToRegion({
-      latitude: Number(
-        selectedSighting.latitude
-      ),
-      longitude: Number(
-        selectedSighting.longitude
-      ),
-      latitudeDelta: 0.08,
-      longitudeDelta: 0.08,
-    });
-
-    setSelectedMarker(null);
-
-  }, [selectedSighting]);
-
-  const handleSearch = (text: string) => {
-    setSearchQuery(text);
-
-    if (!text.trim()) {
-      setFilteredSightings(sightings);
-      return;
-    }
-
-    const filtered = sightings.filter(
-      (item) => {
-        const birdName =
-          item.bird?.common_name?.toLowerCase() || '';
-
-        return birdName.includes(
-          text.toLowerCase()
-        );
-      }
-    );
-
-    setFilteredSightings(filtered);
-  };
+  const {
+    loading,
+    selectedMarker,
+    sightings,
+    searchQuery,
+    filteredSightings,
+    userLocation,
+    selectedSighting,
+    DEFAULT_REGION,
+    mapRef,
+    toast,
+    setSearchQuery,
+    setSelectedMarker,
+    setToast,
+    closeSelection,
+    handleSearch,
+    handleMarkerPress,
+    getTimeAgo,
+    calculateDistance,
+  } = useExplore();
 
   if (loading) {
     return (
@@ -376,6 +154,7 @@ export default function ExploreScreen() {
             : 'dark-content'
         }
       />
+      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
 
       <MapView
         ref={mapRef}
@@ -399,16 +178,10 @@ export default function ExploreScreen() {
                 longitude: Number(item.longitude),
               }}
               onPress={() => {
-
-                setSelectedMarker(item.id);
-
+                handleMarkerPress(item.id);
                 mapRef.current?.animateToRegion({
-                  latitude: Number(
-                    item.latitude
-                  ),
-                  longitude: Number(
-                    item.longitude
-                  ),
+                  latitude: Number(item.latitude),
+                  longitude: Number(item.longitude),
                   latitudeDelta: 0.01,
                   longitudeDelta: 0.01,
                 });
@@ -482,7 +255,7 @@ export default function ExploreScreen() {
 
           <TextInput
             style={styles.searchInput}
-            placeholder="Search locations or species..."
+            placeholder="Search bird..."
             placeholderTextColor={colors.placeholder}
             value={searchQuery}
             onChangeText={handleSearch}

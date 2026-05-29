@@ -28,6 +28,8 @@ import { useAuth } from '../../context/AuthContext';
 import { ProfileRepository } from '../../repositories/profile.repository';
 import { ConversationRepository } from '../../repositories/conversation.repository';
 import { User } from '../../types/models';
+import { handleError } from '../../utils/errorHandler';
+import AppToast from '../../components/AppToast';
 import { supabase } from '../../lib/supabase';
 import { FollowRepository } from '../../repositories/follow.repository';
 
@@ -66,6 +68,11 @@ export default function ProfileScreen() {
   // States for sighting modal
   const [selectedSighting, setSelectedSighting] = useState<any>(null);
   const [showSightingModal, setShowSightingModal] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
 
   const handleSightingPress = (sighting: any) => {
     setSelectedSighting(sighting);
@@ -272,7 +279,7 @@ export default function ProfileScreen() {
 
       } catch (error) {
         if (!isMounted) return;
-        console.error('Error cargando perfil y actividad:', error);
+        handleError(error, setToast, 'Error cargando perfil y actividad');
       } finally {
         if (isMounted) {
           setLoadingProfile(false);
@@ -307,7 +314,7 @@ export default function ProfileScreen() {
         setCanViewPrivateContent(canView);
       }
     } catch (error) {
-      console.error('Error toggling follow:', error);
+      handleError(error, setToast, 'Error toggling follow');
     } finally {
       setTogglingFollow(false);
     }
@@ -341,7 +348,7 @@ export default function ProfileScreen() {
         }
       }
     } catch (err) {
-      console.error('Error toggling follow in modal:', err);
+      handleError(err, setToast, 'Error toggling follow in modal');
     } finally {
       setTogglingModalUserId(null);
     }
@@ -407,7 +414,7 @@ const userData = profile ? {
       }));
       setModalUsersList(mappedList);
     } catch (err) {
-      console.error('Error loading modal users:', err);
+      handleError(err, setToast, 'Error loading modal users');
     } finally {
       setLoadingModalUsers(false);
     }
@@ -428,6 +435,7 @@ const userData = profile ? {
   return (
     <SafeAreaView style={shared.safe}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
       <TopNavBar />
 
       {/* ── Profile Header (fijo, no scroll) ── */}
@@ -507,8 +515,7 @@ const userData = profile ? {
                 const conversationId = await ConversationRepository.createDirectConversation(authUser!.id, displayUserId!);
                 navigation.navigate('Chat', { conversationId });
               } catch (error) {
-                console.error('Error creating conversation:', error);
-                Alert.alert('Error', 'No se pudo crear la conversación.');
+                handleError(error, setToast, 'No se pudo crear la conversación');
               }
             }}>
               <Ionicons name="chatbubble-outline" size={20} color={colors.primary} />

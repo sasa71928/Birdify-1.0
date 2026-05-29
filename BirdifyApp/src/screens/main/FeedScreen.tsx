@@ -1,102 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { FlatList, StyleSheet, StatusBar, RefreshControl, ActivityIndicator, View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../../theme';
 import FeedItem, { Post } from '../../components/FeedItem';
 import TopNavBar from '../../components/TopNavBar';
+import AppToast from '../../components/AppToast';
 import { createStyles } from '../../styles/screens/main/feedScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
-import { SightingRepository } from '../../repositories/sighting.repository';
-import { Sighting } from '../../types/models';
-import { useAuth } from '../../context/AuthContext';
-
-function mapSightingToPost(sighting: any, currentUserId?: string): Post {
-  const timeDiff = Date.now() - new Date(sighting.created_at).getTime();
-  const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60));
-  const timeAgoStr = hoursAgo < 24
-    ? (hoursAgo === 0 ? 'Hace un momento' : `Hace ${hoursAgo} hora${hoursAgo === 1 ? '' : 's'}`)
-    : `Hace ${Math.floor(hoursAgo/24)} día${Math.floor(hoursAgo/24) === 1 ? '' : 's'}`;
-
-  const reactionsList = sighting.reactions || [];
-  const likesCount = reactionsList.length;
-  const hasLiked = currentUserId ? reactionsList.some((r: any) => r.user_id === currentUserId) : false;
-
-  const userData = Array.isArray(sighting.user) ? sighting.user[0] : sighting.user;
-
-  let photoUrl: string | string[] = sighting.photo_url || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=600';
-
-  if (typeof photoUrl === 'string') {
-    try {
-      const parsed = JSON.parse(photoUrl);
-      if (Array.isArray(parsed)) {
-        photoUrl = parsed;
-      }
-    } catch {
-      // Es una URL simple, no un JSON
-    }
-  }
-
-  return {
-    id: sighting.id,
-    userId: sighting.user_id,
-    username: userData?.username || 'Usuario',
-    userAvatar: userData?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
-    location: sighting.is_location_private ? 'Ubicación Privada' : 'En la Naturaleza',
-    image: photoUrl,
-    tag: sighting.bird?.common_name || 'Ave Sin Identificar',
-    likes: likesCount,
-    comments: sighting.comments ? sighting.comments.length : 0,
-    caption: sighting.description || '',
-    timeAgo: timeAgoStr,
-    isVerified: userData?.is_verified === true,
-    commentsList: [],
-    hasLiked,
-    createdAt: sighting.created_at
-  };
-}
+import { useFeed } from '../../hooks/useFeed';
 
 export default function FeedScreen() {
   const { shared, screen, isDark, colors } = useDynamicStyles(createStyles);
-  const { user } = useAuth();
   
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const loadFeed = async () => {
-    try {
-      const sightings = await SightingRepository.getFeed(user?.id);
-      const mappedPosts = sightings.map(item => mapSightingToPost(item, user?.id));
-      setPosts(mappedPosts);
-    } catch (error) {
-      console.error('Error cargando el feed:', error);
-    }
-  };
-
-  const handlePostDeleted = async () => {
-    await loadFeed();
-  };
-
-  const initialLoad = async () => {
-    setIsLoading(true);
-    await loadFeed();
-    setIsLoading(false);
-  };
-
-  const onRefresh = async () => {
-    setIsRefreshing(true);
-    await loadFeed();
-    setIsRefreshing(false);
-  };
-
-  useEffect(() => {
-    initialLoad();
-  }, []);
+  const {
+    posts,
+    isLoading,
+    isRefreshing,
+    toast,
+    setToast,
+    handlePostDeleted,
+    onRefresh,
+  } = useFeed();
 
   return (
     <SafeAreaView style={shared.safe}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <TopNavBar />
+      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
       
       {isLoading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>

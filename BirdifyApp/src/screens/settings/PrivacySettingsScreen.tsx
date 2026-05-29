@@ -20,6 +20,7 @@ import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { ProfileRepository } from '../../repositories/profile.repository';
+import { handleError } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
 
 export default function PrivacySettingsScreen() {
@@ -61,7 +62,7 @@ export default function PrivacySettingsScreen() {
         if (error) throw error;
         setIsPrivateProfile(Boolean(data?.is_private));
       } catch (error) {
-        console.error('Error loading privacy settings:', error);
+        handleError(error, setToast, 'Error loading privacy settings');
       }
     };
 
@@ -83,9 +84,8 @@ export default function PrivacySettingsScreen() {
         'success'
       );
     } catch (error) {
-      console.error('Error updating private profile:', error);
+      handleError(error, setToast, 'No se pudo actualizar la privacidad del perfil');
       setIsPrivateProfile(previous);
-      showToast('No se pudo actualizar la privacidad del perfil.', 'error');
     } finally {
       setIsSavingPrivacy(false);
     }
@@ -138,8 +138,7 @@ export default function PrivacySettingsScreen() {
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
-      console.error(err);
-      showToast(err.message || 'No se pudo cambiar la contraseña. Inténtalo de nuevo.', 'error');
+      handleError(err, setToast, err.message || 'No se pudo cambiar la contraseña. Inténtalo de nuevo.');
     } finally {
       setIsChangingPassword(false);
     }
@@ -182,8 +181,7 @@ export default function PrivacySettingsScreen() {
       setDeleteConfirmationText('');
       await signOut();
     } catch (err: any) {
-      console.error('Error deleting account:', err);
-      showToast('No se pudo eliminar tu cuenta. Por favor vuelve a intentarlo.', 'error');
+      handleError(err, setToast, 'No se pudo eliminar tu cuenta. Por favor vuelve a intentarlo.');
     } finally {
       setIsDeleting(false);
     }

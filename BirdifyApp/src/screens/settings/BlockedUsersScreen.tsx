@@ -7,6 +7,7 @@ import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
 import { useAuth } from '../../context/AuthContext';
 import { UserBlockRepository } from '../../repositories/user_block.repository';
+import { handleError } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
 
 interface BlockedUserItem {
@@ -44,8 +45,7 @@ export default function BlockedUsersScreen() {
       const data = await UserBlockRepository.getBlockedUsers(user.id);
       setBlockedUsers(data || []);
     } catch (error) {
-      console.error('Error loading blocked users:', error);
-      showToast('No se pudieron cargar los usuarios bloqueados.', 'error');
+      handleError(error, setToast, 'No se pudieron cargar los usuarios bloqueados');
     } finally {
       setLoading(false);
     }
@@ -64,10 +64,9 @@ export default function BlockedUsersScreen() {
       setUnblockingUserId(blockedId);
       await UserBlockRepository.unblock(user.id, blockedId);
       setBlockedUsers(prev => prev.filter(item => item.id !== blockedId));
-      showToast(`Desbloqueaste a @${username}.`, 'success');
+      handleError(`Desbloqueaste a @${username}`, setToast, 'Success');
     } catch (error) {
-      console.error('Error unblocking user:', error);
-      showToast('No se pudo desbloquear al usuario.', 'error');
+      handleError(error, setToast, 'No se pudo desbloquear al usuario');
     } finally {
       setUnblockingUserId(null);
     }

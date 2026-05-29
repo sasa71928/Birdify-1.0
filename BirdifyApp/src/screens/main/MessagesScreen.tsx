@@ -92,6 +92,7 @@ export default function MessagesScreen() {
     <SafeAreaView style={shared.safe}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <TopNavBar />
+      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
 
       <View style={styles.container}>
         {/* ── Encabezado con título y botón crear grupo ── */}

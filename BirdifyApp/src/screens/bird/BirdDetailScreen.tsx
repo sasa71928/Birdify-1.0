@@ -17,6 +17,7 @@ import { createStyles } from '../../styles/screens/bird/birdDetailScreen.styles'
 
 import FeedItem from '../../components/FeedItem';
 import { useBirdDetail } from '../../hooks/useBirdDetail';
+import AppToast from '../../components/AppToast';
 
 export default function BirdDetailScreen() {
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
@@ -25,6 +26,8 @@ export default function BirdDetailScreen() {
     posts,
     loading,
     classification,
+    toast,
+    setToast,
     handlePostDeleted,
     goBack,
   } = useBirdDetail();
@@ -42,6 +45,7 @@ export default function BirdDetailScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
 

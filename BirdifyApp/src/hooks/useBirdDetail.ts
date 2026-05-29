@@ -5,6 +5,7 @@ import { RootStackParamList, BirdSpeciesData } from '../navigation/AppNavigator'
 import { SightingRepository } from '../repositories/sighting.repository';
 import { useAuth } from '../context/AuthContext';
 import FeedItem, { Post } from '../components/FeedItem';
+import { handleError } from '../utils/errorHandler';
 
 type BirdDetailNavProp = NativeStackNavigationProp<RootStackParamList, 'BirdDetail'>;
 type BirdDetailRouteProp = RouteProp<RootStackParamList, 'BirdDetail'>;
@@ -76,6 +77,11 @@ export function useBirdDetail() {
   
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
 
   const classification = bird?.classification;
 
@@ -91,7 +97,7 @@ export function useBirdDetail() {
       const mapped = filtered.map((item: any) => mapSightingToPost(item, user?.id));
       setPosts(mapped);
     } catch (error) {
-      console.error('Error loading sightings:', error);
+      handleError(error, setToast, 'Error loading sightings');
     } finally {
       setLoading(false);
     }
@@ -111,6 +117,8 @@ export function useBirdDetail() {
     posts,
     loading,
     classification,
+    toast,
+    setToast,
     
     // Actions
     loadBirdSightings,
