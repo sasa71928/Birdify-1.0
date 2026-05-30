@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { ConversationRepository } from '../repositories/conversation.repository';
+import { MessageRepository } from '../repositories/message.repository';
 import { useAuth } from './AuthContext';
 import { supabase } from '../lib/supabase';
 import { ChatThread } from '../navigation/AppNavigator';
+import { Message } from '../types/message';
 
 interface UnreadMessagesContextType {
   unreadCount: number;
@@ -13,6 +15,10 @@ interface UnreadMessagesContextType {
   conversations: ChatThread[];
   refreshConversations: () => Promise<void>;
   conversationsLoading: boolean;
+  messagesMap: Record<string, Message[]>;
+  fetchMessages: (conversationId: string) => Promise<void>;
+  hasMoreMap: Record<string, boolean>;
+  loadMoreMessages: (conversationId: string) => Promise<void>;
 }
 
 const UnreadMessagesContext = createContext<UnreadMessagesContextType>({
@@ -24,6 +30,10 @@ const UnreadMessagesContext = createContext<UnreadMessagesContextType>({
   conversations: [],
   refreshConversations: async () => {},
   conversationsLoading: true,
+  messagesMap: {},
+  fetchMessages: async () => {},
+  hasMoreMap: {},
+  loadMoreMessages: async () => {},
 });
 
 export function UnreadMessagesProvider({ children }: { children: React.ReactNode }) {
@@ -33,6 +43,8 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
   const [messageTick, setMessageTick] = useState(0);
   const [conversations, setConversations] = useState<ChatThread[]>([]);
   const [conversationsLoading, setConversationsLoading] = useState(true);
+  const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>({});
+  const [hasMoreMap, setHasMoreMap] = useState<Record<string, boolean>>({});
   const subscriptionRef = useRef<any>(null);
   const syncTimerRef = useRef<any>(null);
 
@@ -62,12 +74,16 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
         const currentMember = members.find((m: any) => m.user_id === user.id);
         const userRole = currentMember?.role || 'member';
 
+        const time = item.lastMessage?.created_at
+          ? new Date(item.lastMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : '';
+
         return {
           id: c.id,
           name: title,
           avatar,
           lastMessage: displayMessage || '',
-          time: '',
+          time,
           unreadCount,
           isGroup: c.is_group,
           userRole,
@@ -87,6 +103,147 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
     }
   }, [user?.id]);
 
+  const fetchMessages = useCallback(async (conversationId: string) => {
+    if (!user) return;
+    try {
+      const { messages: rows, hasMore } = await MessageRepository.listPaginated(conversationId, 50);
+
+      // Reverse DESC → ASC para FlatList (viejos arriba, nuevos abajo)
+      const reversedRows = [...rows].reverse();
+
+      // Traer último mensaje leído desde la nueva tabla
+      const lastReadId = await ConversationRepository.getLastReadMessageId(conversationId, user.id);
+
+      // Determinar cuáles mensajes están leídos
+      let readCutoffIndex = -1;
+      if (lastReadId) {
+        const lastReadIndex = reversedRows.findIndex((r) => r.id === lastReadId);
+        if (lastReadIndex !== -1) {
+          readCutoffIndex = lastReadIndex;
+        } else {
+          // lastReadId no está en el batch: comparar por created_at
+          const { data: lastReadMsg } = await supabase
+            .from('messages')
+            .select('created_at')
+            .eq('id', lastReadId)
+            .single();
+          if (lastReadMsg?.created_at) {
+            const lastReadDate = new Date(lastReadMsg.created_at).getTime();
+            // El último mensaje leído es el más reciente cuyo created_at <= lastReadDate
+            for (let i = reversedRows.length - 1; i >= 0; i--) {
+              if (reversedRows[i].created_at && new Date(reversedRows[i].created_at!).getTime() <= lastReadDate) {
+                readCutoffIndex = i;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      const mapped: Message[] = reversedRows.map((r, index) => ({
+        id: r.id,
+        text: r.content || '',
+        time: r.created_at
+          ? new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : '',
+        isMine: r.sender_id === user.id,
+        image: r.image_url || undefined,
+        senderName: r.sender?.username,
+        senderAvatar: r.sender?.profile_pic_url || undefined,
+        replyToId: r.reply_to_id || undefined,
+        replyToText: r.reply_to?.content || undefined,
+        replyToUser: r.reply_to?.sender?.username || undefined,
+        replyToImage: r.reply_to?.image_url || undefined,
+        createdAt: r.created_at || undefined,
+        isRead: readCutoffIndex >= 0 ? index <= readCutoffIndex : false,
+      }));
+
+      setMessagesMap((prev) => ({ ...prev, [conversationId]: mapped }));
+      setHasMoreMap((prev) => ({ ...prev, [conversationId]: hasMore }));
+    } catch (e) {
+      console.error('Error fetching messages:', e);
+    }
+  }, [user?.id]);
+
+  const loadMoreMessages = useCallback(async (conversationId: string) => {
+    if (!user) return;
+    const existing = messagesMap[conversationId];
+    if (!existing || existing.length === 0) return;
+
+    // El primer mensaje del array es el más viejo cargado; usarlo como cursor
+    const oldestMessageId = existing[0].id;
+
+    try {
+      const { messages: rows, hasMore } = await MessageRepository.listPaginated(
+        conversationId,
+        50,
+        oldestMessageId
+      );
+
+      if (rows.length === 0) {
+        setHasMoreMap((prev) => ({ ...prev, [conversationId]: false }));
+        return;
+      }
+
+      // Reverse DESC → ASC
+      const reversedRows = [...rows].reverse();
+
+      const lastReadId = await ConversationRepository.getLastReadMessageId(conversationId, user.id);
+
+      // Determinar readCutoff para los mensajes nuevos
+      let readCutoffIndex = -1;
+      if (lastReadId) {
+        const lastReadIndex = reversedRows.findIndex((r) => r.id === lastReadId);
+        if (lastReadIndex !== -1) {
+          readCutoffIndex = lastReadIndex;
+        } else {
+          const { data: lastReadMsg } = await supabase
+            .from('messages')
+            .select('created_at')
+            .eq('id', lastReadId)
+            .single();
+          if (lastReadMsg?.created_at) {
+            const lastReadDate = new Date(lastReadMsg.created_at).getTime();
+            for (let i = reversedRows.length - 1; i >= 0; i--) {
+              if (reversedRows[i].created_at && new Date(reversedRows[i].created_at!).getTime() <= lastReadDate) {
+                readCutoffIndex = i;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      const newMessages: Message[] = reversedRows.map((r, index) => ({
+        id: r.id,
+        text: r.content || '',
+        time: r.created_at
+          ? new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : '',
+        isMine: r.sender_id === user.id,
+        image: r.image_url || undefined,
+        senderName: r.sender?.username,
+        senderAvatar: r.sender?.profile_pic_url || undefined,
+        replyToId: r.reply_to_id || undefined,
+        replyToText: r.reply_to?.content || undefined,
+        replyToUser: r.reply_to?.sender?.username || undefined,
+        replyToImage: r.reply_to?.image_url || undefined,
+        createdAt: r.created_at || undefined,
+        isRead: readCutoffIndex >= 0 ? index <= readCutoffIndex : false,
+      }));
+
+      setMessagesMap((prev) => {
+        const current = prev[conversationId] || [];
+        const existingIds = new Set(current.map((m) => m.id));
+        const merged = [...newMessages.filter((m) => !existingIds.has(m.id)), ...current];
+        return { ...prev, [conversationId]: merged };
+      });
+      setHasMoreMap((prev) => ({ ...prev, [conversationId]: hasMore }));
+    } catch (e) {
+      console.error('Error loading more messages:', e);
+    }
+  }, [user?.id, messagesMap]);
+
   const refreshUnread = useCallback(async () => {
     await refreshConversations();
   }, [refreshConversations]);
@@ -102,11 +259,42 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
-          table: 'message_reads',
+          table: 'conversation_member_states',
+          filter: `user_id=eq.${user.id}`,
         },
-        () => {
+        (payload) => {
+          console.log('[UnreadMessagesContext] conversation_member_states UPDATE:', payload);
+          const convId = (payload.new as any)?.conversation_id;
+          const oldLastReadId = (payload.old as any)?.last_read_message_id;
+          const newLastReadId = (payload.new as any)?.last_read_message_id;
+
+          // Si last_read_message_id cambió, actualizar contador de no leídos
+          if (convId && oldLastReadId !== newLastReadId && newLastReadId) {
+            console.log('[UnreadMessagesContext] last_read_message_id changed:', { oldLastReadId, newLastReadId });
+            setConversations((prev) => {
+              const convIndex = prev.findIndex((c) => c.id === convId);
+              if (convIndex === -1) return prev;
+
+              const updated = [...prev];
+              const conv = { ...updated[convIndex] };
+
+              // Recalcular unreadCount basado en el nuevo last_read_message_id
+              // Esto es una aproximación; refreshConversations dará el valor exacto
+              if ((conv.unreadCount || 0) > 0) {
+                conv.unreadCount = Math.max(0, (conv.unreadCount || 0) - 1);
+              }
+
+              updated[convIndex] = conv;
+              return updated;
+            });
+
+            // Actualizar contador total
+            setUnreadCount((prev) => Math.max(0, prev - 1));
+          }
+
+          // Refresh completo para asegurar datos exactos
           refreshConversations();
         }
       )
@@ -119,15 +307,50 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
         },
         (payload) => {
           const senderId = (payload.new as any)?.sender_id;
-          if (senderId !== user.id) {
+          const convId = (payload.new as any)?.conversation_id;
+          const newMessage = payload.new as any;
+
+          // Recargar mensajes de esta conversación si están en memoria
+          if (convId) {
+            setMessagesMap((prev) => {
+              if (!prev[convId]) return prev;
+              return prev;
+            });
+            fetchMessages(convId).catch(() => {});
+          }
+
+          // Actualizar lista de conversaciones inmediatamente con el nuevo mensaje
+          if (convId && senderId !== user.id) {
+            setConversations((prev) => {
+              const convIndex = prev.findIndex((c) => c.id === convId);
+              if (convIndex === -1) return prev;
+
+              const updated = [...prev];
+              const conv = { ...updated[convIndex] };
+
+              // Actualizar lastMessage con datos del payload
+              // Nota: realtime payload no incluye relaciones join (sender), 
+              // así que usamos solo el contenido disponible
+              const lastMessageText = newMessage.content || (newMessage.image_url ? '📷 Foto' : '');
+              const displayMessage = conv.isGroup
+                ? `Nuevo mensaje: ${lastMessageText}`
+                : lastMessageText;
+
+              conv.lastMessage = displayMessage;
+              conv.unreadCount = (conv.unreadCount || 0) + 1;
+
+              // Mover al tope de la lista
+              updated.splice(convIndex, 1);
+              updated.unshift(conv);
+
+              return updated;
+            });
+
+            // Actualizar contador total
             setUnreadCount((prev) => prev + 1);
             setHasNewMessage(true);
             setMessageTick((prev) => prev + 1);
           }
-          // Pequeño delay para dar tiempo a la DB de propagar el nuevo mensaje
-          setTimeout(() => {
-            refreshConversations();
-          }, 300);
         }
       )
       .on(
@@ -137,7 +360,9 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
           schema: 'public',
           table: 'messages',
         },
-        () => {
+        (payload) => {
+          const convId = (payload.new as any)?.conversation_id;
+          if (convId) fetchMessages(convId).catch(() => {});
           refreshConversations();
         }
       )
@@ -148,7 +373,9 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
           schema: 'public',
           table: 'messages',
         },
-        () => {
+        (payload) => {
+          const convId = (payload.old as any)?.conversation_id;
+          if (convId) fetchMessages(convId).catch(() => {});
           refreshConversations();
         }
       )
@@ -181,7 +408,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
 
     syncTimerRef.current = setInterval(() => {
       refreshConversations();
-    }, 3000);
+    }, 30000);
 
     return () => {
       if (subscriptionRef.current) {
@@ -191,14 +418,14 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
         clearInterval(syncTimerRef.current);
       }
     };
-  }, [user?.id, refreshConversations]);
+  }, [user?.id, refreshConversations, fetchMessages]);
 
   const clearNewMessage = useCallback(() => {
     setHasNewMessage(false);
   }, []);
 
   return (
-    <UnreadMessagesContext.Provider value={{ unreadCount, hasNewMessage, refreshUnread, clearNewMessage, messageTick, conversations, refreshConversations, conversationsLoading }}>
+    <UnreadMessagesContext.Provider value={{ unreadCount, hasNewMessage, refreshUnread, clearNewMessage, messageTick, conversations, refreshConversations, conversationsLoading, messagesMap, fetchMessages, hasMoreMap, loadMoreMessages }}>
       {children}
     </UnreadMessagesContext.Provider>
   );

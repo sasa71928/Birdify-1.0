@@ -67,7 +67,7 @@ export default function MessagesScreen() {
                 </View>
             )
         ) : (
-            <Image source={{ uri: item.avatar }} style={styles.avatar} />
+            <Image source={{ uri: item.avatar || 'https://gravatar.com/avatar/?d=mp' }} style={styles.avatar} />
         )}
         {item.isOnline && <View style={styles.onlineIndicator} />}
       </View>

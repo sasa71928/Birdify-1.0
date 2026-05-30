@@ -25,9 +25,24 @@ export interface MessageRow {
   };
 }
 
+export interface PaginatedMessagesResult {
+  messages: MessageRow[];
+  hasMore: boolean;
+}
+
 export const MessageRepository = {
   async list(conversationId: string): Promise<MessageRow[]> {
-    const { data, error } = await supabase
+    // Delegar a paginación con un límite alto para compatibilidad
+    const result = await this.listPaginated(conversationId, 1000);
+    return result.messages;
+  },
+
+  async listPaginated(
+    conversationId: string,
+    limit: number = 50,
+    beforeMessageId?: string
+  ): Promise<PaginatedMessagesResult> {
+    let query = supabase
       .from('messages')
       .select(
         `
@@ -39,27 +54,44 @@ export const MessageRepository = {
         reply_to_id,
         created_at,
         sender:users (id, username, profile_pic_url)
-      `
+      `,
+        { count: 'exact' }
       )
       .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (beforeMessageId) {
+      // Traer mensajes con created_at menor al del cursor
+      const { data: cursorMsg } = await supabase
+        .from('messages')
+        .select('created_at')
+        .eq('id', beforeMessageId)
+        .single();
+      if (cursorMsg) {
+        query = query.lt('created_at', cursorMsg.created_at);
+      }
+    }
+
+    const { data, error, count } = await query;
 
     if (error) throw error;
-    
-    // Fetch reply details separately for messages that have reply_to_id
+
     const messages = (data || []) as any[];
+
+    // Fetch reply details separately for messages that have reply_to_id
     const replyToIds = messages
       .map(m => m.reply_to_id)
       .filter(id => id != null);
-    
+
     if (replyToIds.length > 0) {
       const { data: replyData } = await supabase
         .from('messages')
         .select('id, content, image_url, sender:users (username, fullname)')
         .in('id', replyToIds);
-      
+
       const replyMap = new Map((replyData || []).map(r => [r.id, r]));
-      
+
       messages.forEach(m => {
         if (m.reply_to_id) {
           const reply = replyMap.get(m.reply_to_id);
@@ -75,8 +107,9 @@ export const MessageRepository = {
         }
       });
     }
-    
-    return messages;
+
+    const hasMore = messages.length >= limit;
+    return { messages, hasMore };
   },
 
   async send(params: {

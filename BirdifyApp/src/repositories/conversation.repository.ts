@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase';
-import { MessageReadRepository } from './message_read.repository';
 
 export type ConversationRole = 'admin' | 'member';
 
@@ -119,7 +118,7 @@ export const ConversationRepository = {
 
     const results = await Promise.all(
       filteredConversations.map(async (conversation) => {
-        const unreadCount = await MessageReadRepository.getUnreadCount(conversation.id, userId);
+        const unreadCount = await this.getUnreadCount(conversation.id, userId);
         return {
           conversation,
           lastMessage: lastByConversation.get(conversation.id),
@@ -358,6 +357,123 @@ export const ConversationRepository = {
       .delete()
       .eq('conversation_id', conversationId)
       .in('user_id', userIds);
+    if (error) throw error;
+  },
+
+  // ── conversation_member_states (último mensaje leído) ──
+  async getLastReadMessageId(conversationId: string, userId: string): Promise<string | null> {
+    const { data, error } = await supabase
+      .from('conversation_member_states')
+      .select('last_read_message_id')
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data?.last_read_message_id ?? null;
+  },
+
+  async upsertLastReadMessageId(conversationId: string, userId: string, messageId: string): Promise<void> {
+    console.log('[ConversationRepository] upsertLastReadMessageId:', { conversationId, userId, messageId });
+    const { error } = await supabase
+      .from('conversation_member_states')
+      .upsert({
+        conversation_id: conversationId,
+        user_id: userId,
+        last_read_message_id: messageId,
+        last_read_at: new Date().toISOString(),
+      }, { onConflict: 'conversation_id, user_id' });
+
+    if (error) {
+      console.error('[ConversationRepository] upsertLastReadMessageId error:', error);
+      throw error;
+    }
+    console.log('[ConversationRepository] upsertLastReadMessageId success');
+  },
+
+  async getUnreadCount(conversationId: string, userId: string): Promise<number> {
+    const { data: stateData, error: stateError } = await supabase
+      .from('conversation_member_states')
+      .select('last_read_message_id')
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (stateError) throw stateError;
+
+    const lastReadId = stateData?.last_read_message_id;
+
+    if (!lastReadId) {
+      // No hay mensaje leído: contar todos los mensajes que no son míos
+      const { count, error } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('conversation_id', conversationId)
+        .neq('sender_id', userId);
+
+      if (error) throw error;
+      return count || 0;
+    }
+
+    // Traer created_at del último mensaje leído
+    const { data: lastReadMsg } = await supabase
+      .from('messages')
+      .select('created_at')
+      .eq('id', lastReadId)
+      .maybeSingle();
+
+    if (!lastReadMsg) {
+      const { count, error } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('conversation_id', conversationId)
+        .neq('sender_id', userId);
+
+      if (error) throw error;
+      return count || 0;
+    }
+
+    // Contar mensajes no míos después del último leído
+    const { count, error } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('conversation_id', conversationId)
+      .neq('sender_id', userId)
+      .gt('created_at', lastReadMsg.created_at);
+
+    if (error) throw error;
+    return count || 0;
+  },
+
+  // ── Posición visible del scroll ──
+  async getVisibleMessageId(conversationId: string, userId: string): Promise<string | null> {
+    const { data, error } = await supabase
+      .from('conversation_member_states')
+      .select('visible_message_id')
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data?.visible_message_id ?? null;
+  },
+
+  async upsertVisibleMessage(conversationId: string, userId: string, messageId: string): Promise<void> {
+    const { data: msgData } = await supabase
+      .from('messages')
+      .select('created_at')
+      .eq('id', messageId)
+      .single();
+
+    const { error } = await supabase
+      .from('conversation_member_states')
+      .upsert({
+        conversation_id: conversationId,
+        user_id: userId,
+        visible_message_id: messageId,
+        visible_message_created_at: msgData?.created_at || new Date().toISOString(),
+      }, { onConflict: 'conversation_id, user_id' });
+
     if (error) throw error;
   },
 };
