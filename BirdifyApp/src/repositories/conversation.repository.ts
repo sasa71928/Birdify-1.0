@@ -116,12 +116,54 @@ export const ConversationRepository = {
       }
     }
 
+    // Batch query conversation_member_states using RPC
+    const { data: memberStates, error: statesError } = await supabase
+      .rpc('get_batch_conversation_member_states', {
+        p_user_id: userId,
+        p_conversation_ids: conversationIds,
+      });
+
+    if (statesError) {
+      console.error('Error batch fetching member states, falling back to individual queries:', statesError);
+      // Fallback to individual queries if RPC fails
+      const results = await Promise.all(
+        filteredConversations.map(async (conversation) => {
+          const unreadCount = await ConversationRepository.getUnreadCount(conversation.id, userId);
+          return {
+            conversation,
+            lastMessage: lastByConversation.get(conversation.id),
+            unread: unreadCount,
+          };
+        })
+      );
+      return results;
+    }
+
+    // Create a map of conversation_id -> last_read_message_id from the batch results
+    const stateMap = new Map<string, string | null>();
+    for (const state of memberStates || []) {
+      stateMap.set(state.conversation_id, state.last_read_message_id);
+    }
+
     const results = await Promise.all(
       filteredConversations.map(async (conversation) => {
-        const unreadCount = await this.getUnreadCount(conversation.id, userId);
+        const lastReadId = stateMap.get(conversation.id);
+        const lastMessage = lastByConversation.get(conversation.id);
+
+        // Optimization: if last message ID equals last read ID, unread is 0
+        if (lastReadId && lastMessage && lastMessage.id === lastReadId) {
+          return {
+            conversation,
+            lastMessage,
+            unread: 0,
+          };
+        }
+
+        // Otherwise, calculate the actual count
+        const unreadCount = await ConversationRepository.getUnreadCount(conversation.id, userId);
         return {
           conversation,
-          lastMessage: lastByConversation.get(conversation.id),
+          lastMessage,
           unread: unreadCount,
         };
       })

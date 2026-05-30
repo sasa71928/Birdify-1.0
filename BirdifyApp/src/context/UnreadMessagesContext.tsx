@@ -19,6 +19,7 @@ interface UnreadMessagesContextType {
   fetchMessages: (conversationId: string) => Promise<void>;
   hasMoreMap: Record<string, boolean>;
   loadMoreMessages: (conversationId: string) => Promise<void>;
+  appendRealtimeMessage: (convId: string, payload: any) => void;
 }
 
 const UnreadMessagesContext = createContext<UnreadMessagesContextType>({
@@ -34,6 +35,7 @@ const UnreadMessagesContext = createContext<UnreadMessagesContextType>({
   fetchMessages: async () => {},
   hasMoreMap: {},
   loadMoreMessages: async () => {},
+  appendRealtimeMessage: () => {},
 });
 
 export function UnreadMessagesProvider({ children }: { children: React.ReactNode }) {
@@ -47,6 +49,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
   const [hasMoreMap, setHasMoreMap] = useState<Record<string, boolean>>({});
   const subscriptionRef = useRef<any>(null);
   const syncTimerRef = useRef<any>(null);
+  const refreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refreshConversations = useCallback(async () => {
     if (!user) return;
@@ -102,6 +105,15 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
       setConversationsLoading(false);
     }
   }, [user?.id]);
+
+  const debouncedRefresh = useCallback(() => {
+    if (refreshDebounceRef.current) {
+      clearTimeout(refreshDebounceRef.current);
+    }
+    refreshDebounceRef.current = setTimeout(() => {
+      refreshConversations();
+    }, 500);
+  }, [refreshConversations]);
 
   const fetchMessages = useCallback(async (conversationId: string) => {
     if (!user) return;
@@ -163,6 +175,36 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
     } catch (e) {
       console.error('Error fetching messages:', e);
     }
+  }, [user?.id]);
+
+  const appendRealtimeMessage = useCallback((convId: string, payload: any) => {
+    if (!user) return;
+
+    const newMessage: Message = {
+      id: payload.id,
+      text: payload.content || '',
+      time: payload.created_at
+        ? new Date(payload.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : '',
+      isMine: payload.sender_id === user.id,
+      image: payload.image_url || undefined,
+      senderName: undefined, // Se enriquece con fetch separado si es grupo
+      senderAvatar: undefined,
+      replyToId: payload.reply_to_id || undefined,
+      replyToText: undefined,
+      replyToUser: undefined,
+      replyToImage: undefined,
+      createdAt: payload.created_at || undefined,
+      isRead: false,
+    };
+
+    setMessagesMap(prev => {
+      if (!prev[convId]) return prev; // Si no está en memoria, no tocar
+      const existing = prev[convId];
+      // Evitar duplicados
+      if (existing.some(m => m.id === payload.id)) return prev;
+      return { ...prev, [convId]: [...existing, newMessage] };
+    });
   }, [user?.id]);
 
   const loadMoreMessages = useCallback(async (conversationId: string) => {
@@ -294,7 +336,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
             setUnreadCount((prev) => Math.max(0, prev - 1));
           }
 
-          // Refresh completo para asegurar datos exactos
+          // Refresh completo inmediato para asegurar datos exactos del conteo
           refreshConversations();
         }
       )
@@ -310,13 +352,9 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
           const convId = (payload.new as any)?.conversation_id;
           const newMessage = payload.new as any;
 
-          // Recargar mensajes de esta conversación si están en memoria
+          // Agregar mensaje incrementalmente en lugar de recargar todo
           if (convId) {
-            setMessagesMap((prev) => {
-              if (!prev[convId]) return prev;
-              return prev;
-            });
-            fetchMessages(convId).catch(() => {});
+            appendRealtimeMessage(convId, newMessage);
           }
 
           // Actualizar lista de conversaciones inmediatamente con el nuevo mensaje
@@ -329,7 +367,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
               const conv = { ...updated[convIndex] };
 
               // Actualizar lastMessage con datos del payload
-              // Nota: realtime payload no incluye relaciones join (sender), 
+              // Nota: realtime payload no incluye relaciones join (sender),
               // así que usamos solo el contenido disponible
               const lastMessageText = newMessage.content || (newMessage.image_url ? '📷 Foto' : '');
               const displayMessage = conv.isGroup
@@ -350,6 +388,9 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
             setUnreadCount((prev) => prev + 1);
             setHasNewMessage(true);
             setMessageTick((prev) => prev + 1);
+
+            // Debounced refresh para obtener datos exactos
+            debouncedRefresh();
           }
         }
       )
@@ -363,7 +404,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
         (payload) => {
           const convId = (payload.new as any)?.conversation_id;
           if (convId) fetchMessages(convId).catch(() => {});
-          refreshConversations();
+          debouncedRefresh();
         }
       )
       .on(
@@ -376,7 +417,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
         (payload) => {
           const convId = (payload.old as any)?.conversation_id;
           if (convId) fetchMessages(convId).catch(() => {});
-          refreshConversations();
+          debouncedRefresh();
         }
       )
       .on(
@@ -388,7 +429,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
           filter: `user_id=eq.${user.id}`,
         },
         () => {
-          refreshConversations();
+          debouncedRefresh();
         }
       )
       .on(
@@ -399,7 +440,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
           table: 'conversations',
         },
         () => {
-          refreshConversations();
+          debouncedRefresh();
         }
       )
       .subscribe();
@@ -417,6 +458,9 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
       if (syncTimerRef.current) {
         clearInterval(syncTimerRef.current);
       }
+      if (refreshDebounceRef.current) {
+        clearTimeout(refreshDebounceRef.current);
+      }
     };
   }, [user?.id, refreshConversations, fetchMessages]);
 
@@ -425,7 +469,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
   }, []);
 
   return (
-    <UnreadMessagesContext.Provider value={{ unreadCount, hasNewMessage, refreshUnread, clearNewMessage, messageTick, conversations, refreshConversations, conversationsLoading, messagesMap, fetchMessages, hasMoreMap, loadMoreMessages }}>
+    <UnreadMessagesContext.Provider value={{ unreadCount, hasNewMessage, refreshUnread, clearNewMessage, messageTick, conversations, refreshConversations, conversationsLoading, messagesMap, fetchMessages, hasMoreMap, loadMoreMessages, appendRealtimeMessage, }}>
       {children}
     </UnreadMessagesContext.Provider>
   );

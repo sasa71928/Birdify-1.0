@@ -207,9 +207,9 @@ export default function ChatScreen() {
   const route = useRoute<ChatRouteProp>();
   const { conversationId } = route.params;
   const { user } = useAuth();
-  const { messagesMap, fetchMessages, hasMoreMap, loadMoreMessages } = useUnreadMessages();
+  const { messagesMap, fetchMessages, hasMoreMap, loadMoreMessages, appendRealtimeMessage } = useUnreadMessages();
 
-  const [messages, setMessages] = useState<Message[]>([]);
+  const messages = messagesMap[conversationId] ?? [];
   const [input, setInput] = useState('');
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -235,6 +235,7 @@ export default function ChatScreen() {
   const overlayPulse = useRef(new Animated.Value(0)).current;
   const overlayLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const [lastReadMessageId, setLastReadMessageId] = useState<string | null>(null);
+  const [readStatusLoaded, setReadStatusLoaded] = useState(false);
   const [visibleMessageId, setVisibleMessageId] = useState<string | null>(null);
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
@@ -246,6 +247,24 @@ export default function ChatScreen() {
 
   const isNearBottomRef = useRef(true);
 
+  // Centralized function to mark conversation as read with duplicate guards
+  const markConversationAsRead = useCallback(async () => {
+    if (!user || messages.length === 0) return;
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg || lastMsg.isMine) return;
+    
+    // Only mark if the last unread message is different from the last marked
+    if (lastMsg.id === lastReadMessageId) return;
+    
+    try {
+      await ConversationRepository.upsertLastReadMessageId(conversationId, user.id, lastMsg.id);
+      setLastReadMessageId(lastMsg.id);
+    } catch (e) {
+      // Silent fail, the context has fallback with polling every 30s
+      console.error('[ChatScreen] Error marking as read:', e);
+    }
+  }, [messages, user?.id, conversationId, lastReadMessageId]);
+
   // Caché de header de conversación para evitar re-fetch
   const conversationCache = useRef<Map<string, {
     title: string;
@@ -254,98 +273,6 @@ export default function ChatScreen() {
     otherUserId: string | null;
   }>>(new Map());
 
-  // Ref para la suscripción de lectura en tiempo real
-  const readStatusChannelRef = useRef<any>(null);
-
-  // Suscripción a cambios en conversation_member_states para actualizar isRead en tiempo real
-  useEffect(() => {
-    if (!user) return;
-
-    // Limpiar canal anterior si existe
-    if (readStatusChannelRef.current) {
-      supabase.removeChannel(readStatusChannelRef.current);
-      readStatusChannelRef.current = null;
-    }
-
-    const channelName = `chat-read-status-${conversationId}-${user.id}`;
-    const channel = supabase
-      .channel(channelName, {
-        config: {
-          broadcast: { self: true },
-        },
-      })
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'conversation_member_states',
-          filter: `conversation_id=eq.${conversationId}&user_id=eq.${user.id}`,
-        },
-        async (payload) => {
-          const newLastReadId = (payload.new as any)?.last_read_message_id;
-
-          if (newLastReadId) {
-            setLastReadMessageId(newLastReadId);
-
-            // Actualizar isRead de los mensajes existentes sin recargar desde DB
-            setMessages((prevMessages) => {
-              const lastReadIndex = prevMessages.findIndex((m) => m.id === newLastReadId);
-
-              if (lastReadIndex !== -1) {
-                // El mensaje está en el array actual: marcar hasta ese índice
-                return prevMessages.map((m, idx) => ({
-                  ...m,
-                  isRead: idx <= lastReadIndex,
-                }));
-              } else {
-                // El mensaje no está en el array actual (caso de paginación)
-                // Por defecto, no cambiar nada (el usuario puede scrollear para cargar más)
-                return prevMessages;
-              }
-            });
-
-            // Si el mensaje no está en el array actual, verificar si todos deberían marcarse como leídos
-            const lastReadIndex = messages.findIndex((m) => m.id === newLastReadId);
-            if (lastReadIndex === -1) {
-              const { data: lastReadMsg } = await supabase
-                .from('messages')
-                .select('created_at')
-                .eq('id', newLastReadId)
-                .single();
-
-              if (lastReadMsg?.created_at && messages.length > 0) {
-                const lastReadDate = new Date(lastReadMsg.created_at).getTime();
-                const firstMsgDate = messages[0].createdAt
-                  ? new Date(messages[0].createdAt).getTime()
-                  : 0;
-
-                // Si el lastRead es más viejo que el primer mensaje cargado, marcar todos como leídos
-                if (lastReadDate <= firstMsgDate) {
-                  setMessages((prev) => prev.map((m) => ({ ...m, isRead: true })));
-                }
-              }
-            }
-          }
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('Subscribed to read status updates');
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          readStatusChannelRef.current = null;
-        }
-      });
-
-    readStatusChannelRef.current = channel;
-
-    return () => {
-      if (readStatusChannelRef.current) {
-        supabase.removeChannel(readStatusChannelRef.current);
-        readStatusChannelRef.current = null;
-      }
-    };
-  }, [conversationId, user?.id]);
 
   // Animación del botón scroll-to-bottom
   useEffect(() => {
@@ -431,9 +358,6 @@ export default function ChatScreen() {
 
     // Usar mensajes globales si existen
     const globalMessages = messagesMap[conversationId];
-    if (globalMessages) {
-      setMessages(globalMessages);
-    }
 
     // Usar caché de header si existe
     const cached = conversationCache.current.get(conversationId);
@@ -518,7 +442,6 @@ export default function ChatScreen() {
             ]);
             if (iBlocked || theyBlocked) {
               if (mounted) {
-                setMessages([]);
                 setLoading(false);
                 setScrollDone(true);
               }
@@ -529,6 +452,7 @@ export default function ChatScreen() {
 
         if (mounted) {
           setLastReadMessageId(lastReadId);
+          setReadStatusLoaded(true);
           setVisibleMessageId(visibleId);
         }
 
@@ -556,41 +480,6 @@ export default function ChatScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, user?.id, navigation]);
 
-  // Sincronizar mensajes locales con el mapa global cuando cambia
-  useEffect(() => {
-    const global = messagesMap[conversationId];
-    if (!global) return;
-
-    setMessages((prevLocal) => {
-      // Si no hay mensajes locales, usar los globales directamente
-      if (prevLocal.length === 0) return global;
-
-      // Si los extremos son diferentes, hay nuevos mensajes o se cargaron más
-      if (
-        prevLocal.length !== global.length ||
-        prevLocal[0]?.id !== global[0]?.id ||
-        prevLocal[prevLocal.length - 1]?.id !== global[global.length - 1]?.id
-      ) {
-        return global;
-      }
-
-      // Solo actualizar isRead para evitar re-renders innecesarios
-      const hasReadDiff = global.some((g, i) => {
-        const local = prevLocal[i];
-        return local && g.isRead !== local.isRead;
-      });
-
-      if (hasReadDiff) {
-        return prevLocal.map((local, i) => {
-          const g = global[i];
-          if (!g) return local;
-          return g.isRead !== local.isRead ? { ...local, isRead: g.isRead } : local;
-        });
-      }
-
-      return prevLocal;
-    });
-  }, [messagesMap, conversationId]);
 
   // Scroll inicial: posicionar en el primer mensaje no leído (estilo WhatsApp)
   // Guardar último mensaje visible (bottom-most) como posición de scroll
@@ -694,6 +583,8 @@ export default function ChatScreen() {
 
     if (!headerReady) return;
 
+    if (!readStatusLoaded) return; // Add this condition
+
     if (!messages.length) {
       setScrollDone(true);
       return;
@@ -702,6 +593,7 @@ export default function ChatScreen() {
     performInitialScroll();
   }, [
     headerReady,
+    readStatusLoaded,
     messages,
     lastReadMessageId,
     visibleMessageId,
@@ -788,31 +680,17 @@ export default function ChatScreen() {
     }, 100);
 
     // Marcar como leído hasta el último mensaje
-    if (user && lastMessage) {
-      console.log('[ChatScreen] Marking as read:', lastMessage.id);
-      ConversationRepository.upsertLastReadMessageId(conversationId, user.id, lastMessage.id).catch(e => {
-        console.error('[ChatScreen] Error marking as read:', e);
-        handleError(e, setToast, 'Error marking messages as read');
-      });
+    if (isNearBottomRef.current) {
+      markConversationAsRead();
     }
-
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [messages, user?.id]);
+  }, [messages, user?.id, markConversationAsRead]);
 
   // Marcar mensajes como leídos al abrir el chat si hay mensajes no leídos
   useEffect(() => {
     if (!headerReady || !initialScrollDone.current || messages.length === 0) return;
 
-    const lastMessage = messages[messages.length - 1];
-    if (user && lastMessage && !lastMessage.isMine && !lastMessage.isRead) {
-      console.log('[ChatScreen] Opening chat - marking last message as read:', lastMessage.id);
-      ConversationRepository.upsertLastReadMessageId(conversationId, user.id, lastMessage.id).catch(e => {
-        console.error('[ChatScreen] Error marking as read on open:', e);
-      });
-    }
-  }, [headerReady, messages, user?.id, conversationId]);
+    markConversationAsRead();
+  }, [headerReady, messages, user?.id, conversationId, markConversationAsRead]);
 
   const checkScrollPosition = useCallback((offsetY: number, contentH: number, layoutH: number) => {
     if (contentH <= layoutH) {
@@ -848,18 +726,6 @@ export default function ChatScreen() {
     const replyToUser = replyingTo?.senderName || (replyingTo?.isMine ? 'Tú' : headerTitle);
     const replyToImage = replyingTo?.image;
 
-    const newMsg: Message = {
-      id: Date.now().toString(),
-      text: text || '',
-      image: selectedImage || undefined,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isMine: true,
-      replyToId: replyToId || undefined,
-      replyToText,
-      replyToUser,
-      replyToImage,
-    };
-    setMessages((prev) => [...prev, newMsg]);
     setInput('');
     setSelectedImage(null);
     setReplyingTo(null);
@@ -1083,7 +949,7 @@ export default function ChatScreen() {
                   justifyContent: 'center',
                   alignItems: 'center',
                   opacity: overlayOpacity,
-                }]}
+               }]}
                 pointerEvents="auto"
               >
                 <Animated.View
@@ -1106,9 +972,10 @@ export default function ChatScreen() {
                     borderRadius: 30,
                     backgroundColor: colors.primary,
                     opacity: 0.15,
-                  }} />
-                </Animated.View>
+                  }}
+                />
               </Animated.View>
+            </Animated.View>
             )}
 
             <Animated.View
@@ -1131,6 +998,7 @@ export default function ChatScreen() {
               }}
             >
               <TouchableOpacity
+                activeOpacity={0.85}
                 style={{
                   width: 44,
                   height: 44,
@@ -1140,7 +1008,6 @@ export default function ChatScreen() {
                   alignItems: 'center',
                   ...Shadows.active,
                 }}
-                activeOpacity={0.85}
                 onPress={() => {
                   listRef.current?.scrollToEnd({ animated: true });
                   setShowScrollButton(false);
@@ -1149,8 +1016,7 @@ export default function ChatScreen() {
                 <Ionicons name="arrow-down" size={22} color={colors.white} />
               </TouchableOpacity>
             </Animated.View>
-          </View>
-
+        </View>
         {/* ── Input bar ── */}
         <View style={styles.inputContainer}>
           {replyingTo && (
@@ -1247,7 +1113,7 @@ export default function ChatScreen() {
                   onPress={() => {
                     setOptionsVisible(false);
                     navigation.navigate('EditGroup', { conversationId });
-                  }}
+                   }}
                   style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}
                 >
                   <Ionicons name="pencil-outline" size={22} color={colors.textPrimary} />
@@ -1352,7 +1218,7 @@ export default function ChatScreen() {
                   width: Dimensions.get('window').width, 
                   height: Dimensions.get('window').height * 0.6,
                   resizeMode: 'contain' 
-                }}
+                 }}
               />
             </TouchableOpacity>
           )}
