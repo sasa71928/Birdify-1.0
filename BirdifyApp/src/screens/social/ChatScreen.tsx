@@ -229,6 +229,7 @@ export default function ChatScreen() {
   const [showScrollButton, setShowScrollButton] = useState(false);
   const scrollButtonAnim = useRef(new Animated.Value(0)).current;
   const initialScrollDone = useRef(false);
+  const lastSavedVisibleRef = useRef<string | null>(null);
   const [headerReady, setHeaderReady] = useState(false);
   const [scrollDone, setScrollDone] = useState(false);
   const overlayOpacity = useRef(new Animated.Value(1)).current;
@@ -245,8 +246,20 @@ export default function ChatScreen() {
     type: 'success',
   });
 
-  const isNearBottomRef = useRef(true);
+  const isNearBottomRef = useRef(false);
+  const currentTopVisibleRef = useRef<string | null>(null);
 
+  const visibleMessageTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (visibleMessageTimeout.current) {
+        clearTimeout(visibleMessageTimeout.current);
+      }
+    };
+  }, []);
+  
   // Centralized function to mark conversation as read with duplicate guards
   const markConversationAsRead = useCallback(async () => {
     if (!user || messages.length === 0) return;
@@ -263,7 +276,7 @@ export default function ChatScreen() {
       // Silent fail, the context has fallback with polling every 30s
       console.error('[ChatScreen] Error marking as read:', e);
     }
-  }, [messages, user?.id, conversationId, lastReadMessageId]);
+  }, [[user?.id, messages, conversationId, lastReadMessageId]]);
 
   // Caché de header de conversación para evitar re-fetch
   const conversationCache = useRef<Map<string, {
@@ -272,7 +285,6 @@ export default function ChatScreen() {
     isGroup: boolean;
     otherUserId: string | null;
   }>>(new Map());
-
 
   // Animación del botón scroll-to-bottom
   useEffect(() => {
@@ -329,27 +341,15 @@ export default function ChatScreen() {
     setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3600);
   };
 
-  const formatDateLabel = (dateString: string) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    // Reset time for comparison
-    today.setHours(0, 0, 0, 0);
-    yesterday.setHours(0, 0, 0, 0);
-    const messageDate = new Date(date);
-    messageDate.setHours(0, 0, 0, 0);
-
-    if (messageDate.getTime() === today.getTime()) {
-      return 'Hoy';
-    } else if (messageDate.getTime() === yesterday.getTime()) {
-      return 'Ayer';
-    } else {
-      return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-    }
-  };
-
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
+  
+  
   useEffect(() => {
     let mounted = true;
     initialScrollDone.current = false;
@@ -480,28 +480,51 @@ export default function ChatScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, user?.id, navigation]);
 
+  // Map de id de mensaje a su índice en la lista actual para ordenar los viewableItems por su posición en la lista
+  const messageIndexMap = React.useMemo(() => {
+      const map = new Map<string, number>();
 
+      messages.forEach((m, idx) => {
+        map.set(m.id, idx);
+      });
+
+      return map;
+    }, [messages]);
   // Scroll inicial: posicionar en el primer mensaje no leído (estilo WhatsApp)
-  // Guardar último mensaje visible (bottom-most) como posición de scroll
+  // Guardar el mensaje más alto visible para restaurar posición
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: Array<{ item: Message }> }) => {
     if (viewableItems.length === 0) return;
+    
+    // Mensaje más arriba visible actualmente (el que debería marcarse como "visible" en la conversación)
+    const topMost = [...viewableItems].sort((a, b) => {
+    const aIdx = messageIndexMap.get(a.item.id) ?? -1;
+    const bIdx = messageIndexMap.get(b.item.id) ?? -1;
+    return aIdx - bIdx;
+  })[0];
 
-    // Crear Map de id -> índice para O(1) lookups en lugar de O(n) findIndex
-    const messageIndexMap = new Map<string, number>();
-    messages.forEach((m, idx) => messageIndexMap.set(m.id, idx));
+  const id = topMost.item.id;
 
-    // El último visible = el más abajo en la lista (mayor índice)
-    const bottomMost = [...viewableItems].sort((a, b) => {
-      const aIdx = messageIndexMap.get(a.item.id) ?? -1;
-      const bIdx = messageIndexMap.get(b.item.id) ?? -1;
-      return bIdx - aIdx;
-    })[0];
+  currentTopVisibleRef.current = id;
 
-    const id = bottomMost.item.id;
-    setVisibleMessageId(id);
-    // Persistir en DB
-    if (user) {
-      ConversationRepository.upsertVisibleMessage(conversationId, user.id, id).catch(() => {});
+  setVisibleMessageId(id);
+
+    if (
+      user &&
+      id !== lastSavedVisibleRef.current
+    ) {
+      lastSavedVisibleRef.current = id;
+
+      if (visibleMessageTimeout.current) {
+        clearTimeout(visibleMessageTimeout.current);
+      }
+
+      visibleMessageTimeout.current = setTimeout(() => {
+        ConversationRepository.upsertVisibleMessage(
+          conversationId,
+          user.id,
+          id
+        ).catch(() => {});
+      }, 500);
     }
   }, [messages, conversationId, user?.id]);
 
@@ -519,6 +542,7 @@ export default function ChatScreen() {
     }
 
     let targetIndex = -1;
+    let restoringUnread = false;
 
     // Caso 1: existen mensajes no leídos
     if (lastReadMessageId) {
@@ -526,16 +550,25 @@ export default function ChatScreen() {
         m => m.id === lastReadMessageId
       );
 
-      if (
+      const hasUnread =
         lastReadIdx !== -1 &&
-        lastReadIdx < messages.length - 1
-      ) {
-        targetIndex = lastReadIdx + 1;
-      }
-    }
+        lastReadIdx < messages.length - 1;
 
-    // Caso 2: todos leídos → volver a posición guardada
-    else if (visibleMessageId) {
+
+      if (hasUnread) {
+        targetIndex = lastReadIdx + 1;
+        restoringUnread = true;
+      } 
+      else if (visibleMessageId) {
+        const visibleIdx = messages.findIndex(
+          m => m.id === visibleMessageId
+        );
+
+        if (visibleIdx !== -1) {
+          targetIndex = visibleIdx;
+        }
+      }
+    } else if (visibleMessageId) {
       const visibleIdx = messages.findIndex(
         m => m.id === visibleMessageId
       );
@@ -544,7 +577,7 @@ export default function ChatScreen() {
         targetIndex = visibleIdx;
       }
     }
-
+    
     requestAnimationFrame(() => {
       setTimeout(() => {
         try {
@@ -552,7 +585,7 @@ export default function ChatScreen() {
             listRef.current?.scrollToIndex({
               index: targetIndex,
               animated: false,
-              viewPosition: lastReadMessageId ? 0 : 1,
+              viewPosition: restoringUnread ? 0.35 : 0
             });
           } else {
             listRef.current?.scrollToEnd({
@@ -583,7 +616,9 @@ export default function ChatScreen() {
 
     if (!headerReady) return;
 
-    if (!readStatusLoaded) return; // Add this condition
+    if (!readStatusLoaded) return;
+
+    if (!messagesMap[conversationId]) return;
 
     if (!messages.length) {
       setScrollDone(true);
@@ -658,6 +693,7 @@ export default function ChatScreen() {
   useEffect(() => {
     initialScrollDone.current = false;
     setScrollDone(false);
+    setReadStatusLoaded(false);
   }, [conversationId]);
 
   // Actualizaciones posteriores (mensajes nuevos en tiempo real)
@@ -689,7 +725,9 @@ export default function ChatScreen() {
   useEffect(() => {
     if (!headerReady || !initialScrollDone.current || messages.length === 0) return;
 
-    markConversationAsRead();
+    if (isNearBottomRef.current) {
+      markConversationAsRead();
+    }
   }, [headerReady, messages, user?.id, conversationId, markConversationAsRead]);
 
   const checkScrollPosition = useCallback((offsetY: number, contentH: number, layoutH: number) => {
@@ -722,26 +760,29 @@ export default function ChatScreen() {
 
     // Guardar datos del reply antes de limpiar el estado
     const replyToId = replyingTo?.id || null;
-    const replyToText = replyingTo?.text;
-    const replyToUser = replyingTo?.senderName || (replyingTo?.isMine ? 'Tú' : headerTitle);
-    const replyToImage = replyingTo?.image;
+
+    const imageToSend = selectedImage;
 
     setInput('');
     setSelectedImage(null);
     setReplyingTo(null);
 
-    // Scroll to end immediately after adding the message
-    setTimeout(() => {
-      listRef.current?.scrollToEnd({ animated: true });
-    }, 50);
+    
 
     try {
       await MessageRepository.send({
         conversationId,
         senderId: user.id,
         content: text || null,
-        imageUrl: selectedImage || null,
+        imageUrl: imageToSend || null,
         replyToId,
+      });
+
+      // Scroll cuando el envío ya terminó
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToEnd({
+          animated: true,
+        });
       });
     } catch (e) {
       handleError(e, setToast, 'No se pudo enviar el mensaje');
@@ -797,13 +838,16 @@ export default function ChatScreen() {
     }
   };
 
-  const scrollToMessage = (replyToId: string) => {
-    const index = messages.findIndex((msg) => msg.id === replyToId);
+  const scrollToMessage = useCallback((replyToId: string) => {
+    const index = messages.findIndex(
+      msg => msg.id === replyToId
+    );
+
     if (index !== -1) {
       setHighlightedMessageId(replyToId);
+
       highlightBorderWidth.setValue(2);
 
-      // Border width fade out animation
       Animated.sequence([
         Animated.timing(highlightBorderWidth, {
           toValue: 2,
@@ -825,7 +869,7 @@ export default function ChatScreen() {
         viewPosition: 0.5,
       });
     }
-  };
+  }, [messages, highlightBorderWidth]);
 
   const renderMessage = useCallback(({ item, index }: { item: Message; index: number }) => {
     const previousMessageCreatedAt = index > 0 ? messages[index - 1]?.createdAt : undefined;
@@ -920,6 +964,19 @@ export default function ChatScreen() {
               onMomentumScrollEnd={(event) => {
                 const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
                 checkScrollPosition(contentOffset?.y ?? 0, contentSize?.height ?? 0, layoutMeasurement?.height ?? 0);
+                if (
+                  user &&
+                  currentTopVisibleRef.current &&
+                  currentTopVisibleRef.current !== lastSavedVisibleRef.current
+                ) {
+                  lastSavedVisibleRef.current = currentTopVisibleRef.current;
+
+                  ConversationRepository.upsertVisibleMessage(
+                    conversationId,
+                    user.id,
+                    currentTopVisibleRef.current
+                  );
+                }
               }}
               onScrollEndDrag={(event) => {
                 const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
@@ -1009,7 +1066,12 @@ export default function ChatScreen() {
                   ...Shadows.active,
                 }}
                 onPress={() => {
-                  listRef.current?.scrollToEnd({ animated: true });
+                  isNearBottomRef.current = true;
+
+                  listRef.current?.scrollToEnd({
+                    animated: true,
+                  });
+
                   setShowScrollButton(false);
                 }}
               >
