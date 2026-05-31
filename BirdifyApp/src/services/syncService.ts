@@ -1,1 +1,183 @@
-aW1wb3J0IE5ldEluZm8gZnJvbSAnQHJlYWN0LW5hdGl2ZS1jb21tdW5pdHkvbmV0aW5mbyc7CmltcG9ydCBkYiBmcm9tICcuLi9saWIvZGF0YWJhc2UnOwppbXBvcnQgeyBzdXBhYmFzZSB9IGZyb20gJy4uL2xpYi9zdXBhYmFzZSc7CmltcG9ydCAncmVhY3QtbmF0aXZlLWdldC1yYW5kb20tdmFsdWVzJzsKaW1wb3J0IHsgdjQgYXMgdXVpZHY0IH0gZnJvbSAndXVpZCc7CgpleHBvcnQgbGV0IGlzT25saW5lID0gZmFsc2U7CgpleHBvcnQgZnVuY3Rpb24gZ2VuZXJhdGVJZCgpOiBzdHJpbmcgewogIHJldHVybiB1dWlkdjQoKTsKfQoKZXhwb3J0IGZ1bmN0aW9uIGluaXROZXR3b3JrTGlzdGVuZXIoKSB7CiAgLy8gQ29uc3VsdGEgZWwgZXN0YWRvIGFjdHVhbCBpbm1lZGlhdGFtZW50ZQogIE5ldEluZm8uZmV0Y2goKS50aGVuKHN0YXRlID0+IHsKICAgIGlzT25saW5lID0gISFzdGF0ZS5pc0Nvbm5lY3RlZDsKICAgIGNvbnNvbGUubG9nKGDwn5KlIEVzdGFkbyBpbmljaWFsIGRlIHJlZDogJHtpc09ubGluZSA/ICdvbmxpbmUnIDogJ29mZmxpbmUnfWApOwogIH0pOwoKICAvLyBMdWVnbyBlc2N1Y2hhIGNhbWJpb3MKICBOZXRJN2ZvLmFkZEV2ZW50TGlzdGVuZXIoc3RhdGUgPT4gewogICAgY29uc3Qgd2FzT2ZmbGluZSA9ICFpc09ubGluZTsKICAgIGlzT25saW5lID0gISFzdGF0ZS5pc0Nvbm5lY3RlZDsKCiAgICBpZiAod2FzT2ZmbGluZSAmJiBpc09ubGluZSkgewogICAgICBjb25zb2xlLmxvZygn8J+ZjiwgUmVkIHJlY3VwZXJhZGEsIHNpbmNyb25pemFuZG8uLi4nKTsKICAgICAgZmx1c2hTeW5jUXVldWUoKTsKICAgIH0KCiAgICBpZiAoIWlzT25saW5lKSB7CiAgICAgIGNvbnNvbGUubG9nKCfwn5O0IFNpbiByZWQsIG1vZG8gb2ZmbGluZSBhY3RpdmFkbycpOwogICAgfQogIH0pOwp9CgpleHBvcnQgYXN5bmMgZnVuY3Rpb24gYWRkVG9RdWV1ZSgKICB0YWJsZU5hbWU6IHN0cmluZywKICBvcGVyYXRpb246ICdJTlNFUlQnIHwgJ1VQREFURScgfCAnREVMRVRFJywKICBwYXlsb2FkOiBvYmplY3QKKSB7CiAgY29uc3QgaWQgPSBnZW5lcmF0ZUlkKCk7CiAgYXdhaXQgZGIucnVuQXN5bmMoCiAgICBgSU5TRVJUIElOVE8gc3luY19xdWV1ZSAoaWQsIHRhYmxlX25hbWUsIG9wZXJhdGlvbiwgcGF5bG9hZCkgVkFMVUVTICg/LCA/LCA/LCA/KWAsCiAgICBbaWQsIHRhYmxlTmFtZSwgb3BlcmF0aW9uLCBKU09OLnN0cmluZ2lmeShwYXlsb2FkKV0KICApOwp9CgpmdW5jdGlvbiBkZWNvZGVCYXNlNjRUb0FycmF5QnVmZmVyKGJhc2U2NDogc3RyaW5nKTogQXJyYXlCdWZmZXIgewogIGNvbnN0IGNoYXJzID0gJ0FCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXowMTIzNDU2Nzg5Ky8nOwogIGNvbnN0IGxvb2t1cCA9IG5ldyBVaW50OEFycmF5KDI1Nik7CiAgZm9yIChsZXQgaSA9IDA7IGkgPCBjaGFycy5sZW5ndGg7IGkrKykgewogICAgbG9va3VwW2NoYXJzLmNoYXJDb2RlQXQoaSldID0gaTsKICB9CiAgbGV0IGJ1ZmZlckxlbmd0aCA9IGJhc2U2NC5sZW5ndGggKiAwLjc1OwogIGlmIChiYXNlNjRbYmFzZTY0Lmxlbmd0aCAtIDFdID09PSAnPScpIHsKICAgIGJ1ZmZlckxlbmd0aC0tOwogICAgaWYgKGJhc2U2NFtiYXNlNjQubGVuZ3RoIC0gMl0gPT09ICc9JykgYnVmZmVyTGVuZ3RoLS07CiAgfQogIGNvbnN0IGFycmF5QnVmZmVyID0gbmV3IEFycmF5QnVmZmVyKGJ1ZmZlckxlbmd0aCk7CiAgY29uc3QgYnl0ZXMgPSBuZXcgVWludDhBcnJheShhcnJheUJ1ZmZlcik7CiAgbGV0IHAgPSAwOwogIGZvciAobGV0IGkgPSAwOyBpIDwgYmFzZTY0Lmxlbmd0aDsgaSArPSA0KSB7CiAgICBjb25zdCBiMSA9IGxvb2t1cFtiYXNlNjQuY2hhckNvZGVBdChpKV07CiAgICBjb25zdCBiMiA9IGxvb2t1cFtiYXNlNjQuY2hhckNvZGVBdChpICsgMSldOwogICAgY29uc3QgYjMgPSBsb29rdXBbYmFzZTY0LmNoYXJDb2RlQXQoaSArIDIpXTsKICAgIGNvbnN0IGI0ID0gbG9va3VwW2Jhc2U2NC5jaGFyQ29kZUF0KGkgKyAzKV07CiAgICBieXRlc1twKytdID0gKGIxIDw8IDIpIHwgKGIyID4+IDQpOwogICAgaWYgKHAgPCBidWZmZXJMZW5ndGgpIGJ5dGVzW3ArK10gPSAoKGIyICYgMTUpIDw8IDQpIHwgKGIzID4+IDIpOwogICAgaWYgKHAgPCBidWZmZXJMZW5ndGgpIGJ5dGVzW3ArK10gPSAoKGIzICYgMykgPDwgNikgfCAoYjQgJiA2Myk7CiAgfQogIHJldHVybiBhcnJheUJ1ZmZlcjsKfQoKZXhwb3J0IGFzeW5jIGZ1bmN0aW9uIGZsdXNoU3luY1F1ZXVlKCkgewogIGNvbnN0IHJvd3MgPSBhd2FpdCBkYi5nZXRBbGxBc3luYzx7CiAgICBpZDogc3RyaW5nOwogICAgdGFibGVfbmFtZTogc3RyaW5nOwogICAgb3BlcmF0aW9uOiBzdHJpbmc7CiAgICBwYXlsb2FkOiBzdHJpbmc7CiAgICBhdHRlbXB0czogbnVtYmVyOwogIH0+KGBTRU1FQ1QgKiBGUk9NIHN5bmNfcXVldWUgT1JERVIgQlkgY3JlYXRlZF9hdCBBU0NgKTsKCiAgZm9yIChjb25zdCByb3cgb2Ygcm93cykgewogICAgY29uc3QgcGF5bG9hZCA9IEpTT04ucGFyc2Uocm93LnBheWxvYWQpOwogICAgbGV0IGVycm9yID0gbnVsbDsKCiAgICB0cnkgewogICAgICAvLyDilIzilIAilIAgTWFuZWpvIGVzcGVjaWFsOiBzaWdodGluZyBjb24gaW1hZ2VuIGxvY2FsIOKUjOKUgOKUgOKUgOKUgOKUgOKUgAogICAgICBpZiAocm93LnRhYmxlX25hbWUgPT09ICdzaWdodGluZ3MnICYmIHJvdy5vcGVyYXRpb24gPT09ICdJTlNFUlQnICYmIHBheWxvYWQuX2xvY2FsSW1hZ2VQYXRoKSB7CiAgICAgICAgY29uc3QgeyBfbG9jYWxJbWFnZVBhdGgsIF9iaXJkTmFtZSwgX3NjaWVudGlmaWNOYW1lLCAuLi5zaWdodGluZ0RhdGEgfSA9IHBheWxvYWQ7CgogICAgICAgIC8vIDEuIEJ1c2NhciBvIGNyZWFyIGF2ZSBlbiBTdXBhYmFzZQogICAgICAgIGxldCBmaW5hbEJpcmRJZCA9IHNpZ2h0aW5nRGF0YS5iaXJkX2lkOwogICAgICAgIGNvbnN0IHsgZGF0YTogYmlyZHMgfSA9IGF3YWl0IHN1cGFiYXNlCiAgICAgICAgICAuZnJvbSgnYmlyZHMnKQogICAgICAgICAgLnNlbGVjdCgnaWQnKQogICAgICAgICAgLmlsaWtlKCdjb21tb25fbmFtZScsIF9iaXJkTmFtZSkKICAgICAgICAgIC5saW1pdCgxKTsKCiAgICAgICAgaWYgKGJpcmRzICYmIGJpcmRzLmxlbmd0aCA+IDApIHsKICAgICAgICAgIGZpbmFsQmlyZElkID0gYmlyZHNbMF0uaWQ7CiAgICAgICAgfSBlbHNlIHsKICAgICAgICAgIGNvbnN0IHsgZGF0YTogbmV3QmlyZCwgZXJyb3I6IGJpcmRFcnJvciB9ID0gYXdhaXQgc3VwYWJhc2UKICAgICAgICAgICAgLmZyb20oJ2JpcmRzJykKICAgICAgICAgICAgLmluc2VydCh7CiAgICAgICAgICAgICAgY29tbW9uX25hbWU6IF9iaXJkTmFtZSwKICAgICAgICAgICAgICBzY2llbnRpZmljX25hbWU6IF9zY2llbnRpZmljTmFtZSB8fCBfYmlyZE5hbWUgKyAnIHNwLicsCiAgICAgICAgICAgICAgZGVzY3JpcHRpb246ICdSZWdpc3RyYWRvIG9mZmxpbmUuJywKICAgICAgICAgICAgICBzZWFzb246ICdEZXNjb25vY2lkbycsCiAgICAgICAgICAgICAgaGFiaXRhdF9pbmZvOiAnRGVzY29ub2NpZG8nLAogICAgICAgICAgICAgIGlkZWFsX3pvbmVzOiAnRGVzY29ub2NpZG8nCiAgICAgICAgICAgIH0pCiAgICAgICAgICAgIC5zZWxlY3QoKQogICAgICAgICAgICAuc2luZ2xlKCk7CiAgICAgICAgICBpZiAoYmlyZEVycm9yKSB0aHJvdyBiaXJkRXJyb3I7CiAgICAgICAgICBmaW5hbEJpcmRJZCA9IG5ld0JpcmQuaWQ7CiAgICAgICAgfQoKICAgICAgICAvLyAyLiBTdWJpciBpbWFnZW4gYSBTdXBhYmFzZSBTdG9yYWdlCiAgICAgICAgY29uc3QgZXh0ID0gX2xvY2FsSW1hZ2VQYXRoLnNwbGl0KCcuJykucG9wKCkgfHwgJ2pwZyc7CiAgICAgICAgY29uc3QgZmlsZU5hbWUgPSBgJHtzaWdodGluZ0RhdGEudXNlcl9pZH0vJHtEYXRlLm5vdygpfS4ke2V4dH1gOwogICAgICAgIGNvbnN0IGJhc2U2NCA9IGF3YWl0IGZldGNoKF9sb2NhbEltYWdlUGF0aCkKICAgICAgICAgIC50aGVuKHIgPT4gci5ibG9iKCkpCiAgICAgICAgICAudGhlbihibG9iID0+IG5ldyBQcm9taXNlPHN0cmluZz4oKHJlc29sdmUsIHJlamVjdCkgPT4gewogICAgICAgICAgICBjb25zdCByZWFkZXIgPSBuZXcgRmlsZVJlYWRlcigpOwogICAgICAgICAgICByZWFkZXIub25sb2FkID0gKCkgPT4gcmVzb2x2ZSgocmVhZGVyLnJlc3VsdCBhcyBzdHJpbmcpLnNwbGl0KCcsJylbMV0pOwogICAgICAgICAgICByZWFkZXIub25lcnJvciA9IHJlamVjdDsKICAgICAgICAgICAgcmVhZGVyLnJlYWRBc0RhdGFVUkwoYmxvYik7CiAgICAgICAgICB9KSk7CgogICAgICAgIGNvbnN0IGFycmF5QnVmZmVyID0gZGVjb2RlQmFzZTY0VG9BcnJheUJ1ZmZlcihiYXNlNjQpOwogICAgICAgIGNvbnN0IHsgZXJyb3I6IHVwbG9hZEVycm9yIH0gPSBhd2FpdCBzdXBhYmFzZS5zdG9yYWdlCiAgICAgICAgICAuZnJvbSgnU2lnaHRpbmdzJykKICAgICAgICAgIC51cGxvYWQoZmlsZU5hbWUsIGFycmF5QnVmZmVyLCB7CiAgICAgICAgICAgIGNvbnRlbnRUeXBlOiBgaW1hZ2UvJHtleHQgPT09ICdwbmcnID8gJ3BuZycgOiAnanBlZyd9YCwKICAgICAgICAgICAgdXBzZXJ0OiB0cnVlCiAgICAgICAgICB9KTsKICAgICAgICBpZiAodXBsb2FkRXJyb3IpIHRocm93IHVwbG9hZEVycm9yOwoKICAgICAgICBjb25zdCB7IGRhdGE6IHsgcHVibGljVXJsIH0gfSA9IHN1cGFiYXNlLnN0b3JhZ2UuZnJvbSgnU2lnaHRpbmdzJykuZ2V0UHVibGljVXJsKGZpbGVOYW1lKTsKCiAgICAgICAgLy8gMy4gSW5zZXJ0YXIgc2lnaHRpbmcgZW4gU3VwYWJhc2UsIHVwc2VydCBhY3R1YWxpemEgc2kgeWEgZXhpc3RlLCBpbnNlcnRhIHNpIG5vCiAgICAgICAgKHsgZXJyb3IgfSA9IGF3YWl0IHN1cGFiYXNlLmZyb20oJ3NpZ2h0aW5ncycpLnVwc2VydCh7CiAgICAgICAgICAuLi5zaWdodGluZ0RhdGEsCiAgICAgICAgICBiaXJkX2lkOiBmaW5hbEJpcmRJZCwKICAgICAgICAgIHBob3RvX3VybDogcHVibGljVXJsCiAgICAgICAgfSwgeyBvbkNvbmZsaWN0OiAnaWQnIH0pKTsKCiAgICAgICAgaWYgKCFlcnJvcikgewogICAgICAgICAgLy8gNC4gQWN0dWFsaXphciBTUUxpdGUgbG9jYWwgY29uIFVSTCByZWFsCiAgICAgICAgICBhd2FpdCBkYi5ydW5Bc3luYygKICAgICAgICAgICAgYFVQREFURSBzaWdodGluZ3MgU0VUIHBob3RvX3VybCA9ID8sIHN5bmNfc3RhdHVzID0gJ3N5bmNlZCcsIGJpcmRfaWQgPSA/IFdIRVJFIGlkID0gP2AsCiAgICAgICAgICAgIFtwdWJsaWNVcmwsIGZpbmFsQmlyZElkLCBzaWdodGluZ0RhdGEuaWRdCiAgICAgICAgICApOwogICAgICAgIH0KCiAgICAgIH0gZWxzZSB7CiAgICAgICAgLy8g4pSM4pSA4pSAIEZsdWpvIGdlbsOpcmljbyAoVVBEQVRFLCBERUxFVEUsIG90cm9zIElOU0VSVCkg4pSM4pSA4pSA4pSA4pSA4pSACiAgICAgICAgaWYgKHJvdy5vcGVyYXRpb24gPT09ICdJTlNFUlQnKSB7CiAgICAgICAgICAoeyBlcnJvciB9ID0gYXdhaXQgc3VwYWJhc2UuZnJvbShyb3cudGFibGVfbmFtZSkuaW5zZXJ0KHBheWxvYWQpKTsKICAgICAgICB9IGVsc2UgaWYgKHJvdy5vcGVyYXRpb24gPT09ICdVUERBVEUnKSB7CiAgICAgICAgICAoeyBlcnJvciB9ID0gYXdhaXQgc3VwYWJhc2UuZnJvbShyb3cudGFibGVfbmFtZSkudXBkYXRlKHBheWxvYWQpLmVxKCdpZCcsIHBheWxvYWQuaWQpKTsKICAgICAgICB9IGVsc2UgaWYgKHJvdy5vcGVyYXRpb24gPT09ICdERUxFVEUnKSB7CiAgICAgICAgICAoeyBlcnJvciB9ID0gYXdhaXQgc3VwYWJhc2UuZnJvbShyb3cudGFibGVfbmFtZSkuZGVsZXRlKCkuZXEoJ2lkJywgcGF5bG9hZC5pZCkpOwogICAgICAgIH0KICAgICAgfQoKICAgICAgaWYgKCFlcnJvcikgewogICAgICAgIGF3YWl0IGRiLnJ1bkFzeW5jKGBERUxFVEUgRlJPTSBzeW5jX3F1ZXVlIFdIRVJFIGlkID0gP2AsIFtyb3cuaWRdKTsKICAgICAgICBjb25zb2xlLmxvZyhg4pyFIFNpbmNyb25pemFkbzogJHtyb3cub3BlcmF0aW9ufSBlbiAke3Jvdy50YWJsZV9uYW1lfWApOwogICAgICB9IGVsc2UgewogICAgICAgIHRocm93IGVycm9yOwogICAgICB9CgogICAgfSBjYXRjaCAoZXJyKSB7CiAgICAgIGNvbnNvbGUud2Fybihg4pqgIEZhbGzDsyBzeW5jIChpbnRlbnRvICR7cm93LmF0dGVtcHRzICsgMX0pOmAsIGVycik7CiAgICAgIGF3YWl0IGRiLnJ1bkFzeW5jKAogICAgICAgIGBVUERBVEUgc3luY19xdWV1ZSBTRVQgYXR0ZW1wdHMgPSBhdHRlbXB0cyArIDEgV0hFUkUgaWQgPSA/YCwKICAgICAgICBbcm93LmlkXQogICAgICApOwogICAgfQogIH0KfQo=
+import NetInfo from '@react-native-community/netinfo';
+import db from '../lib/database';
+import { supabase } from '../lib/supabase';
+import 'react-native-get-random-values';
+import { v4 as uuidv4 } from 'uuid';
+
+export let isOnline = false;
+
+export function generateId(): string {
+  return uuidv4();
+}
+
+export function initNetworkListener() {
+  // Estado inicial
+  NetInfo.fetch().then(state => {
+    isOnline = !!state.isConnected;
+    console.log(`Estado inicial de red: ${isOnline ? 'online' : 'offline'}`);
+  });
+
+  // Escuchar cambios
+  NetInfo.addEventListener(state => {
+    const wasOffline = !isOnline;
+    isOnline = !!state.isConnected;
+
+    if (wasOffline && isOnline) {
+      console.log('Red recuperada, sincronizando...');
+      flushSyncQueue();
+    }
+
+    if (!isOnline) {
+      console.log('Sin red, modo offline activado');
+    }
+  });
+}
+
+export async function addToQueue(
+  tableName: string,
+  operation: 'INSERT' | 'UPDATE' | 'DELETE',
+  payload: object
+) {
+  const id = generateId();
+  await db.runAsync(
+    `INSERT INTO sync_queue (id, table_name, operation, payload) VALUES (?, ?, ?, ?)`,
+    [id, tableName, operation, JSON.stringify(payload)]
+  );
+}
+
+function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const lookup = new Uint8Array(256);
+  for (let i = 0; i < chars.length; i++) {
+    lookup[chars.charCodeAt(i)] = i;
+  }
+  let bufferLength = base64.length * 0.75;
+  if (base64[base64.length - 1] === '=') {
+    bufferLength--;
+    if (base64[base64.length - 2] === '=') bufferLength--;
+  }
+  const arrayBuffer = new ArrayBuffer(bufferLength);
+  const bytes = new Uint8Array(arrayBuffer);
+  let p = 0;
+  for (let i = 0; i < base64.length; i += 4) {
+    const b1 = lookup[base64.charCodeAt(i)];
+    const b2 = lookup[base64.charCodeAt(i + 1)];
+    const b3 = lookup[base64.charCodeAt(i + 2)];
+    const b4 = lookup[base64.charCodeAt(i + 3)];
+    bytes[p++] = (b1 << 2) | (b2 >> 4);
+    if (p < bufferLength) bytes[p++] = ((b2 & 15) << 4) | (b3 >> 2);
+    if (p < bufferLength) bytes[p++] = ((b3 & 3) << 6) | (b4 & 63);
+  }
+  return arrayBuffer;
+}
+
+export async function flushSyncQueue() {
+  const rows = await db.getAllAsync<{
+    id: string;
+    table_name: string;
+    operation: string;
+    payload: string;
+    attempts: number;
+  }>(`SELECT * FROM sync_queue ORDER BY created_at ASC`);
+
+  for (const row of rows) {
+    const payload = JSON.parse(row.payload);
+    let error = null;
+
+    try {
+      // Sighting con imagen local pendiente de subir
+      if (row.table_name === 'sightings' && row.operation === 'INSERT' && payload._localImagePath) {
+        const { _localImagePath, _birdName, _scientificName, ...sightingData } = payload;
+
+        // 1. Buscar o crear ave en Supabase
+        let finalBirdId = sightingData.bird_id;
+        const { data: birds } = await supabase
+          .from('birds')
+          .select('id')
+          .ilike('common_name', _birdName)
+          .limit(1);
+
+        if (birds && birds.length > 0) {
+          finalBirdId = birds[0].id;
+        } else {
+          const { data: newBird, error: birdError } = await supabase
+            .from('birds')
+            .insert({
+              common_name: _birdName,
+              scientific_name: _scientificName || _birdName + ' sp.',
+              description: 'Registrado offline.',
+              season: 'Desconocido',
+              habitat_info: 'Desconocido',
+              ideal_zones: 'Desconocido',
+            })
+            .select()
+            .single();
+          if (birdError) throw birdError;
+          finalBirdId = newBird.id;
+        }
+
+        // 2. Subir imagen a Supabase Storage
+        const ext = _localImagePath.split('.').pop() || 'jpg';
+        const fileName = `${sightingData.user_id}/${Date.now()}.${ext}`;
+        const base64 = await fetch(_localImagePath)
+          .then(r => r.blob())
+          .then(blob => new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve((reader.result as string).split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          }));
+
+        const arrayBuffer = decodeBase64ToArrayBuffer(base64);
+        const { error: uploadError } = await supabase.storage
+          .from('Sightings')
+          .upload(fileName, arrayBuffer, {
+            contentType: `image/${ext === 'png' ? 'png' : 'jpeg'}`,
+            upsert: true,
+          });
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage.from('Sightings').getPublicUrl(fileName);
+
+        // 3. Insertar sighting en Supabase
+        ({ error } = await supabase.from('sightings').upsert({
+          ...sightingData,
+          bird_id: finalBirdId,
+          photo_url: publicUrl,
+        }, { onConflict: 'id' }));
+
+        if (!error) {
+          // 4. Actualizar SQLite con URL real
+          await db.runAsync(
+            `UPDATE sightings SET photo_url = ?, sync_status = 'synced', bird_id = ? WHERE id = ?`,
+            [publicUrl, finalBirdId, sightingData.id]
+          );
+        }
+
+      } else {
+        // Flujo generico
+        if (row.operation === 'INSERT') {
+          ({ error } = await supabase.from(row.table_name).insert(payload));
+        } else if (row.operation === 'UPDATE') {
+          ({ error } = await supabase.from(row.table_name).update(payload).eq('id', payload.id));
+        } else if (row.operation === 'DELETE') {
+          ({ error } = await supabase.from(row.table_name).delete().eq('id', payload.id));
+        }
+      }
+
+      if (!error) {
+        await db.runAsync(`DELETE FROM sync_queue WHERE id = ?`, [row.id]);
+        console.log(`Sincronizado: ${row.operation} en ${row.table_name}`);
+      } else {
+        throw error;
+      }
+
+    } catch (err) {
+      console.warn(`Fallo sync (intento ${row.attempts + 1}):`, err);
+      await db.runAsync(
+        `UPDATE sync_queue SET attempts = attempts + 1 WHERE id = ?`,
+        [row.id]
+      );
+    }
+  }
+}
