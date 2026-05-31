@@ -252,6 +252,9 @@ export default function ChatScreen() {
   const visibleMessageTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const restoringScrollRef = useRef(true);
+
+
   useEffect(() => {
     return () => {
       if (visibleMessageTimeout.current) {
@@ -493,20 +496,29 @@ export default function ChatScreen() {
   // Scroll inicial: posicionar en el primer mensaje no leído (estilo WhatsApp)
   // Guardar el mensaje más alto visible para restaurar posición
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: Array<{ item: Message }> }) => {
-    if (viewableItems.length === 0) return;
-    
+    if (!initialScrollDone.current) {
+      return;
+    }
+    if (viewableItems.length === 0) {
+      return;
+    }
+    console.log(
+      '[VIEWABLE]',
+      'scrollDone=', scrollDone,
+      'initialScrollDone=', initialScrollDone.current
+    );
     // Mensaje más arriba visible actualmente (el que debería marcarse como "visible" en la conversación)
     const topMost = [...viewableItems].sort((a, b) => {
-    const aIdx = messageIndexMap.get(a.item.id) ?? -1;
-    const bIdx = messageIndexMap.get(b.item.id) ?? -1;
-    return aIdx - bIdx;
-  })[0];
+      const aIdx = messageIndexMap.get(a.item.id) ?? -1;
+      const bIdx = messageIndexMap.get(b.item.id) ?? -1;
+      return aIdx - bIdx;
+    })[0];
 
-  const id = topMost.item.id;
+    const id = topMost.item.id;
 
-  currentTopVisibleRef.current = id;
+    currentTopVisibleRef.current = id;
 
-  setVisibleMessageId(id);
+    setVisibleMessageId(id);
 
     if (
       user &&
@@ -517,7 +529,10 @@ export default function ChatScreen() {
       if (visibleMessageTimeout.current) {
         clearTimeout(visibleMessageTimeout.current);
       }
-
+      console.log(
+        '[SAVE_VISIBLE]',
+        id
+      );
       visibleMessageTimeout.current = setTimeout(() => {
         ConversationRepository.upsertVisibleMessage(
           conversationId,
@@ -587,18 +602,21 @@ export default function ChatScreen() {
               animated: false,
               viewPosition: restoringUnread ? 0.35 : 0
             });
+             restoringScrollRef.current = false;
           } else {
             listRef.current?.scrollToEnd({
               animated: false,
             });
+            restoringScrollRef.current = false;
           }
-
+          console.log('SCROLLED TO', targetIndex);
           initialScrollDone.current = true;
           setScrollDone(true);
         } catch {
           listRef.current?.scrollToEnd({
             animated: false,
           });
+            restoringScrollRef.current = false;
 
           initialScrollDone.current = true;
           setScrollDone(true);
@@ -996,6 +1014,7 @@ export default function ChatScreen() {
                     index: info.index,
                     animated: false,
                   });
+                   restoringScrollRef.current = false;
                 }, 300);
               }}
             />
