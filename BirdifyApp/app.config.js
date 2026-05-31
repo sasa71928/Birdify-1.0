@@ -41,6 +41,7 @@ export default {
       'expo-font',
       'expo-notifications',
       'expo-mail-composer',
+      'expo-sqlite',
       ['expo-system-ui', { backgroundColor: '#154212' }],
     ],
     extra: {
