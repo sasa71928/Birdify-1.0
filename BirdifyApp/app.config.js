@@ -18,6 +18,7 @@ export default {
     },
     ios: {
       supportsTablet: true,
+      bundleIdentifier: 'com.sasa.BirdifyApp',
     },
     android: {
       adaptiveIcon: {

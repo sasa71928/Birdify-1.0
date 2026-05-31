@@ -1,4 +1,7 @@
-import React from 'react';
+import 'react-native-get-random-values';
+import React, { useEffect } from 'react';
+import { initDatabase } from './src/lib/database';
+import { initNetworkListener } from './src/services/syncService';
 import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -48,6 +51,14 @@ export default function App() {
     'BeVietnamPro-SemiBold': BeVietnamPro_600SemiBold,
     'BeVietnamPro-Bold': BeVietnamPro_700Bold,
   });
+
+    useEffect(() => {
+    initDatabase()
+      .then(() => console.log('✅ SQLite inicializado'))
+      .catch(e => console.error('❌ Error al inicializar SQLite:', e));
+
+    initNetworkListener();
+  }, []);
 
   if (!fontsLoaded) {
     return (
