@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   StatusBar,
@@ -11,10 +10,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, Radius, Shadows } from '../../theme';
+import { Colors } from '../../theme';
 import styles from '../../styles/screens/settings/offlineStorageScreen.styles';
 
-// ── Tipos ──────────────────────────────────────────────────────────────────────
 interface DownloadPackage {
   id: string;
   name: string;
@@ -58,7 +56,6 @@ export default function OfflineStorageScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
-      {/* ── Header ── */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
@@ -68,19 +65,15 @@ export default function OfflineStorageScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        
-        {/* ── Storage Overview ── */}
         <View style={styles.card}>
           <View style={styles.storageHeader}>
             <MaterialCommunityIcons name="database" size={24} color={Colors.primary} />
             <Text style={styles.storageTitle}>Storage Usage</Text>
           </View>
-          
           <View style={styles.progressBarContainer}>
             <View style={[styles.progressBar, { width: '35%' }]} />
             <View style={[styles.progressBarApp, { width: '15%' }]} />
           </View>
-          
           <View style={styles.storageLegends}>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: Colors.primary }]} />
@@ -91,13 +84,11 @@ export default function OfflineStorageScreen() {
               <Text style={styles.legendText}>Free (4.2 GB)</Text>
             </View>
           </View>
-          
           <Text style={styles.storageDesc}>
             Download dictionaries and maps to identify birds and log sightings even without an internet connection.
           </Text>
         </View>
 
-        {/* ── Preferences ── */}
         <View style={styles.preferencesCard}>
           <View style={styles.prefRow}>
             <View>
@@ -113,9 +104,7 @@ export default function OfflineStorageScreen() {
           </View>
         </View>
 
-        {/* ── Download Packages ── */}
         <Text style={styles.sectionTitle}>Available for Download</Text>
-        
         <View style={styles.packageList}>
           {packages.map((pkg, index) => {
             const isLast = index === packages.length - 1;
@@ -125,7 +114,6 @@ export default function OfflineStorageScreen() {
                   <View style={styles.packageInfo}>
                     <Text style={styles.packageName}>{pkg.name}</Text>
                     <Text style={styles.packageSize}>{pkg.size}</Text>
-                    
                     {pkg.status === 'downloading' && (
                       <View style={styles.downloadProgressWrap}>
                         <View style={styles.downloadTrack}>
@@ -135,11 +123,7 @@ export default function OfflineStorageScreen() {
                       </View>
                     )}
                   </View>
-                  
-                  <TouchableOpacity 
-                    style={styles.downloadBtn}
-                    onPress={() => toggleDownload(pkg.id)}
-                  >
+                  <TouchableOpacity style={styles.downloadBtn} onPress={() => toggleDownload(pkg.id)}>
                     {getStatusIcon(pkg.status)}
                   </TouchableOpacity>
                 </View>
@@ -148,11 +132,7 @@ export default function OfflineStorageScreen() {
             );
           })}
         </View>
-
       </ScrollView>
     </SafeAreaView>
   );
 }
-
-// ── Estilos ───────────────────────────────────────────────────────────────────
-
