@@ -28,9 +28,14 @@ export function NewSightingsProvider({ children }: { children: React.ReactNode }
           schema: 'public',
           table: 'sightings',
         },
-        (payload) => {
+        async (payload) => {
           const newId = payload.new?.id;
+          const authorId = payload.new?.user_id;
           if (!newId) return;
+
+          // Sesión local en caché, sin llamada al servidor
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user?.id === authorId) return;
 
           setNewPostIds((prevIds) => {
             if (prevIds.has(newId)) return prevIds;
