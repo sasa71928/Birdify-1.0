@@ -12,7 +12,7 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 import { createStyles } from '../styles/components/BottomNavBar.styles';
 import { useDynamicStyles } from '../hooks/useDynamicStyles';
 
-export default function BottomNavBar({ state }: any) {
+export default function BottomNavBar({ state, hideNav }: { state?: any; hideNav?: boolean }) {
   const navigation = useNavigation<NavigationProp>();
   const { screen: styles, colors } = useDynamicStyles(createStyles);
   const route = useRoute();
@@ -37,8 +37,8 @@ export default function BottomNavBar({ state }: any) {
     <View style={styles.container}>
       <View style={styles.innerContainer}>
 
-        {/* Home — oculto en offline */}
-        {!isOffline && (
+        {/* Home — oculto en offline o hideNav */}
+        {!isOffline && !hideNav && (
           <TouchableOpacity
             style={[styles.navItem, currentRoute === 'Feed' && styles.activeItem]}
             onPress={() => navigation.navigate('MainTabs', { screen: 'Feed' })}
@@ -54,8 +54,8 @@ export default function BottomNavBar({ state }: any) {
           </TouchableOpacity>
         )}
 
-        {/* Explore — oculto en offline */}
-        {!isOffline && (
+        {/* Explore — oculto en offline o hideNav */}
+        {!isOffline && !hideNav && (
           <TouchableOpacity
             style={[styles.navItem, currentRoute === 'Explore' && styles.activeItem]}
             onPress={() => navigation.navigate('MainTabs', { screen: 'Explore' })}
@@ -78,8 +78,8 @@ export default function BottomNavBar({ state }: any) {
           </View>
         </TouchableOpacity>
 
-        {/* Dictionary — oculto en offline */}
-        {!isOffline && (
+        {/* Dictionary — oculto en offline o hideNav */}
+        {!isOffline && !hideNav && (
           <TouchableOpacity
             style={[styles.navItem, currentRoute === 'Dictionary' && styles.activeItem]}
             onPress={() => navigation.navigate('MainTabs', { screen: 'Dictionary' })}
@@ -92,8 +92,8 @@ export default function BottomNavBar({ state }: any) {
           </TouchableOpacity>
         )}
 
-        {/* Messages — oculto en offline */}
-        {!isOffline && (
+        {/* Messages — oculto en offline o hideNav */}
+        {!isOffline && !hideNav && (
           <TouchableOpacity
             style={[styles.navItem, currentRoute === 'Messages' && styles.activeItem]}
             onPress={() => navigation.navigate('MainTabs', { screen: 'Messages' })}

@@ -1,4 +1,5 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useContext } from 'react';
+
 import {
   View,
   Text,
@@ -21,7 +22,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../navigation/AppNavigator';
+import { RootStackParamList, OfflineContext } from '../../navigation/AppNavigator';
 import MapView, { Marker } from 'react-native-maps';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TopNavBar from '../../components/TopNavBar';
@@ -94,6 +95,7 @@ const createMapStyle = (colors: any) => [
 export default function RecordSightingScreen({ route }: { route: any }) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { shared, screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const isOffline = useContext(OfflineContext);
 
   const MAP_STYLE = useMemo(
   () => createMapStyle(colors),
@@ -591,7 +593,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <BottomNavBar />
+      {!isOffline && <BottomNavBar hideNav />}
 
       {/* Selector de Foto Custom Modal */}
       <Modal
