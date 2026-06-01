@@ -14,6 +14,7 @@ import DictionaryScreen     from '../screens/main/DictionaryScreen';
 import MessagesScreen       from '../screens/main/MessagesScreen';
 import ExploreScreen        from '../screens/main/ExploreScreen';
 import WelcomeScreen        from '../screens/auth/WelcomeScreen';
+import OfflineFeedScreen from '../screens/main/OfflineFeedScreen';
 
 import RecordSightingScreen from '../screens/bird/RecordSightingScreen';
 import ProfileScreen        from '../screens/social/ProfileScreen';
@@ -33,9 +34,9 @@ import ThemeSettingsScreen from '../screens/settings/ThemeSettingsScreen';
 import HelpSupportScreen from '../screens/settings/HelpSupportScreen';
 import AboutBirdifyScreen from '../screens/settings/AboutBirdifyScreen';
 import BlockedUsersScreen from '../screens/settings/BlockedUsersScreen';
+import { useAuth } from '../context/AuthContext';
 
 // ── OfflineContext ─────────────────────────────────────────────────────────────
-// Permite que BottomNavBar y cualquier pantalla sepan si hay red.
 export const OfflineContext = createContext(false);
 export function useOffline() { return useContext(OfflineContext); }
 
@@ -103,7 +104,7 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab   = createMaterialTopTabNavigator();
 
-// ── Tabs ONLINE (los 4 tabs normales) ─────────────────────────────────────────
+// ── Tabs ONLINE ───────────────────────────────────────────────────────────────
 function OnlineTabs() {
   return (
     <Tab.Navigator
@@ -120,9 +121,7 @@ function OnlineTabs() {
   );
 }
 
-// ── Tabs OFFLINE (solo Feed con caché local) ───────────────────────────────────
-import OfflineFeedScreen from '../screens/main/OfflineFeedScreen';
-
+// ── Tabs OFFLINE ──────────────────────────────────────────────────────────────
 function OfflineTabs() {
   return (
     <Tab.Navigator
@@ -136,37 +135,25 @@ function OfflineTabs() {
   );
 }
 
-
-// ── MainTabs: detecta red y elige Online/Offline ───────────────────────────────
+// ── MainTabs: solo elige Online/Offline según contexto ────────────────────────
 function MainTabs() {
+  const isOffline = useContext(OfflineContext);
+  return isOffline ? <OfflineTabs /> : <OnlineTabs />;
+}
+
+// ── AppNavigator ──────────────────────────────────────────────────────────────
+export default function AppNavigator() {
+  const { session, isLoading } = useAuth();
   const [online, setOnline] = useState(syncIsOnline);
 
   useEffect(() => {
-    // Inicializar el listener global de red (syncService)
     initNetworkListener();
-
-    // Escucha local para actualizar el estado React
     const unsubscribe = NetInfo.addEventListener(state => {
       setOnline(!!state.isConnected);
     });
-
-    // Estado inicial
     NetInfo.fetch().then(state => setOnline(!!state.isConnected));
-
     return unsubscribe;
   }, []);
-
-  return (
-    <OfflineContext.Provider value={!online}>
-      {online ? <OnlineTabs /> : <OfflineTabs />}
-    </OfflineContext.Provider>
-  );
-}
-
-import { useAuth } from '../context/AuthContext';
-
-export default function AppNavigator() {
-  const { session, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -177,38 +164,38 @@ export default function AppNavigator() {
   }
 
   return (
-    <Stack.Navigator
-      screenOptions={{ headerShown: false } as any}
-    >
-      {!session ? (
-        <>
-          <Stack.Screen name="Welcome"  component={WelcomeScreen} />
-          <Stack.Screen name="Register" component={RegisterScreen} />
-          <Stack.Screen name="Login"    component={LoginScreen} />
-        </>
-      ) : (
-        <>
-          <Stack.Screen name="MainTabs" component={MainTabs} />
-          <Stack.Screen name="RecordSighting" component={RecordSightingScreen} />
-          <Stack.Screen name="Profile"        component={ProfileScreen} />
-          <Stack.Screen name="Search"         component={SearchScreen} />
-          <Stack.Screen name="BirdDetail"      component={BirdDetailScreen} />
-          <Stack.Screen name="Chat"            component={ChatScreen} />
-          <Stack.Screen name="CreateGroup"      component={CreateGroupScreen} />
-          <Stack.Screen name="EditGroup"        component={EditGroupScreen} />
-          <Stack.Screen name="SearchMessages"   component={SearchMessagesScreen} />
-          <Stack.Screen name="Settings"         component={SettingsScreen} />
-          <Stack.Screen name="OfflineStorage"   component={OfflineStorageScreen} />
-          <Stack.Screen name="LanguageSettings" component={LanguageSettingsScreen} />
-          <Stack.Screen name="PrivacySettings"  component={PrivacySettingsScreen} />
-          <Stack.Screen name="BlockedUsers"     component={BlockedUsersScreen} />
-          <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
-          <Stack.Screen name="EditProfile"      component={EditProfileScreen} />
-          <Stack.Screen name="ThemeSettings"    component={ThemeSettingsScreen} />
-          <Stack.Screen name="HelpSupport"      component={HelpSupportScreen} />
-          <Stack.Screen name="AboutBirdify"      component={AboutBirdifyScreen} />
-        </>
-      )}
-    </Stack.Navigator>
+    <OfflineContext.Provider value={!online}>
+      <Stack.Navigator screenOptions={{ headerShown: false } as any}>
+        {!session ? (
+          <>
+            <Stack.Screen name="Welcome"  component={WelcomeScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="Login"    component={LoginScreen} />
+          </>
+        ) : (
+          <>
+            <Stack.Screen name="MainTabs"            component={MainTabs} />
+            <Stack.Screen name="RecordSighting"      component={RecordSightingScreen} />
+            <Stack.Screen name="Profile"             component={ProfileScreen} />
+            <Stack.Screen name="Search"              component={SearchScreen} />
+            <Stack.Screen name="BirdDetail"          component={BirdDetailScreen} />
+            <Stack.Screen name="Chat"                component={ChatScreen} />
+            <Stack.Screen name="CreateGroup"         component={CreateGroupScreen} />
+            <Stack.Screen name="EditGroup"           component={EditGroupScreen} />
+            <Stack.Screen name="SearchMessages"      component={SearchMessagesScreen} />
+            <Stack.Screen name="Settings"            component={SettingsScreen} />
+            <Stack.Screen name="OfflineStorage"      component={OfflineStorageScreen} />
+            <Stack.Screen name="LanguageSettings"    component={LanguageSettingsScreen} />
+            <Stack.Screen name="PrivacySettings"     component={PrivacySettingsScreen} />
+            <Stack.Screen name="BlockedUsers"        component={BlockedUsersScreen} />
+            <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+            <Stack.Screen name="EditProfile"         component={EditProfileScreen} />
+            <Stack.Screen name="ThemeSettings"       component={ThemeSettingsScreen} />
+            <Stack.Screen name="HelpSupport"         component={HelpSupportScreen} />
+            <Stack.Screen name="AboutBirdify"        component={AboutBirdifyScreen} />
+          </>
+        )}
+      </Stack.Navigator>
+    </OfflineContext.Provider>
   );
 }
