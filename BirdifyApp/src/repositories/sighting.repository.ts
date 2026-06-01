@@ -148,17 +148,51 @@ export const SightingRepository = {
     }
   },
 
-  async update(id: string, sighting: Partial<Omit<Sighting, 'id' | 'created_at' | 'updated_at'>>): Promise<Sighting> {
-    const { data, error } = await supabase
-      .from('sightings')
-      .update(sighting)
-      .eq('id', id)
-      .select()
-      .single();
+  async update(id: string, changes: Partial<Omit<Sighting, 'id' | 'created_at' | 'updated_at'>>): Promise<Sighting> {
+  const now = new Date().toISOString();
 
-    if (error) throw error;
-    return data;
-  },
+  if (!isOnline) {
+    // Construir SET dinámico para SQLite
+    const fields = Object.keys(changes);
+    const setClause = fields.map(f => `${f} = ?`).join(', ');
+    const values = fields.map(f => (changes as any)[f] ?? null);
+
+    await db.runAsync(
+      `UPDATE sightings SET ${setClause}, updated_at = ?, sync_status = 'pending' WHERE id = ?`,
+      [...values, now, id]
+    );
+
+    await addToQueue('sightings', 'UPDATE', { id, ...changes, updated_at: now });
+
+    const row = await db.getFirstAsync<Sighting>(
+      `SELECT * FROM sightings WHERE id = ?`, [id]
+    );
+    if (!row) throw new Error('Sighting no encontrado');
+    return row;
+  }
+
+  // Online: actualizar Supabase
+  const { data, error } = await supabase
+    .from('sightings')
+    .update({ ...changes, updated_at: now })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  // Reflejar en SQLite
+  const fields = Object.keys(changes);
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const values = fields.map(f => (changes as any)[f] ?? null);
+
+  await db.runAsync(
+    `UPDATE sightings SET ${setClause}, updated_at = ?, sync_status = 'synced' WHERE id = ?`,
+    [...values, now, id]
+  ).catch(() => {});
+
+  return data;
+},
 
   async getFeed(currentUserId?: string, page = 0, limit = 20): Promise<any[]> {
     // ── OFFLINE: devolver caché local ──────────────────────────────────────────
@@ -332,12 +366,26 @@ export const SightingRepository = {
     return formattedData || [];
   },
 
-  async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('sightings')
-      .delete()
-      .eq('id', id);
+async delete(id: string): Promise<void> {
+  if (!isOnline) {
+    await db.runAsync(`DELETE FROM sightings WHERE id = ?`, [id]);
+    await addToQueue('sightings', 'DELETE', { id });
+    return;
+  }
 
-    if (error) throw error;
-  },
+  const { error } = await supabase
+    .from('sightings')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error(`[delete] Error en Supabase:`, error);
+    throw error;
+  }
+
+  await db.runAsync(`DELETE FROM sightings WHERE id = ?`, [id]).catch((e) => {
+    console.warn(`[delete] Error borrando de SQLite (no crítico):`, e);
+  });
+},
+
 };

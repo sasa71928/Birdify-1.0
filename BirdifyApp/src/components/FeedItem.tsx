@@ -89,7 +89,7 @@ function FeedItem({ post, onPostDeleted, onNavigateAway, isNew }: FeedItemProps)
     message: '',
     type: 'success',
   });
-  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = React.useCallback((message: string, type: 'success' | 'error') => {
     if (toastTimerRef.current) {
@@ -431,19 +431,28 @@ function FeedItem({ post, onPostDeleted, onNavigateAway, isNew }: FeedItemProps)
     }, 300);
   };
 
-  const handleDeleteSighting = async () => {
-    const createdAt = new Date(post.createdAt);
-    const now = new Date();
-    const diffMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
+const handleDeleteSighting = async () => {
+  const createdAt = new Date(post.createdAt);
+  const now = new Date();
+  const diffMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
 
-    if (diffMinutes > 10) {
-      Alert.alert('Error', 'Solo puedes eliminar avistamientos dentro de 10 minutos después de publicarlos.');
-      return;
-    }
-
+  if (diffMinutes > 10) {
     resetOptionsModal();
+    setTimeout(() => {
+      Alert.alert(
+        'No se puede eliminar',
+        'Solo puedes eliminar avistamientos dentro de los 10 minutos después de publicarlos.'
+      );
+    }, 350);
+    return;
+  }
+
+  // Esperar a que el options sheet cierre antes de abrir el delete modal
+  resetOptionsModal();
+  setTimeout(() => {
     setShowDeleteModal(true);
-  };
+  }, 350);
+};
 
   const confirmDeleteSighting = async () => {
     setIsDeleting(true);
