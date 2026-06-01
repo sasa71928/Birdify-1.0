@@ -11,13 +11,11 @@ export function generateId(): string {
 }
 
 export function initNetworkListener() {
-  // Estado inicial
   NetInfo.fetch().then(state => {
     isOnline = !!state.isConnected;
     console.log(`Estado inicial de red: ${isOnline ? 'online' : 'offline'}`);
   });
 
-  // Escuchar cambios
   NetInfo.addEventListener(state => {
     const wasOffline = !isOnline;
     isOnline = !!state.isConnected;
@@ -85,7 +83,6 @@ export async function flushSyncQueue() {
     let error = null;
 
     try {
-      // Sighting con imagen local pendiente de subir
       if (row.table_name === 'sightings' && row.operation === 'INSERT' && payload._localImagePath) {
         const { _localImagePath, _birdName, _scientificName, ...sightingData } = payload;
 
@@ -147,15 +144,22 @@ export async function flushSyncQueue() {
         }, { onConflict: 'id' }));
 
         if (!error) {
-          // 4. Actualizar SQLite con URL real
+          // 4. Actualizar bird local con ID real de Supabase para que el JOIN siga funcionando
           await db.runAsync(
-            `UPDATE sightings SET photo_url = ?, sync_status = 'synced', bird_id = ? WHERE id = ?`,
+            `UPDATE birds SET id = ? WHERE id = ?`,
+            [finalBirdId, sightingData.bird_id]
+          );
+
+          // 5. Actualizar sighting — photo_url = URL Supabase, local_photo_path intacto
+          await db.runAsync(
+            `UPDATE sightings
+             SET photo_url = ?, sync_status = 'synced', bird_id = ?
+             WHERE id = ?`,
             [publicUrl, finalBirdId, sightingData.id]
           );
         }
 
       } else {
-        // Flujo generico
         if (row.operation === 'INSERT') {
           ({ error } = await supabase.from(row.table_name).insert(payload));
         } else if (row.operation === 'UPDATE') {

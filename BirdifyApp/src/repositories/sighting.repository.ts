@@ -19,12 +19,11 @@ export const SightingRepository = {
         updated_at: now,
       };
 
-      // Guardar en SQLite local
       await db.runAsync(
         `INSERT INTO sightings
           (id, user_id, bird_id, description, latitude, longitude,
-           is_location_private, photo_url, created_at, updated_at, sync_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           is_location_private, photo_url, local_photo_path, created_at, updated_at, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           localRecord.id,
           localRecord.user_id,
@@ -34,13 +33,25 @@ export const SightingRepository = {
           localRecord.longitude ?? null,
           localRecord.is_location_private ? 1 : 0,
           localRecord.photo_url ?? null,
+          (sighting as any)._localImagePath ?? null,
           localRecord.created_at,
           localRecord.updated_at,
           'pending',
         ]
       );
 
-      // Encolar para sincronizar cuando vuelva la red
+      // Guardar ave local para que el JOIN funcione offline
+      if ((sighting as any)._birdName && localRecord.bird_id) {
+        await db.runAsync(
+          `INSERT OR REPLACE INTO birds (id, common_name, scientific_name) VALUES (?, ?, ?)`,
+          [
+            localRecord.bird_id,
+            (sighting as any)._birdName,
+            (sighting as any)._scientificName ?? (sighting as any)._birdName + ' sp.',
+          ]
+        ).catch(() => {});
+      }
+
       const queuePayload: any = { ...sighting, id: localId };
       if ((sighting as any)._localImagePath) {
         queuePayload._localImagePath = (sighting as any)._localImagePath;
@@ -53,9 +64,11 @@ export const SightingRepository = {
     }
 
     // ── MODO ONLINE (flujo original) ──────────────────────────────────────────
+    const { _localImagePath, _birdName, _scientificName, ...cleanSighting } = sighting as any;
+
     const { data, error } = await supabase
       .from('sightings')
-      .insert(sighting)
+      .insert(cleanSighting)
       .select()
       .single();
 
@@ -63,18 +76,37 @@ export const SightingRepository = {
 
     this.notifyFollowers(sighting.user_id, data.id).catch(() => {});
 
-    // Cachear en SQLite para uso offline futuro
+    // Cachear sighting — conserva local_photo_path si ya existe
     db.runAsync(
-      `INSERT OR REPLACE INTO sightings
+      `INSERT INTO sightings
         (id, user_id, bird_id, description, latitude, longitude,
-         is_location_private, photo_url, created_at, updated_at, sync_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')`,
+         is_location_private, photo_url, local_photo_path, created_at, updated_at, sync_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')
+       ON CONFLICT(id) DO UPDATE SET
+         photo_url   = excluded.photo_url,
+         bird_id     = excluded.bird_id,
+         sync_status = 'synced',
+         updated_at  = excluded.updated_at`,
       [
         data.id, data.user_id, data.bird_id, data.description,
         data.latitude, data.longitude, data.is_location_private ? 1 : 0,
-        data.photo_url, data.created_at, data.updated_at,
+        data.photo_url,
+        (sighting as any)._localImagePath ?? null,
+        data.created_at, data.updated_at,
       ]
     ).catch(() => {});
+
+    // Cachear ave para que el JOIN funcione offline
+    if ((sighting as any)._birdName && data.bird_id) {
+      db.runAsync(
+        `INSERT OR REPLACE INTO birds (id, common_name, scientific_name) VALUES (?, ?, ?)`,
+        [
+          data.bird_id,
+          (sighting as any)._birdName,
+          (sighting as any)._scientificName ?? (sighting as any)._birdName + ' sp.',
+        ]
+      ).catch(() => {});
+    }
 
     return data;
   },
@@ -143,6 +175,8 @@ export const SightingRepository = {
       );
       return rows.map(r => ({
         ...r,
+        // Prefiere path local para imagen
+        photo_url: r.local_photo_path ?? r.photo_url,
         user: { id: r.user_id, username: r.username, fullname: r.fullname, profile_pic_url: r.profile_pic_url, is_verified: r.is_verified },
         bird: r.common_name ? { id: r.bird_id, common_name: r.common_name, scientific_name: r.scientific_name } : null,
         reactions: [],
@@ -199,13 +233,18 @@ export const SightingRepository = {
       comments: item.comments || [],
     }));
 
-    // Cachear en SQLite
+    // Cachear en SQLite — sin pisar local_photo_path ni birds locales
     for (const item of formattedData) {
       db.runAsync(
-        `INSERT OR REPLACE INTO sightings
+        `INSERT INTO sightings
           (id, user_id, bird_id, description, latitude, longitude,
            is_location_private, photo_url, created_at, updated_at, sync_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')
+         ON CONFLICT(id) DO UPDATE SET
+           bird_id     = excluded.bird_id,
+           photo_url   = excluded.photo_url,
+           sync_status = 'synced',
+           updated_at  = excluded.updated_at`,
         [
           item.id, item.user_id, item.bird_id, item.description,
           item.latitude, item.longitude, item.is_location_private ? 1 : 0,
@@ -213,6 +252,16 @@ export const SightingRepository = {
         ]
       ).catch(() => {});
 
+        // Cachear ave para que el JOIN funcione offline
+        if (item.bird) {
+          const bird = Array.isArray(item.bird) ? item.bird[0] : item.bird;
+          if (bird) {
+            db.runAsync(
+              `INSERT OR REPLACE INTO birds (id, common_name, scientific_name) VALUES (?, ?, ?)`,
+              [bird.id, bird.common_name, bird.scientific_name]
+            ).catch(() => {});
+          }
+        }
       if (item.user) {
         db.runAsync(
           `INSERT OR REPLACE INTO users (id, username, fullname, profile_pic_url, is_verified)
@@ -241,6 +290,7 @@ export const SightingRepository = {
       );
       return rows.map(r => ({
         ...r,
+        photo_url: r.local_photo_path ?? r.photo_url,
         user: { id: r.user_id, username: r.username, fullname: r.fullname, profile_pic_url: r.profile_pic_url, is_verified: r.is_verified },
         bird: r.common_name ? { id: r.bird_id, common_name: r.common_name, scientific_name: r.scientific_name } : null,
         reactions: [],

@@ -38,6 +38,7 @@ export async function initDatabase() {
       longitude REAL,
       is_location_private INTEGER DEFAULT 0,
       photo_url TEXT,
+      local_photo_path TEXT,
       sighting_date TEXT,
       created_at TEXT,
       updated_at TEXT
@@ -78,9 +79,13 @@ export async function initDatabase() {
     );
   `);
 
-  // Migracion: agregar sync_status si no existe
+  // Migraciones
   await db.execAsync(
     `ALTER TABLE sightings ADD COLUMN sync_status TEXT DEFAULT 'synced'`
+  ).catch(() => {});
+
+  await db.execAsync(
+    `ALTER TABLE sightings ADD COLUMN local_photo_path TEXT`
   ).catch(() => {});
 }
 

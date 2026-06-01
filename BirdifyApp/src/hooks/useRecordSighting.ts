@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { isOnline, addToQueue, generateId } from '../services/syncService';
+import db from '../lib/database';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Alert, Dimensions, Animated, PanResponder } from 'react-native';
@@ -321,13 +323,78 @@ export function useRecordSighting(editingSightingId?: string) {
 
     setIsPosting(true);
     try {
+    // ── FLUJO OFFLINE ──────────────────────────────────────────────
+    if (!isOnline) {
+      const sightingId = generateId();
+      const localPhotoUrl = imageUris[0] ?? null;
+
+      // Fix Bug 1: guardar ave en SQLite 
+      let localBirdId: string | null = null;
+      if (birdName.trim()) {
+        const existingBird = await db.getFirstAsync<{ id: string }>(
+          `SELECT id FROM birds WHERE common_name = ? LIMIT 1`,
+          [birdName]
+        );
+        if (existingBird) {
+          localBirdId = existingBird.id;
+        } else {
+          localBirdId = sightingId + '_bird';
+          await db.runAsync(
+            `INSERT OR IGNORE INTO birds (id, common_name, scientific_name) VALUES (?, ?, ?)`,
+            [localBirdId, birdName, selectedBird?.scientific_name ?? '']
+          );
+        }
+      }
+
+      // Fix Bug 2: columna local_photo_path separada de photo_url
+      await db.runAsync(
+        `INSERT INTO sightings 
+          (id, user_id, bird_id, description, latitude, longitude, 
+          is_location_private, photo_url, local_photo_path, sighting_date, created_at, sync_status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+        [
+          sightingId,
+          user.id,
+          localBirdId,
+          notes,
+          region.latitude,
+          region.longitude,
+          isPrivate ? 1 : 0,
+          localPhotoUrl,   // photo_url inicial = path local
+          localPhotoUrl,   // local_photo_path = siempre el path del dispositivo
+          new Date().toISOString(),
+          new Date().toISOString(),
+        ]
+      );
+
+      await addToQueue('sightings', 'INSERT', {
+        id: sightingId,
+        user_id: user.id,
+        bird_id: localBirdId,
+        description: notes,
+        latitude: region.latitude,
+        longitude: region.longitude,
+        is_location_private: isPrivate,
+        sighting_date: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        _localImagePath: localPhotoUrl,
+        _birdName: birdName,
+        _scientificName: selectedBird?.scientific_name ?? null,
+      });
+
+      showToast('Avistamiento guardado offline. Se sincronizará al recuperar conexión.', 'success');
+      setShouldNavigateToFeed(true);
+      return;
+    }
+
+      // ── FLUJO ONLINE ───────────────────────────────────────────────
       let finalBirdId = null;
       const searchName = selectedBird ? selectedBird.common_name : birdName;
       const birds = await BirdRepository.search(searchName);
 
       if (birds && birds.length > 0) {
-        finalBirdId = birds[0].id;
-      } else {
+        finalBirdId = (birds[0] as any).id;
+      }else {
         const { data: newBird, error: birdError } = await supabase
           .from('birds')
           .insert({
@@ -394,8 +461,9 @@ export function useRecordSighting(editingSightingId?: string) {
         await SightingRepository.create({
           ...sightingData,
           user_id: user.id,
-          sighting_date: new Date().toISOString()
-        });
+          sighting_date: new Date().toISOString(),
+          _localImagePath: imageUris[0] ?? null,
+        } as any);
         showToast('¡Avistamiento publicado con éxito!', 'success');
       }
 

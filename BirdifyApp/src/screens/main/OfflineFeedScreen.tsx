@@ -7,7 +7,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  TouchableOpacity,
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +15,7 @@ import db from '../../lib/database';
 import { Colors } from '../../theme';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { createStyles } from '../../styles/screens/main/feedScreen.styles';
+import { useAuth } from '../../context/AuthContext';
 
 interface LocalSighting {
   id: string;
@@ -24,10 +24,10 @@ interface LocalSighting {
   latitude: number | null;
   longitude: number | null;
   photo_url: string | null;
+  local_photo_path: string | null;
   sighting_date: string | null;
   created_at: string | null;
   sync_status: string | null;
-  // joined from birds table
   common_name: string | null;
   scientific_name: string | null;
 }
@@ -59,11 +59,13 @@ const SightingCard = ({ item }: { item: LocalSighting }) => {
       })
     : 'Fecha desconocida';
 
+  const photoUri = item.local_photo_path ?? item.photo_url;
+
   return (
     <View style={styles.card}>
-      {item.photo_url ? (
+      {photoUri ? (
         <Image
-          source={{ uri: item.photo_url }}
+          source={{ uri: photoUri }}
           style={styles.photo}
           resizeMode="cover"
         />
@@ -115,26 +117,29 @@ const SightingCard = ({ item }: { item: LocalSighting }) => {
 
 export default function OfflineFeedScreen() {
   const { colors, isDark } = useDynamicStyles(createStyles);
+  const { user } = useAuth();
   const [sightings, setSightings] = useState<LocalSighting[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadSightings = useCallback(async () => {
+    if (!user) return;
     try {
       const rows = await db.getAllAsync<LocalSighting>(`
         SELECT
           s.id, s.bird_id, s.description, s.latitude, s.longitude,
-          s.photo_url, s.sighting_date, s.created_at, s.sync_status,
+          s.photo_url, s.local_photo_path, s.sighting_date, s.created_at, s.sync_status,
           b.common_name, b.scientific_name
         FROM sightings s
         LEFT JOIN birds b ON b.id = s.bird_id
+        WHERE s.user_id = ?
         ORDER BY s.created_at DESC
-      `);
+      `, [user.id]);
       setSightings(rows);
     } catch (e) {
       console.error('Error leyendo sightings offline:', e);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     setLoading(true);
@@ -151,13 +156,12 @@ export default function OfflineFeedScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      {/* Header offline */}
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <View style={styles.offlinePill}>
           <Ionicons name="cloud-offline-outline" size={14} color="#92400e" />
           <Text style={styles.offlinePillText}>Modo sin conexión</Text>
         </View>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Mis avistamientos</Text>
+        <Text style={[styles.headerTitle, { color: colors.primary }]}>Mis avistamientos</Text>
         <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
           Se sincronizarán cuando haya conexión
         </Text>
@@ -170,7 +174,7 @@ export default function OfflineFeedScreen() {
       ) : sightings.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="binoculars-outline" size={48} color={Colors.textSecondary} />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>Sin avistamientos locales</Text>
+          <Text style={[styles.emptyTitle, { color: colors.primary }]}>Sin avistamientos locales</Text>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
             Registra un avistamiento y se guardará aquí aunque no tengas internet.
           </Text>
@@ -204,14 +208,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 4,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontFamily: 'PlusJakartaSans-Bold',
-  },
-  headerSub: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans',
-  },
+  headerTitle: { fontSize: 20, fontFamily: 'PlusJakartaSans-Bold' },
+  headerSub: { fontSize: 13, fontFamily: 'PlusJakartaSans' },
   offlinePill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -223,29 +221,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     marginBottom: 4,
   },
-  offlinePillText: {
-    fontSize: 12,
-    color: '#92400e',
-    fontFamily: 'PlusJakartaSans-SemiBold',
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-    gap: 12,
-  },
-  emptyTitle: {
-    fontSize: 17,
-    fontFamily: 'PlusJakartaSans-SemiBold',
-    textAlign: 'center',
-  },
-  emptyText: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  offlinePillText: { fontSize: 12, color: '#92400e', fontFamily: 'PlusJakartaSans-SemiBold' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, gap: 12 },
+  emptyTitle: { fontSize: 17, fontFamily: 'PlusJakartaSans-SemiBold', textAlign: 'center' },
+  emptyText: { fontSize: 14, fontFamily: 'PlusJakartaSans', textAlign: 'center', lineHeight: 20 },
   list: { padding: 12, gap: 12 },
   card: {
     backgroundColor: Colors.surface,
@@ -257,61 +236,21 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  photo: {
-    width: '100%',
-    height: 180,
-  },
+  photo: { width: '100%', height: 180 },
   photoPlaceholder: {
-    backgroundColor: Colors.surfaceOffset,
+    backgroundColor: Colors.secondaryBlue,
     justifyContent: 'center',
     alignItems: 'center',
   },
   cardBody: { padding: 14, gap: 6 },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  birdName: {
-    fontSize: 16,
-    fontFamily: 'PlusJakartaSans-Bold',
-    color: Colors.text,
-  },
-  scientificName: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans',
-    color: Colors.textSecondary,
-    fontStyle: 'italic',
-  },
-  description: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans',
-    color: Colors.textSecondary,
-    lineHeight: 20,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    gap: 16,
-    marginTop: 4,
-  },
-  footerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  footerText: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontFamily: 'PlusJakartaSans',
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderRadius: 99,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
+  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  birdName: { fontSize: 16, fontFamily: 'PlusJakartaSans-Bold', color: Colors.primary },
+  scientificName: { fontSize: 13, fontFamily: 'PlusJakartaSans', color: Colors.textSecondary, fontStyle: 'italic' },
+  description: { fontSize: 14, fontFamily: 'PlusJakartaSans', color: Colors.textSecondary, lineHeight: 20 },
+  cardFooter: { flexDirection: 'row', gap: 16, marginTop: 4 },
+  footerItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  footerText: { fontSize: 12, color: Colors.textSecondary, fontFamily: 'PlusJakartaSans' },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3 },
   badgePending: { backgroundColor: '#fef3c7' },
   badgeSynced: { backgroundColor: '#dcfce7' },
   badgeText: { fontSize: 11, fontFamily: 'PlusJakartaSans-SemiBold' },

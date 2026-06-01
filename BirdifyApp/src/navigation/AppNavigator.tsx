@@ -121,6 +121,8 @@ function OnlineTabs() {
 }
 
 // ── Tabs OFFLINE (solo Feed con caché local) ───────────────────────────────────
+import OfflineFeedScreen from '../screens/main/OfflineFeedScreen';
+
 function OfflineTabs() {
   return (
     <Tab.Navigator
@@ -129,10 +131,11 @@ function OfflineTabs() {
       initialRouteName="Feed"
       screenOptions={{ swipeEnabled: false }}
     >
-      <Tab.Screen name="Feed" component={FeedScreen} />
+      <Tab.Screen name="Feed" component={OfflineFeedScreen} />
     </Tab.Navigator>
   );
 }
+
 
 // ── MainTabs: detecta red y elige Online/Offline ───────────────────────────────
 function MainTabs() {
