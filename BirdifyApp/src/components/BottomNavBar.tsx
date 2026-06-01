@@ -38,7 +38,7 @@ export default function BottomNavBar({ state, hideNav }: { state?: any; hideNav?
       <View style={styles.innerContainer}>
 
         {/* Home — oculto en offline o hideNav */}
-        {!isOffline && !hideNav && (
+        {!isOffline && (
           <TouchableOpacity
             style={[styles.navItem, currentRoute === 'Feed' && styles.activeItem]}
             onPress={() => navigation.navigate('MainTabs', { screen: 'Feed' })}
@@ -55,7 +55,7 @@ export default function BottomNavBar({ state, hideNav }: { state?: any; hideNav?
         )}
 
         {/* Explore — oculto en offline o hideNav */}
-        {!isOffline && !hideNav && (
+        {!isOffline && (
           <TouchableOpacity
             style={[styles.navItem, currentRoute === 'Explore' && styles.activeItem]}
             onPress={() => navigation.navigate('MainTabs', { screen: 'Explore' })}
@@ -79,7 +79,7 @@ export default function BottomNavBar({ state, hideNav }: { state?: any; hideNav?
         </TouchableOpacity>
 
         {/* Dictionary — oculto en offline o hideNav */}
-        {!isOffline && !hideNav && (
+        {!isOffline && (
           <TouchableOpacity
             style={[styles.navItem, currentRoute === 'Dictionary' && styles.activeItem]}
             onPress={() => navigation.navigate('MainTabs', { screen: 'Dictionary' })}
@@ -93,7 +93,7 @@ export default function BottomNavBar({ state, hideNav }: { state?: any; hideNav?
         )}
 
         {/* Messages — oculto en offline o hideNav */}
-        {!isOffline && !hideNav && (
+        {!isOffline && (
           <TouchableOpacity
             style={[styles.navItem, currentRoute === 'Messages' && styles.activeItem]}
             onPress={() => navigation.navigate('MainTabs', { screen: 'Messages' })}
