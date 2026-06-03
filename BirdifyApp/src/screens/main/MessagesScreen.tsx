@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { OfflineContext } from '../../navigation/AppNavigator';
 import {
   View,
   Text,
@@ -27,6 +28,7 @@ import { handleError } from '../../utils/errorHandler';
 
 export default function MessagesScreen() {
   const { shared, screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const isOffline = useContext(OfflineContext); 
   const { user } = useAuth();
   const {
     loading,
@@ -63,6 +65,21 @@ export default function MessagesScreen() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [startingChat, setStartingChat] = useState<string | null>(null);
   const fabScale = useState(new Animated.Value(1))[0];
+
+  if (isOffline) {
+    return (
+      <SafeAreaView style={shared.safe}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+        <TopNavBar />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
+          <Ionicons name="chatbubble-outline" size={48} color={colors.textSecondary} />
+          <Text style={{ color: colors.textSecondary, marginTop: 12, fontSize: 16, textAlign: 'center' }}>
+            Los mensajes no están disponibles sin conexión
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const loadFollowingUsers = async () => {
     if (!user) return;

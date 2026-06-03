@@ -1,5 +1,5 @@
-import React, { useMemo, useCallback } from 'react';
-
+import React, { useMemo, useCallback, useContext } from 'react';
+import { OfflineContext } from '../../navigation/AppNavigator';
 import {
   View,
   Text,
@@ -93,6 +93,7 @@ const createMapStyle = (colors: any) => [
 
 export default function ExploreScreen() {
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const isOffline = useContext(OfflineContext);
   const navigation = useNavigation<NavProp>();
   const isFocused = useIsFocused();
 
@@ -151,6 +152,18 @@ export default function ExploreScreen() {
       </Marker>
     );
   }), [filteredSightings, selectedMarker, colors.primary, colors.secondaryBlue, handleMarkerPress]);
+
+  if (isOffline) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface }]}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+        <Ionicons name="cloud-offline-outline" size={48} color={colors.textSecondary} />
+        <Text style={{ color: colors.textSecondary, marginTop: 12, fontSize: 16 }}>
+          No disponible sin conexión
+        </Text>
+      </View>
+    );
+  }
 
   // Evitar que MapView se monte hasta que la pestaña este activa
   // (previene crash por falta de Google Maps API key al iniciar la app)

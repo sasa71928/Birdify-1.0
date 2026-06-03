@@ -10,26 +10,6 @@ export function generateId(): string {
   return uuidv4();
 }
 
-export function initNetworkListener() {
-  NetInfo.fetch().then(state => {
-    isOnline = !!state.isConnected;
-    console.log(`Estado inicial de red: ${isOnline ? 'online' : 'offline'}`);
-  });
-
-  NetInfo.addEventListener(state => {
-    const wasOffline = !isOnline;
-    isOnline = !!state.isConnected;
-
-    if (wasOffline && isOnline) {
-      console.log('Red recuperada, sincronizando...');
-      flushSyncQueue();
-    }
-
-    if (!isOnline) {
-      console.log('Sin red, modo offline activado');
-    }
-  });
-}
 
 export async function addToQueue(
   tableName: string,
