@@ -7,6 +7,8 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { SightingRepository } from '../repositories/sighting.repository';
 import * as Location from 'expo-location';
 import { handleError } from '../utils/errorHandler';
+import { useContext } from 'react';
+import { OfflineContext } from '../navigation/AppNavigator';
 
 type ExploreNavProp = NativeStackNavigationProp<RootStackParamList, 'Explore'>;
 type ExploreRouteProp = RouteProp<RootStackParamList, 'Explore'>;
@@ -32,7 +34,7 @@ export function useExplore() {
   const route = useRoute<ExploreRouteProp>();
   const isFocused = useIsFocused();
   const mapRef = useRef<MapView>(null);
-  
+  const isOffline = useContext(OfflineContext);
   const [loading, setLoading] = useState(true);
   const [selectedMarker, setSelectedMarker] = useState<string | null>(null);
   const [sightings, setSightings] = useState<MapSighting[]>([]);
@@ -82,6 +84,10 @@ export function useExplore() {
   };
 
   const loadSightings = useCallback(async () => {
+        if (isOffline) {           // guard offline
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const data = await SightingRepository.getFeed();
@@ -97,7 +103,7 @@ export function useExplore() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isOffline]);    
 
   const loadUserLocation = async (isMounted: boolean) => {
     try {
@@ -127,6 +133,10 @@ export function useExplore() {
 
     const initializeScreen = async () => {
       if (!isFocused) return;
+      if (isOffline) {         // ← agrega este guard
+        setLoading(false);
+        return;
+      }
       await loadSightings();
       await loadUserLocation(isMounted);
     };
@@ -136,7 +146,7 @@ export function useExplore() {
     return () => {
       isMounted = false;
     };
-  }, [loadSightings, isFocused]);
+  }, [loadSightings, isFocused, isOffline]); 
 
   // Navigate to target sighting if provided
   useEffect(() => {

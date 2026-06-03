@@ -8,12 +8,14 @@ import { useUnreadMessages } from '../context/UnreadMessagesContext';
 import { RootStackParamList, ChatThread } from '../navigation/AppNavigator';
 import { Dimensions } from 'react-native';
 import { handleError } from '../utils/errorHandler';
-
+import { useContext } from 'react';
+import { OfflineContext } from '../navigation/AppNavigator';
 type MessagesNavProp = NativeStackNavigationProp<RootStackParamList, 'Messages'>;
 
 export function useMessages() {
   const navigation = useNavigation<MessagesNavProp>();
   const { user } = useAuth();
+  const isOffline = useContext(OfflineContext);
   const { conversations, refreshConversations, conversationsLoading } = useUnreadMessages();
 
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -32,10 +34,10 @@ export function useMessages() {
   // Refrescar silenciosamente al entrar a la pantalla
   useFocusEffect(
     React.useCallback(() => {
-      if (user) {
+      if (user && !isOffline) {   // !isOffline
         refreshConversations();
       }
-    }, [user, refreshConversations])
+    }, [user, refreshConversations, isOffline]) 
   );
 
   const handleDeleteConversation = async (conversationId: string) => {

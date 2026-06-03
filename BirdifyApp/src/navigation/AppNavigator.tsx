@@ -5,7 +5,7 @@ import { createMaterialTopTabNavigator } from '@react-navigation/material-top-ta
 import NetInfo from '@react-native-community/netinfo';
 import BottomNavBar from '../components/BottomNavBar';
 import { Colors } from '../theme';
-import { isOnline as syncIsOnline, initNetworkListener } from '../services/syncService';
+import { isOnline as syncIsOnline } from '../services/syncService';
 
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import LoginScreen    from '../screens/auth/LoginScreen';
@@ -141,19 +141,31 @@ function MainTabs() {
   return isOffline ? <OfflineTabs /> : <OnlineTabs />;
 }
 
-// ── AppNavigator ──────────────────────────────────────────────────────────────
-export default function AppNavigator() {
-  const { session, isLoading } = useAuth();
-  const [online, setOnline] = useState(syncIsOnline);
+export function OfflineProvider({ children }: { children: React.ReactNode }) {
+  const [online, setOnline] = useState(false);
 
   useEffect(() => {
-    initNetworkListener();
     const unsubscribe = NetInfo.addEventListener(state => {
       setOnline(!!state.isConnected);
     });
     NetInfo.fetch().then(state => setOnline(!!state.isConnected));
     return unsubscribe;
   }, []);
+
+  return (
+    <OfflineContext.Provider value={!online}>
+      {children}
+    </OfflineContext.Provider>
+  );
+}
+
+// ── AppNavigator ──────────────────────────────────────────────────────────────
+export default function AppNavigator() {
+  const { session, isLoading } = useAuth();
+
+  // ← ELIMINA: useState(online)
+  // ← ELIMINA: useEffect con NetInfo
+  // initNetworkListener() ya se llama en App.tsx
 
   if (isLoading) {
     return (
@@ -164,38 +176,36 @@ export default function AppNavigator() {
   }
 
   return (
-    <OfflineContext.Provider value={!online}>
-      <Stack.Navigator screenOptions={{ headerShown: false } as any}>
-        {!session ? (
-          <>
-            <Stack.Screen name="Welcome"  component={WelcomeScreen} />
-            <Stack.Screen name="Register" component={RegisterScreen} />
-            <Stack.Screen name="Login"    component={LoginScreen} />
-          </>
-        ) : (
-          <>
-            <Stack.Screen name="MainTabs"            component={MainTabs} />
-            <Stack.Screen name="RecordSighting"      component={RecordSightingScreen} />
-            <Stack.Screen name="Profile"             component={ProfileScreen} />
-            <Stack.Screen name="Search"              component={SearchScreen} />
-            <Stack.Screen name="BirdDetail"          component={BirdDetailScreen} />
-            <Stack.Screen name="Chat"                component={ChatScreen} />
-            <Stack.Screen name="CreateGroup"         component={CreateGroupScreen} />
-            <Stack.Screen name="EditGroup"           component={EditGroupScreen} />
-            <Stack.Screen name="SearchMessages"      component={SearchMessagesScreen} />
-            <Stack.Screen name="Settings"            component={SettingsScreen} />
-            <Stack.Screen name="OfflineStorage"      component={OfflineStorageScreen} />
-            <Stack.Screen name="LanguageSettings"    component={LanguageSettingsScreen} />
-            <Stack.Screen name="PrivacySettings"     component={PrivacySettingsScreen} />
-            <Stack.Screen name="BlockedUsers"        component={BlockedUsersScreen} />
-            <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
-            <Stack.Screen name="EditProfile"         component={EditProfileScreen} />
-            <Stack.Screen name="ThemeSettings"       component={ThemeSettingsScreen} />
-            <Stack.Screen name="HelpSupport"         component={HelpSupportScreen} />
-            <Stack.Screen name="AboutBirdify"        component={AboutBirdifyScreen} />
-          </>
-        )}
-      </Stack.Navigator>
-    </OfflineContext.Provider>
+    <Stack.Navigator screenOptions={{ headerShown: false } as any}>
+      {!session ? (
+        <>
+          <Stack.Screen name="Welcome"  component={WelcomeScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="Login"    component={LoginScreen} />
+        </>
+      ) : (
+        <>
+          <Stack.Screen name="MainTabs"             component={MainTabs} />
+          <Stack.Screen name="RecordSighting"       component={RecordSightingScreen} />
+          <Stack.Screen name="Profile"              component={ProfileScreen} />
+          <Stack.Screen name="Search"               component={SearchScreen} />
+          <Stack.Screen name="BirdDetail"           component={BirdDetailScreen} />
+          <Stack.Screen name="Chat"                 component={ChatScreen} />
+          <Stack.Screen name="CreateGroup"          component={CreateGroupScreen} />
+          <Stack.Screen name="EditGroup"            component={EditGroupScreen} />
+          <Stack.Screen name="SearchMessages"       component={SearchMessagesScreen} />
+          <Stack.Screen name="Settings"             component={SettingsScreen} />
+          <Stack.Screen name="OfflineStorage"       component={OfflineStorageScreen} />
+          <Stack.Screen name="LanguageSettings"     component={LanguageSettingsScreen} />
+          <Stack.Screen name="PrivacySettings"      component={PrivacySettingsScreen} />
+          <Stack.Screen name="BlockedUsers"         component={BlockedUsersScreen} />
+          <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+          <Stack.Screen name="EditProfile"          component={EditProfileScreen} />
+          <Stack.Screen name="ThemeSettings"        component={ThemeSettingsScreen} />
+          <Stack.Screen name="HelpSupport"          component={HelpSupportScreen} />
+          <Stack.Screen name="AboutBirdify"         component={AboutBirdifyScreen} />
+        </>
+      )}
+    </Stack.Navigator>
   );
 }

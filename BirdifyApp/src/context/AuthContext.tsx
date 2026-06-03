@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { NotificationService } from '../services/notification.service';
+import NetInfo from '@react-native-community/netinfo';
 
 interface AuthContextProps {
   user: User | null;
@@ -52,6 +53,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const ensurePublicProfile = async (authUser: User) => {
+      const netState = await NetInfo.fetch();
+  if (!netState.isConnected) return;
     try {
       const { data: existing, error } = await supabase
         .from('users')

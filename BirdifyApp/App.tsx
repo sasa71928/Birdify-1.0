@@ -1,7 +1,6 @@
 import 'react-native-get-random-values';
 import React, { useEffect } from 'react';
 import { initDatabase } from './src/lib/database';
-import { initNetworkListener } from './src/services/syncService';
 import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -26,6 +25,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { NewSightingsProvider } from './src/context/NewSightingsContext';
 import { UnreadMessagesProvider } from './src/context/UnreadMessagesContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { OfflineProvider } from './src/navigation/AppNavigator';
 
 // Configurar handler de notificaciones antes de que la app monte
 // Esto es requerido para que expo-notifications funcione correctamente en Android standalone
@@ -57,7 +57,6 @@ export default function App() {
       .then(() => console.log('✅ SQLite inicializado'))
       .catch(e => console.error('❌ Error al inicializar SQLite:', e));
 
-    initNetworkListener();
   }, []);
 
   if (!fontsLoaded) {
@@ -74,9 +73,11 @@ export default function App() {
         <ThemeProvider>
           <NewSightingsProvider>
             <UnreadMessagesProvider>
-              <NavigationContainer>
-                <AppNavigator />
-              </NavigationContainer>
+              <OfflineProvider>
+                <NavigationContainer>
+                  <AppNavigator />
+                </NavigationContainer>
+              </OfflineProvider>
             </UnreadMessagesProvider>
           </NewSightingsProvider>
         </ThemeProvider>

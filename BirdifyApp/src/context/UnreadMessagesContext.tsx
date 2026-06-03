@@ -5,6 +5,8 @@ import { useAuth } from './AuthContext';
 import { supabase } from '../lib/supabase';
 import { ChatThread } from '../navigation/AppNavigator';
 import { Message } from '../types/message';
+import { OfflineContext } from '../navigation/AppNavigator';
+import NetInfo from '@react-native-community/netinfo';
 
 interface UnreadMessagesContextType {
   unreadCount: number;
@@ -40,6 +42,7 @@ const UnreadMessagesContext = createContext<UnreadMessagesContextType>({
 
 export function UnreadMessagesProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const isOffline = useContext(OfflineContext);
   const [unreadCount, setUnreadCount] = useState(0);
   const [hasNewMessage, setHasNewMessage] = useState(false);
   const [messageTick, setMessageTick] = useState(0);
@@ -53,6 +56,19 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
 
   const refreshConversations = useCallback(async () => {
     if (!user) return;
+
+  // Guarda primero el estado de React, luego verificacion directa
+    if (isOffline) {
+      setConversationsLoading(false);
+    return;
+    }
+
+  // Verificacion sincrona de red como respaldo
+    const netState = await NetInfo.fetch();
+    if (!netState.isConnected) {
+      setConversationsLoading(false);
+      return;
+    }
     try {
       setConversationsLoading(true);
       const items = await ConversationRepository.listForUser(user.id);
@@ -104,7 +120,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
     } finally {
       setConversationsLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, isOffline]);
 
   const debouncedRefresh = useCallback(() => {
     if (refreshDebounceRef.current) {
@@ -291,7 +307,10 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
   }, [refreshConversations]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user|| isOffline) {
+      setConversationsLoading(false);
+      return;
+    }
 
     refreshConversations();
 
@@ -462,7 +481,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
         clearTimeout(refreshDebounceRef.current);
       }
     };
-  }, [user?.id, refreshConversations, fetchMessages]);
+  }, [user?.id, refreshConversations, fetchMessages, isOffline]);
 
   const clearNewMessage = useCallback(() => {
     setHasNewMessage(false);
