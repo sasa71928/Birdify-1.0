@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   StatusBar,
+  TouchableOpacity,
+  Alert, 
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +18,7 @@ import { Colors } from '../../theme';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { createStyles } from '../../styles/screens/main/feedScreen.styles';
 import { useAuth } from '../../context/AuthContext';
+import { deletePendingSighting } from '../../services/syncService';
 
 interface LocalSighting {
   id: string;
@@ -48,7 +51,7 @@ const SyncBadge = ({ status }: { status: string | null }) => {
   );
 };
 
-const SightingCard = ({ item }: { item: LocalSighting }) => {
+const SightingCard = ({ item, onDelete, }: { item: LocalSighting; onDelete: (id: string) => void; }) =>{
   const date = item.sighting_date
     ? new Date(item.sighting_date).toLocaleDateString('es-MX', {
         day: '2-digit', month: 'short', year: 'numeric',
@@ -60,15 +63,28 @@ const SightingCard = ({ item }: { item: LocalSighting }) => {
     : 'Fecha desconocida';
 
   const photoUri = item.local_photo_path ?? item.photo_url;
+  const isPending = item.sync_status !== 'synced';
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Eliminar avistamiento',
+      '¿Seguro que quieres eliminar este avistamiento? No se ha sincronizado aún.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => onDelete(item.id),
+        },
+      ]
+    );
+  };
+
 
   return (
     <View style={styles.card}>
       {photoUri ? (
-        <Image
-          source={{ uri: photoUri }}
-          style={styles.photo}
-          resizeMode="cover"
-        />
+        <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" />
       ) : (
         <View style={[styles.photo, styles.photoPlaceholder]}>
           <Ionicons name="image-outline" size={36} color={Colors.textSecondary} />
@@ -110,6 +126,17 @@ const SightingCard = ({ item }: { item: LocalSighting }) => {
             <Text style={styles.footerText}>{date}</Text>
           </View>
         </View>
+
+        {isPending && (
+          <TouchableOpacity
+            onPress={handleDelete}
+            style={styles.deleteButton}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="trash-outline" size={14} color="#b91c1c" />
+            <Text style={styles.deleteText}>Eliminar</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -152,6 +179,17 @@ export default function OfflineFeedScreen() {
     setRefreshing(false);
   }, [loadSightings]);
 
+  // ← NUEVO: handler de borrado
+  const handleDelete = useCallback(async (id: string) => {
+    try {
+      await deletePendingSighting(id);
+      setSightings(prev => prev.filter(s => s.id !== id));
+    } catch (e) {
+      console.error('Error eliminando sighting:', e);
+      Alert.alert('Error', 'No se pudo eliminar el avistamiento.');
+    }
+  }, []);
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
@@ -183,7 +221,9 @@ export default function OfflineFeedScreen() {
         <FlatList
           data={sightings}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <SightingCard item={item} />}
+          renderItem={({ item }) => (
+            <SightingCard item={item} onDelete={handleDelete} />
+          )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -199,7 +239,6 @@ export default function OfflineFeedScreen() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   header: {
@@ -256,4 +295,21 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, fontFamily: 'PlusJakartaSans-SemiBold' },
   badgeTextPending: { color: '#92400e' },
   badgeTextSynced: { color: '#166534' },
+
+  deleteButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+  alignSelf: 'flex-start',
+  marginTop: 6,
+  paddingVertical: 4,
+  paddingHorizontal: 10,
+  borderRadius: 99,
+  backgroundColor: '#fee2e2',
+},
+deleteText: {
+  fontSize: 12,
+  color: '#b91c1c',
+  fontFamily: 'PlusJakartaSans-SemiBold',
+},
 });

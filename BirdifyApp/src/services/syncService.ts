@@ -165,3 +165,14 @@ export async function flushSyncQueue() {
     }
   }
 }
+export async function deletePendingSighting(sightingId: string): Promise<void> {
+  // 1. Borrar de sync_queue 
+  await db.runAsync(
+    `DELETE FROM sync_queue
+     WHERE table_name = 'sightings'
+       AND JSON_EXTRACT(payload, '$.id') = ?`,
+    [sightingId]
+  );
+  // 2. Borrar de la tabla local
+  await db.runAsync(`DELETE FROM sightings WHERE id = ?`, [sightingId]);
+}
