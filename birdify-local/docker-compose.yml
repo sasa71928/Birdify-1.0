@@ -99,6 +99,28 @@ services:
     volumes:
       - ./config/kong.yml:/var/lib/kong/kong.yml:ro
 
+  db-proxy:
+    image: haproxy:2.4
+    container_name: db-proxy
+    restart: unless-stopped
+    networks:
+      birdify-net:
+        ipv4_address: 172.20.0.20
+    volumes:
+      - ./config/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+
+  failover-monitor:
+    image: postgres:15-alpine
+    container_name: failover-monitor
+    restart: unless-stopped
+    depends_on:
+      - db-proxy
+    networks:
+      - birdify-net
+    volumes:
+      - ./config/failover-monitor.sh:/usr/local/bin/failover-monitor.sh:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/failover-monitor.sh"]
+
   auth:
     image: supabase/gotrue:v2.132.3
     container_name: supabase-auth
@@ -112,7 +134,7 @@ services:
       GOTRUE_API_PORT: 9999
       API_EXTERNAL_URL: http://${TU_IP_LOCAL}:8000
       GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db-primary:5432/${POSTGRES_DB}
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db-proxy:5432/${POSTGRES_DB}
       GOTRUE_SITE_URL: http://${TU_IP_LOCAL}:3000
       GOTRUE_JWT_SECRET: ${JWT_SECRET}
       GOTRUE_JWT_EXP: 3600
@@ -133,7 +155,7 @@ services:
     networks:
       - birdify-net
     environment:
-      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db-primary:5432/${POSTGRES_DB}
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db-proxy:5432/${POSTGRES_DB}
       PGRST_DB_SCHEMA: public,storage,graphql_public
       PGRST_DB_ANON_ROLE: anon
       PGRST_JWT_SECRET: ${JWT_SECRET}
@@ -154,7 +176,7 @@ services:
       ENABLE_TAILSCALE: "false"
       DNS_NODES: "''"
       API_JWT_SECRET: ${JWT_SECRET}
-      DB_HOST: db-primary
+      DB_HOST: db-proxy
       DB_PORT: 5432
       DB_USER: postgres
       DB_PASSWORD: ${POSTGRES_PASSWORD}
@@ -164,6 +186,8 @@ services:
       PORT: "4000"
       FLY_ALLOC_ID: "fly123"
       FLY_APP_NAME: "realtime"
+      REGION: "default"
+      FLY_REGION: "default"
       REPLICATION_MODE: RLS
       REPLICATION_POLL_INTERVAL: 100
       SECURE_CHANNELS: "true"
@@ -181,7 +205,7 @@ services:
       - birdify-net
     environment:
       PG_META_PORT: 8080
-      PG_META_DB_HOST: db-primary
+      PG_META_DB_HOST: db-proxy
       PG_META_DB_PORT: 5432
       PG_META_DB_NAME: ${POSTGRES_DB}
       PG_META_DB_USER: postgres
@@ -202,7 +226,7 @@ services:
       SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       JWT_SECRET: ${JWT_SECRET}
       PGRST_JWT_SECRET: ${JWT_SECRET}
-      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db-primary:5432/${POSTGRES_DB}?search_path=storage,public
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db-proxy:5432/${POSTGRES_DB}?search_path=storage,public
       FILE_SIZE_LIMIT: 52428800
       STORAGE_BACKEND: file
       FILE_STORAGE_BACKEND_PATH: /var/lib/storage
