@@ -33,7 +33,7 @@ export const SightingRepository = {
           localRecord.longitude ?? null,
           localRecord.is_location_private ? 1 : 0,
           localRecord.photo_url ?? null,
-          (sighting as any)._localImagePath ?? null,
+          (sighting as any)._localImagePaths ?? null,
           localRecord.created_at,
           localRecord.updated_at,
           'pending',
@@ -53,8 +53,8 @@ export const SightingRepository = {
       }
 
       const queuePayload: any = { ...sighting, id: localId };
-      if ((sighting as any)._localImagePath) {
-        queuePayload._localImagePath = (sighting as any)._localImagePath;
+      if ((sighting as any)._localImagePaths) {
+        queuePayload._localImagePaths = (sighting as any)._localImagePaths;
         queuePayload._birdName = (sighting as any)._birdName;
         queuePayload._scientificName = (sighting as any)._scientificName;
       }
@@ -64,7 +64,7 @@ export const SightingRepository = {
     }
 
     // ── MODO ONLINE (flujo original) ──────────────────────────────────────────
-    const { _localImagePath, _birdName, _scientificName, ...cleanSighting } = sighting as any;
+    const { _localImagePaths, _birdName, _scientificName, ...cleanSighting } = sighting as any;
 
     const { data, error } = await supabase
       .from('sightings')
@@ -91,7 +91,7 @@ export const SightingRepository = {
         data.id, data.user_id, data.bird_id, data.description,
         data.latitude, data.longitude, data.is_location_private ? 1 : 0,
         data.photo_url,
-        (sighting as any)._localImagePath ?? null,
+        (sighting as any)._localImagePaths ?? null,
         data.created_at, data.updated_at,
       ]
     ).catch(() => {});
@@ -207,14 +207,30 @@ export const SightingRepository = {
          LIMIT ? OFFSET ?`,
         [limit, page * limit]
       );
+      
+      const sightingIds = rows.map(r => r.id);
+      
+      let localReactions: any[] = [];
+      let localComments: any[] = [];
+      if (sightingIds.length > 0) {
+        const placeholders = sightingIds.map(() => '?').join(',');
+        localReactions = await db.getAllAsync<any>(
+          `SELECT sighting_id, user_id FROM reactions WHERE sighting_id IN (${placeholders})`,
+          sightingIds
+        );
+        localComments = await db.getAllAsync<any>(
+          `SELECT id, sighting_id FROM comments WHERE sighting_id IN (${placeholders})`,
+          sightingIds
+        );
+      }
+
       return rows.map(r => ({
         ...r,
-        // Prefiere path local para imagen
         photo_url: r.local_photo_path ?? r.photo_url,
         user: { id: r.user_id, username: r.username, fullname: r.fullname, profile_pic_url: r.profile_pic_url, is_verified: r.is_verified },
         bird: r.common_name ? { id: r.bird_id, common_name: r.common_name, scientific_name: r.scientific_name } : null,
-        reactions: [],
-        comments: [],
+        reactions: localReactions.filter(react => react.sighting_id === r.id),
+        comments: localComments.filter(comment => comment.sighting_id === r.id),
       }));
     }
 

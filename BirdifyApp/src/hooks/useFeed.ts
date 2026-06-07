@@ -13,12 +13,20 @@ interface FeedCache {
   userId?: string;
 }
 
-function mapSightingToPost(sighting: any, currentUserId?: string): Post {
-  const timeDiff = Date.now() - new Date(sighting.created_at).getTime();
-  const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60));
-  const timeAgoStr = hoursAgo < 24
-    ? (hoursAgo === 0 ? 'Hace un momento' : `Hace ${hoursAgo} hora${hoursAgo === 1 ? '' : 's'}`)
-    : `Hace ${Math.floor(hoursAgo/24)} día${Math.floor(hoursAgo/24) === 1 ? '' : 's'}`;
+export function mapSightingToPost(sighting: any, currentUserId?: string): Post {
+  const timeDiff = Math.max(0, Date.now() - new Date(sighting.created_at).getTime());
+  const minutesAgo = Math.floor(timeDiff / (1000 * 60));
+  const hoursAgo = Math.floor(minutesAgo / 60);
+  const daysAgo = Math.floor(hoursAgo / 24);
+
+  let timeAgoStr = 'Hace un momento';
+  if (minutesAgo > 0 && minutesAgo < 60) {
+    timeAgoStr = `Hace ${minutesAgo} min`;
+  } else if (hoursAgo >= 1 && hoursAgo < 24) {
+    timeAgoStr = `Hace ${hoursAgo} hora${hoursAgo === 1 ? '' : 's'}`;
+  } else if (daysAgo >= 1) {
+    timeAgoStr = `Hace ${daysAgo} día${daysAgo === 1 ? '' : 's'}`;
+  }
 
   const reactionsList = sighting.reactions || [];
   const likesCount = reactionsList.length;

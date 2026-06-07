@@ -210,6 +210,9 @@ services:
       REGION: local
       GLOBAL_S3_BUCKET: stub
       ENABLE_IMAGE_TRANSFORMATION: "true"
+      DB_SCHEMA: storage
+      SCHEMA: storage
+      PGRST_DB_SCHEMA: storage
     volumes:
       - storage-data:/var/lib/storage
 

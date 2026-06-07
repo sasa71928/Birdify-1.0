@@ -19,9 +19,12 @@ import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { createStyles } from '../../styles/screens/main/feedScreen.styles';
 import { useAuth } from '../../context/AuthContext';
 import { deletePendingSighting } from '../../services/syncService';
+import FeedItem from '../../components/FeedItem';
+import { mapSightingToPost } from '../../hooks/useFeed';
 
 interface LocalSighting {
   id: string;
+  user_id: string;
   bird_id: string;
   description: string | null;
   latitude: number | null;
@@ -35,112 +38,7 @@ interface LocalSighting {
   scientific_name: string | null;
 }
 
-const SyncBadge = ({ status }: { status: string | null }) => {
-  const isPending = status !== 'synced';
-  return (
-    <View style={[styles.badge, isPending ? styles.badgePending : styles.badgeSynced]}>
-      <Ionicons
-        name={isPending ? 'cloud-upload-outline' : 'cloud-done-outline'}
-        size={12}
-        color={isPending ? '#92400e' : '#166534'}
-      />
-      <Text style={[styles.badgeText, isPending ? styles.badgeTextPending : styles.badgeTextSynced]}>
-        {isPending ? 'Pendiente' : 'Sincronizado'}
-      </Text>
-    </View>
-  );
-};
-
-const SightingCard = ({ item, onDelete, }: { item: LocalSighting; onDelete: (id: string) => void; }) =>{
-  const date = item.sighting_date
-    ? new Date(item.sighting_date).toLocaleDateString('es-MX', {
-        day: '2-digit', month: 'short', year: 'numeric',
-      })
-    : item.created_at
-    ? new Date(item.created_at).toLocaleDateString('es-MX', {
-        day: '2-digit', month: 'short', year: 'numeric',
-      })
-    : 'Fecha desconocida';
-
-  const photoUri = item.local_photo_path ?? item.photo_url;
-  const isPending = item.sync_status !== 'synced';
-
-  const handleDelete = () => {
-    Alert.alert(
-      'Eliminar avistamiento',
-      '¿Seguro que quieres eliminar este avistamiento? No se ha sincronizado aún.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => onDelete(item.id),
-        },
-      ]
-    );
-  };
-
-
-  return (
-    <View style={styles.card}>
-      {photoUri ? (
-        <Image source={{ uri: photoUri }} style={styles.photo} resizeMode="cover" />
-      ) : (
-        <View style={[styles.photo, styles.photoPlaceholder]}>
-          <Ionicons name="image-outline" size={36} color={Colors.textSecondary} />
-        </View>
-      )}
-
-      <View style={styles.cardBody}>
-        <View style={styles.cardHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.birdName} numberOfLines={1}>
-              {item.common_name ?? 'Ave desconocida'}
-            </Text>
-            {item.scientific_name ? (
-              <Text style={styles.scientificName} numberOfLines={1}>
-                {item.scientific_name}
-              </Text>
-            ) : null}
-          </View>
-          <SyncBadge status={item.sync_status} />
-        </View>
-
-        {item.description ? (
-          <Text style={styles.description} numberOfLines={2}>
-            {item.description}
-          </Text>
-        ) : null}
-
-        <View style={styles.cardFooter}>
-          {item.latitude && item.longitude ? (
-            <View style={styles.footerItem}>
-              <Ionicons name="location-outline" size={13} color={Colors.textSecondary} />
-              <Text style={styles.footerText}>
-                {item.latitude.toFixed(4)}, {item.longitude.toFixed(4)}
-              </Text>
-            </View>
-          ) : null}
-          <View style={styles.footerItem}>
-            <Ionicons name="calendar-outline" size={13} color={Colors.textSecondary} />
-            <Text style={styles.footerText}>{date}</Text>
-          </View>
-        </View>
-
-        {isPending && (
-          <TouchableOpacity
-            onPress={handleDelete}
-            style={styles.deleteButton}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="trash-outline" size={14} color="#b91c1c" />
-            <Text style={styles.deleteText}>Eliminar</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
-  );
-};
+// SightingCard and SyncBadge removed in favor of FeedItem
 
 export default function OfflineFeedScreen() {
   const { colors, isDark } = useDynamicStyles(createStyles);
@@ -154,7 +52,7 @@ export default function OfflineFeedScreen() {
     try {
       const rows = await db.getAllAsync<LocalSighting>(`
         SELECT
-          s.id, s.bird_id, s.description, s.latitude, s.longitude,
+          s.id, s.user_id, s.bird_id, s.description, s.latitude, s.longitude,
           s.photo_url, s.local_photo_path, s.sighting_date, s.created_at, s.sync_status,
           b.common_name, b.scientific_name
         FROM sightings s
@@ -221,9 +119,27 @@ export default function OfflineFeedScreen() {
         <FlatList
           data={sightings}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <SightingCard item={item} onDelete={handleDelete} />
-          )}
+          renderItem={({ item }) => {
+            const mappedPost = mapSightingToPost(
+              {
+                ...item,
+                photo_url: item.local_photo_path ?? item.photo_url,
+                users: { username: 'Yo', fullname: (user as any)?.user_metadata?.fullname, profile_pic_url: (user as any)?.user_metadata?.profile_pic_url },
+                birds: { common_name: item.common_name, scientific_name: item.scientific_name },
+                reactions: [],
+                comments: []
+              },
+              user?.id
+            );
+            mappedPost.syncStatus = item.sync_status === 'synced' ? 'synced' : 'pending';
+
+            return (
+              <FeedItem
+                post={mappedPost}
+                onPostDeleted={() => handleDelete(item.id)}
+              />
+            );
+          }}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           refreshControl={

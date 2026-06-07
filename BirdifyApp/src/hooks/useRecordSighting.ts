@@ -95,8 +95,11 @@ export function useRecordSighting(editingSightingId?: string) {
   const isLocked = useMemo(() => {
     if (!createdAt) return false;
     if (!isEditMode) return false;
+    // Si el estado es pending (sólo disponible si se cargó offline), omitir el bloqueo
+    if (editingSighting?.sync_status === 'pending') return false;
+
     return Date.now() - createdAt.getTime() > EDIT_LIMIT_MINUTES * 60000;
-  }, [isEditMode, createdAt]);
+  }, [isEditMode, createdAt, editingSighting?.sync_status]);
 
   const canEdit = !isLocked;
 
@@ -104,6 +107,29 @@ export function useRecordSighting(editingSightingId?: string) {
     if (!editingSightingId) return;
 
     const loadSighting = async () => {
+      if (!isOnline) {
+        // Cargar desde SQLite si no hay conexión
+        const db = require('../lib/database').default;
+        try {
+          const row = await db.getFirstAsync(
+            `SELECT s.*, b.common_name, b.scientific_name 
+             FROM sightings s 
+             LEFT JOIN birds b ON b.id = s.bird_id 
+             WHERE s.id = ?`,
+            [editingSightingId]
+          );
+          if (row) {
+            setEditingSighting({
+              ...row,
+              birds: { common_name: row.common_name, scientific_name: row.scientific_name }
+            });
+          }
+        } catch (e) {
+          console.error('Error loading offline sighting:', e);
+        }
+        return;
+      }
+
       const { data, error } = await supabase
         .from('sightings')
         .select(`*, 
@@ -326,7 +352,7 @@ export function useRecordSighting(editingSightingId?: string) {
     // ── FLUJO OFFLINE ──────────────────────────────────────────────
     if (!isOnline) {
       const sightingId = generateId();
-      const localPhotoUrl = imageUris[0] ?? null;
+      const localPhotoUrls = imageUris.length > 0 ? JSON.stringify(imageUris) : null;
 
       // Fix Bug 1: guardar ave en SQLite 
       let localBirdId: string | null = null;
@@ -360,8 +386,8 @@ export function useRecordSighting(editingSightingId?: string) {
           region.latitude,
           region.longitude,
           isPrivate ? 1 : 0,
-          localPhotoUrl,   // photo_url inicial = path local
-          localPhotoUrl,   // local_photo_path = siempre el path del dispositivo
+          localPhotoUrls,   // photo_url inicial = array de paths locales
+          localPhotoUrls,   // local_photo_path = siempre array de paths del dispositivo
           new Date().toISOString(),
           new Date().toISOString(),
         ]
@@ -377,7 +403,7 @@ export function useRecordSighting(editingSightingId?: string) {
         is_location_private: isPrivate,
         sighting_date: new Date().toISOString(),
         created_at: new Date().toISOString(),
-        _localImagePath: localPhotoUrl,
+        _localImagePaths: localPhotoUrls,
         _birdName: birdName,
         _scientificName: selectedBird?.scientific_name ?? null,
       });
@@ -427,7 +453,7 @@ export function useRecordSighting(editingSightingId?: string) {
           const arrayBuffer = decodeBase64ToArrayBuffer(base64);
 
           const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('Sightings')
+            .from('sightings')
             .upload(fileName, arrayBuffer, {
               contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
               upsert: true,
@@ -438,7 +464,7 @@ export function useRecordSighting(editingSightingId?: string) {
           }
 
           const { data: { publicUrl } } = supabase.storage
-            .from('Sightings')
+            .from('sightings')
             .getPublicUrl(fileName);
 
           photoUrls.push(publicUrl);
@@ -462,7 +488,7 @@ export function useRecordSighting(editingSightingId?: string) {
           ...sightingData,
           user_id: user.id,
           sighting_date: new Date().toISOString(),
-          _localImagePath: imageUris[0] ?? null,
+          _localImagePaths: imageUris.length > 0 ? JSON.stringify(imageUris) : null,
         } as any);
         showToast('¡Avistamiento publicado con éxito!', 'success');
       }

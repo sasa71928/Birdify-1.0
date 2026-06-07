@@ -42,6 +42,7 @@ export interface Post {
   latitude?: number;
   longitude?: number;
   city?: string;
+  syncStatus?: 'pending' | 'synced';
 }
 
 interface FeedItemProps {
@@ -436,7 +437,7 @@ const handleDeleteSighting = async () => {
   const now = new Date();
   const diffMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
 
-  if (diffMinutes > 10) {
+  if (diffMinutes > 10 && post.syncStatus !== 'pending') {
     resetOptionsModal();
     setTimeout(() => {
       Alert.alert(
@@ -537,14 +538,36 @@ const handleDeleteSighting = async () => {
             navigation.navigate('Profile', { userId: post.userId });
           }}
         >
-          <Image source={{ uri: post.userAvatar }} style={styles.avatar} fadeDuration={0} />
+          {!post.syncStatus && (
+            <Image source={{ uri: post.userAvatar }} style={styles.avatar} fadeDuration={0} />
+          )}
           <View style={styles.userText}>
-            <View style={styles.nameRow}>
-              <Text style={styles.username}>{post.username}</Text>
-              {post.isVerified && (
-                <Ionicons name="checkmark-circle" size={16} color={colors.primary} style={styles.verifiedIcon} />
-              )}
-            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.username} numberOfLines={1}>
+                  {post.username}
+                </Text>
+                {post.isVerified && (
+                  <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />
+                )}
+                {post.syncStatus && (
+                  <View style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 99, paddingHorizontal: 6, paddingVertical: 2,
+                    backgroundColor: post.syncStatus === 'pending' ? '#fef3c7' : '#dcfce7'
+                  }}>
+                    <Ionicons
+                      name={post.syncStatus === 'pending' ? 'cloud-upload-outline' : 'cloud-done-outline'}
+                      size={12}
+                      color={post.syncStatus === 'pending' ? '#92400e' : '#166534'}
+                    />
+                    <Text style={{
+                      fontSize: 10, fontFamily: 'PlusJakartaSans-SemiBold',
+                      color: post.syncStatus === 'pending' ? '#92400e' : '#166534'
+                    }}>
+                      {post.syncStatus === 'pending' ? 'Pendiente' : 'Sincronizado'}
+                    </Text>
+                  </View>
+                )}
+              </View>
             <TouchableOpacity onPress={() => {
               if (post.latitude && post.longitude) {
                 const targetSighting = {

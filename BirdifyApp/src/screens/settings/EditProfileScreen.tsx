@@ -24,7 +24,7 @@ import { useAuth } from '../../context/AuthContext';
 import { ProfileRepository } from '../../repositories/profile.repository';
 import { supabase } from '../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
-import { handleError } from '../../utils/errorHandler';
+import { handleError, showSuccess } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
 
 function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
@@ -212,7 +212,7 @@ export default function EditProfileScreen() {
         .getPublicUrl(fileName);
 
       setAvatar(publicUrl);
-      handleError('Foto de perfil cargada correctamente', setToast, '¡Éxito!');
+      showSuccess('Foto de perfil cargada correctamente', setToast);
     } catch (error: any) {
       handleError(error, setToast, `Detalle técnico: ${error.message || error.error_description || 'Problema de red o de permisos del bucket.'}`);
     } finally {
@@ -289,7 +289,7 @@ export default function EditProfileScreen() {
 
       if (authError) throw authError;
 
-      handleError('Tu perfil ha sido actualizado correctamente', setToast, '¡Éxito!');
+      showSuccess('Tu perfil ha sido actualizado correctamente', setToast);
       navigation.goBack();
     } catch (error: any) {
       handleError(error, setToast, error.message || 'Ocurrió un problema guardando los cambios');

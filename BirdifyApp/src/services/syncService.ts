@@ -10,11 +10,25 @@ export function generateId(): string {
   return uuidv4();
 }
 
+export function initNetworkListener() {
+  NetInfo.addEventListener(state => {
+    isOnline = !!state.isConnected;
+    if (isOnline) {
+      flushSyncQueue().catch(console.error);
+    }
+  });
+  NetInfo.fetch().then(state => {
+    isOnline = !!state.isConnected;
+    if (isOnline) {
+      flushSyncQueue().catch(console.error);
+    }
+  });
+}
 
 export async function addToQueue(
   tableName: string,
-  operation: 'INSERT' | 'UPDATE' | 'DELETE',
-  payload: object
+  operation: 'INSERT' | 'UPDATE' | 'DELETE' | 'DELETE_REACTION',
+  payload: any
 ) {
   const id = generateId();
   await db.runAsync(
@@ -63,11 +77,12 @@ export async function flushSyncQueue() {
     let error = null;
 
     try {
-      if (row.table_name === 'sightings' && row.operation === 'INSERT' && payload._localImagePath) {
-        const { _localImagePath, _birdName, _scientificName, ...sightingData } = payload;
-
-        // 1. Buscar o crear ave en Supabase
-        let finalBirdId = sightingData.bird_id;
+      if (row.table_name === 'sightings') {
+        const { _localImagePaths, _localImagePath, _birdName, _scientificName, ...sightingData } = payload;
+        
+        if (row.operation === 'INSERT') {
+          // 1. Buscar o crear ave en Supabase
+          let finalBirdId = sightingData.bird_id;
         const { data: birds } = await supabase
           .from('birds')
           .select('id')
@@ -94,33 +109,54 @@ export async function flushSyncQueue() {
         }
 
         // 2. Subir imagen a Supabase Storage
-        const ext = _localImagePath.split('.').pop() || 'jpg';
-        const fileName = `${sightingData.user_id}/${Date.now()}.${ext}`;
-        const base64 = await fetch(_localImagePath)
-          .then(r => r.blob())
-          .then(blob => new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve((reader.result as string).split(',')[1]);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          }));
+        let photoUrls: string[] = [];
+          if (_localImagePaths || _localImagePath) {
+            let pathsArray: string[] = [];
+            
+            try {
+              if (_localImagePaths) {
+                pathsArray = JSON.parse(_localImagePaths);
+              } else if (_localImagePath) {
+                pathsArray = [_localImagePath];
+              }
+            } catch {
+              pathsArray = [_localImagePaths || _localImagePath]; // fallback
+            }
 
-        const arrayBuffer = decodeBase64ToArrayBuffer(base64);
-        const { error: uploadError } = await supabase.storage
-          .from('Sightings')
-          .upload(fileName, arrayBuffer, {
-            contentType: `image/${ext === 'png' ? 'png' : 'jpeg'}`,
-            upsert: true,
-          });
-        if (uploadError) throw uploadError;
+            for (let i = 0; i < pathsArray.length; i++) {
+              const path = pathsArray[i];
+              const ext = path.split('.').pop() || 'jpg';
+              const fileName = `${sightingData.user_id}/${Date.now()}_${i}.${ext}`;
+              const base64 = await fetch(path)
+                .then(r => r.blob())
+                .then(blob => new Promise<string>((resolve, reject) => {
+                  const reader = new FileReader();
+                  reader.onload = () => resolve((reader.result as string).split(',')[1]);
+                  reader.onerror = reject;
+                  reader.readAsDataURL(blob);
+                }));
 
-        const { data: { publicUrl } } = supabase.storage.from('Sightings').getPublicUrl(fileName);
+              const arrayBuffer = decodeBase64ToArrayBuffer(base64);
+              const { error: uploadError } = await supabase.storage
+                .from('sightings')
+                .upload(fileName, arrayBuffer, {
+                  contentType: `image/${ext === 'png' ? 'png' : 'jpeg'}`,
+                  upsert: true,
+                });
+              if (uploadError) throw uploadError;
+
+              const { data: { publicUrl } } = supabase.storage.from('sightings').getPublicUrl(fileName);
+              photoUrls.push(publicUrl);
+            }
+          }
+
+          const finalPhotoUrl = photoUrls.length === 1 ? photoUrls[0] : (photoUrls.length > 1 ? JSON.stringify(photoUrls) : null);
 
         // 3. Insertar sighting en Supabase
         ({ error } = await supabase.from('sightings').upsert({
           ...sightingData,
           bird_id: finalBirdId,
-          photo_url: publicUrl,
+          photo_url: finalPhotoUrl,
         }, { onConflict: 'id' }));
 
         if (!error) {
@@ -135,17 +171,28 @@ export async function flushSyncQueue() {
             `UPDATE sightings
              SET photo_url = ?, sync_status = 'synced', bird_id = ?
              WHERE id = ?`,
-            [publicUrl, finalBirdId, sightingData.id]
+            [finalPhotoUrl, finalBirdId, sightingData.id]
           );
         }
-
+        } else if (row.operation === 'UPDATE') {
+          ({ error } = await supabase.from('sightings').update(sightingData).eq('id', sightingData.id));
+        } else if (row.operation === 'DELETE') {
+          ({ error } = await supabase.from('sightings').delete().eq('id', sightingData.id));
+        }
       } else {
         if (row.operation === 'INSERT') {
           ({ error } = await supabase.from(row.table_name).insert(payload));
+          // Notificar owner si es un comentario
+          if (!error && row.table_name === 'comments') {
+            const { CommentRepository } = await import('../repositories/comment.repository');
+            CommentRepository.notifyOwner(payload.sighting_id, payload.user_id, payload.content).catch(() => {});
+          }
         } else if (row.operation === 'UPDATE') {
           ({ error } = await supabase.from(row.table_name).update(payload).eq('id', payload.id));
         } else if (row.operation === 'DELETE') {
           ({ error } = await supabase.from(row.table_name).delete().eq('id', payload.id));
+        } else if (row.operation === 'DELETE_REACTION') {
+          ({ error } = await supabase.from('reactions').delete().match({ sighting_id: payload.sighting_id, user_id: payload.user_id }));
         }
       }
 

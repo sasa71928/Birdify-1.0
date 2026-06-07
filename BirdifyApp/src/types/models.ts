@@ -23,6 +23,7 @@ export interface Bird {
   season: string | null;
   habitat_info: string | null;
   ideal_zones: string | null;
+  image_url: string | null;
 }
 
 export interface Sighting {
