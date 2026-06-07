@@ -12,6 +12,7 @@ interface AppToastProps {
   topOffset?: number;
   containerStyle?: ViewStyle;
   onClose?: () => void;
+  onPress?: () => void;
 }
 
 export default function AppToast({
@@ -22,6 +23,7 @@ export default function AppToast({
   topOffset,
   containerStyle,
   onClose,
+  onPress,
 }: AppToastProps) {
   if (!visible) return null;
 
@@ -29,9 +31,12 @@ export default function AppToast({
 
   return (
     <TouchableOpacity
-      activeOpacity={onClose ? 0.9 : 1}
-      disabled={!onClose}
-      onPress={onClose}
+      activeOpacity={(onClose || onPress) ? 0.9 : 1}
+      disabled={!(onClose || onPress)}
+      onPress={() => {
+        if (onPress) onPress();
+        else if (onClose) onClose();
+      }}
       style={[
         {
           backgroundColor,

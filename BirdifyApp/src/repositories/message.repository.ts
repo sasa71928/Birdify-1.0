@@ -118,19 +118,20 @@ export const MessageRepository = {
     content?: string | null;
     imageUrl?: string | null;
     replyToId?: string | null;
-  }): Promise<void> {
+  }): Promise<any> {
     const { conversationId, senderId, content, imageUrl, replyToId } = params;
-    const { error } = await supabase.from('messages').insert({
+    const { data, error } = await supabase.from('messages').insert({
       conversation_id: conversationId,
       sender_id: senderId,
       content: content ?? null,
       image_url: imageUrl ?? null,
       reply_to_id: replyToId ?? null,
-    });
+    }).select().single();
     if (error) throw error;
 
     // Notificar a otros participantes
     this.notifyRecipients(conversationId, senderId, content).catch(() => {});
+    return data;
   },
 
   async notifyRecipients(conversationId: string, senderId: string, content: string | null | undefined): Promise<void> {

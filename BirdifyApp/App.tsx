@@ -2,6 +2,7 @@ import 'react-native-get-random-values';
 import React, { useEffect } from 'react';
 import { initDatabase } from './src/lib/database';
 import { initNetworkListener } from './src/services/syncService';
+import { initSupabaseClient } from './src/lib/supabase';
 import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -25,6 +26,7 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import { AuthProvider } from './src/context/AuthContext';
 import { NewSightingsProvider } from './src/context/NewSightingsContext';
 import { UnreadMessagesProvider } from './src/context/UnreadMessagesContext';
+import { InteractionsProvider } from './src/context/InteractionsContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { OfflineProvider } from './src/navigation/AppNavigator';
 
@@ -54,9 +56,10 @@ export default function App() {
   });
 
     useEffect(() => {
-    initDatabase()
-      .then(() => console.log('✅ SQLite inicializado'))
-      .catch(e => console.error('❌ Error al inicializar SQLite:', e));
+    initSupabaseClient()
+      .then(() => initDatabase())
+      .then(() => console.log('✅ SQLite e inicialización de Supabase listas'))
+      .catch(e => console.error('❌ Error al inicializar:', e));
 
     initNetworkListener();
   }, []);
@@ -77,7 +80,9 @@ export default function App() {
             <UnreadMessagesProvider>
               <OfflineProvider>
                 <NavigationContainer>
-                  <AppNavigator />
+                  <InteractionsProvider>
+                    <AppNavigator />
+                  </InteractionsProvider>
                 </NavigationContainer>
               </OfflineProvider>
             </UnreadMessagesProvider>

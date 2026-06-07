@@ -131,20 +131,25 @@ export function useFeed() {
   useEffect(() => {
     initialLoad();
 
-    // Sincronización en "tiempo real" periódica (cada 3.5 minutos = 210,000 ms)
+    // Sincronización en "tiempo real" periódica (cada 1 minuto = 60,000 ms)
     // para actualizar silenciosamente comentarios y reacciones en el feed
     const intervalId = setInterval(() => {
       loadFeed(true);
-    }, 210000);
+    }, 60000);
 
     // Recargar feed cuando la cola offline termina de sincronizarse
     const syncListener = DeviceEventEmitter.addListener('sync_completed', () => {
       loadFeed(true);
     });
 
+    const refreshListener = DeviceEventEmitter.addListener('refresh_feed', () => {
+      loadFeed(true);
+    });
+
     return () => {
       clearInterval(intervalId);
       syncListener.remove();
+      refreshListener.remove();
     };
   }, []);
 

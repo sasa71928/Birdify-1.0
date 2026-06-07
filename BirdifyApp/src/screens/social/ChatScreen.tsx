@@ -292,6 +292,7 @@ export default function ChatScreen() {
     fetchMessages,
     hasMoreMap,
     loadMoreMessages,
+    appendRealtimeMessage,
   } = useUnreadMessages();
 
   // ── Mensajes desde el contexto global (única fuente de verdad) ─────────────
@@ -912,13 +913,16 @@ export default function ChatScreen() {
     setReplyingTo(null);
 
     try {
-      await MessageRepository.send({
+      const newMessage = await MessageRepository.send({
         conversationId,
         senderId: user.id,
         content: text || null,
         imageUrl: imageToSend || null,
         replyToId,
       });
+      // Append the message optimistically
+      appendRealtimeMessage(conversationId, newMessage);
+
       requestAnimationFrame(() => {
         listRef.current?.scrollToEnd({ animated: true });
       });

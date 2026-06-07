@@ -51,6 +51,10 @@ const SETTING_SECTIONS: SettingSection[] = [
     ],
   },
   {
+    title: 'Developer',
+    data: [{ id: '9', icon: 'server-outline', label: 'Server Configuration' }],
+  },
+  {
     title: 'Actions',
     data: [{ id: '8', icon: 'log-out-outline', label: 'Log Out', danger: true }],
   },
@@ -124,6 +128,8 @@ export default function SettingsScreen() {
       navigation.navigate('AboutBirdify' as any);
     } else if (item.id === 'verify') {
       setVerificationModalVisible(true);
+    } else if (item.id === '9') {
+      navigation.navigate('ServerConfig' as any);
     } else {
       console.log(`Navigating to ${item.label}`);
     }

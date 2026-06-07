@@ -68,6 +68,12 @@ function FeedItem({ post, onPostDeleted, onNavigateAway, isNew }: FeedItemProps)
   const [likesCount, setLikesCount] = React.useState(post.likes);
   const [commentsCount, setCommentsCount] = React.useState(post.comments);
   const [commentsList, setCommentsList] = React.useState<Comment[]>([]);
+
+  React.useEffect(() => {
+    setLiked(post.hasLiked || false);
+    setLikesCount(post.likes);
+    setCommentsCount(post.comments);
+  }, [post.hasLiked, post.likes, post.comments]);
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [showHeartAnimation, setShowHeartAnimation] = React.useState(false);
   const heartScale = React.useRef(new Animated.Value(0)).current;
@@ -163,10 +169,10 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     let intervalId: NodeJS.Timeout;
     if (showComments) {
       loadComments();
-      // Refrescar silenciosamente los comentarios cada 3.5 minutos (210,000 ms)
+      // Refrescar silenciosamente los comentarios cada 1 minuto (60,000 ms)
       intervalId = setInterval(() => {
         loadComments(false); // asumiendo que loadComments puede tomar un flag para no mostrar loading, o simplemente llamarlo
-      }, 210000);
+      }, 60000);
     }
     return () => {
       if (intervalId) clearInterval(intervalId);

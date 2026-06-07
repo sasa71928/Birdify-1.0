@@ -53,7 +53,6 @@ export const createStyles = (colors: any) => StyleSheet.create({
   postImage: {
     width: '100%',
     height: '100%',
-    borderRadius: Radius.lg,
   },
   tagBadge: {
     position: 'absolute',

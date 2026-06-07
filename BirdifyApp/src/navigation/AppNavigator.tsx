@@ -34,6 +34,7 @@ import ThemeSettingsScreen from '../screens/settings/ThemeSettingsScreen';
 import HelpSupportScreen from '../screens/settings/HelpSupportScreen';
 import AboutBirdifyScreen from '../screens/settings/AboutBirdifyScreen';
 import BlockedUsersScreen from '../screens/settings/BlockedUsersScreen';
+import ServerConfigScreen from '../screens/settings/ServerConfigScreen';
 import { useAuth } from '../context/AuthContext';
 
 // ── OfflineContext ─────────────────────────────────────────────────────────────
@@ -98,6 +99,7 @@ export type RootStackParamList = {
   ThemeSettings: undefined;
   HelpSupport: undefined;
   AboutBirdify: undefined;
+  ServerConfig: undefined;
   MainTabs: { screen?: string; params?: { searchQuery?: string } };
 };
 
@@ -204,6 +206,7 @@ export default function AppNavigator() {
           <Stack.Screen name="ThemeSettings"        component={ThemeSettingsScreen} />
           <Stack.Screen name="HelpSupport"          component={HelpSupportScreen} />
           <Stack.Screen name="AboutBirdify"         component={AboutBirdifyScreen} />
+          <Stack.Screen name="ServerConfig"         component={ServerConfigScreen} />
         </>
       )}
     </Stack.Navigator>

@@ -30,6 +30,7 @@ export default {
           apiKey: process.env.GOOGLE_MAPS_API_KEY || 'YOUR_GOOGLE_MAPS_API_KEY',
         },
       },
+      usesCleartextTraffic: true,
       newArchEnabled: true,
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
