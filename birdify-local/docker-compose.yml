@@ -116,7 +116,13 @@ services:
       GOTRUE_SITE_URL: http://${TU_IP_LOCAL}:3000
       GOTRUE_JWT_SECRET: ${JWT_SECRET}
       GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
       GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_SMTP_ADMIN_EMAIL: noreply@birdify.local
+      GOTRUE_SMTP_HOST: inbucket
+      GOTRUE_SMTP_PORT: 2500
+      GOTRUE_SMTP_SENDER_NAME: Birdify Local
+      GOTRUE_MAILER_AUTOCONFIRM: "false"
 
   rest:
     image: postgrest/postgrest:v11.2.0
@@ -176,7 +182,10 @@ services:
     environment:
       PG_META_PORT: 8080
       PG_META_DB_HOST: db-primary
-      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: ${POSTGRES_DB}
+      PG_META_DB_USER: postgres
+      PG_META_DB_PASSWORD: "postgres"
 
   storage:
     image: supabase/storage-api:v0.43.0
@@ -193,7 +202,7 @@ services:
       SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       JWT_SECRET: ${JWT_SECRET}
       PGRST_JWT_SECRET: ${JWT_SECRET}
-      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db-primary:5432/${POSTGRES_DB}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db-primary:5432/${POSTGRES_DB}?search_path=storage,public
       FILE_SIZE_LIMIT: 52428800
       STORAGE_BACKEND: file
       FILE_STORAGE_BACKEND_PATH: /var/lib/storage
@@ -215,11 +224,32 @@ services:
     ports:
       - "3000:3000"
     environment:
+      HOSTNAME: "0.0.0.0"
       STUDIO_PG_META_URL: http://meta:8080
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: db-primary
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
       DEFAULT_ORGANIZATION_NAME: ${DEFAULT_ORGANIZATION_NAME}
       DEFAULT_PROJECT_NAME: ${DEFAULT_PROJECT_NAME}
       SUPABASE_URL: http://kong:8000
       SUPABASE_PUBLIC_URL: http://${TU_IP_LOCAL}:8000
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      SNIPPETS_MANAGEMENT_FOLDER: /app/snippets
+      NEXT_PUBLIC_SITE_URL: http://${TU_IP_LOCAL}:3000
+      NEXT_ANALYTICS_BACKEND_PROVIDER: postgres
+    volumes:
+      - ./volumes/snippets:/app/snippets
+
+  inbucket:
+    image: inbucket/inbucket:3.0.3
+    container_name: supabase-inbucket
+    restart: unless-stopped
+    networks:
+      - birdify-net
+    ports:
+      - "9000:9000"
+      - "2500:2500"
+      - "1100:1100"

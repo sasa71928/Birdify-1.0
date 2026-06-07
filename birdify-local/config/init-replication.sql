@@ -18,8 +18,18 @@ GRANT ALL ON SCHEMA public TO authenticator;
 -- 4. Crear los esquemas vacíos para que Auth y Storage construyan sobre ellos
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS pgcrypto SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS pgjwt SCHEMA extensions;
 CREATE SCHEMA auth AUTHORIZATION supabase_auth_admin;
 CREATE SCHEMA storage AUTHORIZATION supabase_storage_admin;
+
+-- 4b. Configurar search_path y permisos para Auth
+ALTER ROLE supabase_auth_admin SET search_path TO auth, public, extensions;
+GRANT USAGE ON SCHEMA extensions TO supabase_auth_admin;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA extensions TO supabase_auth_admin;
+
+-- 4c. Cast implícito uuid→text (requerido por GoTrue migrations)
+CREATE CAST (uuid AS text) WITH INOUT AS IMPLICIT;
 
 -- 5. Configurar Replicación y Realtime
 CREATE USER replicator WITH REPLICATION ENCRYPTED PASSWORD 'replica123';

@@ -32,7 +32,7 @@ services:
       - name: storage-route
         paths:
           - /storage/v1
-        strip_path: false
+        strip_path: true
 
   - name: meta
     url: http://meta:8080
