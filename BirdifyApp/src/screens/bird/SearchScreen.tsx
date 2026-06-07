@@ -351,6 +351,53 @@ export default function SearchScreen() {
                 ))}
               </View>
             )}
+
+            {/* DEFAULT SUGGESTIONS */}
+            <View style={[styles.section, { marginTop: recentSearches.length > 0 ? 20 : 0 }]}>
+              <Text style={styles.sectionTitle}>
+                {activeTab === 'birds' ? 'Sugerencias de Aves' : 'Sugerencias de Usuarios'}
+              </Text>
+
+              {activeTab === 'birds' ? (
+                birds.slice(0, 10).map(bird => (
+                  <TouchableOpacity
+                    key={bird.id}
+                    style={styles.resultCard}
+                    activeOpacity={0.8}
+                    onPress={() => openBird(bird)}
+                  >
+                    <Image
+                      source={{ uri: bird.image }}
+                      style={styles.resultImage}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.resultTitle}>{bird.name}</Text>
+                      <Text style={styles.resultSubtitle}>{bird.scientificName}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                ))
+              ) : (
+                users.slice(0, 10).map(user => (
+                  <TouchableOpacity
+                    key={user.id}
+                    style={styles.resultCard}
+                    activeOpacity={0.8}
+                    onPress={() => openUser(user)}
+                  >
+                    <Image
+                      source={{ uri: user.profile_pic_url || 'https://gravatar.com/avatar/?d=mp' }}
+                      style={styles.userAvatar}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.resultTitle}>{user.fullname || user.username}</Text>
+                      <Text style={styles.resultSubtitle}>@{user.username}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
           </>
         )}
       </ScrollView>

@@ -16,15 +16,7 @@ import { handleError, showSuccess } from '../utils/errorHandler';
 
 type RecordSightingNavProp = NativeStackNavigationProp<RootStackParamList>;
 
-const MOCK_BIRDS_CATALOG = [
-  { id: '1', common_name: 'Cardenal Rojo', scientific_name: 'Cardinalis cardinalis' },
-  { id: '2', common_name: 'Azulejo', scientific_name: 'Cyanocitta cristata' },
-  { id: '3', common_name: 'Petirrobo Americano', scientific_name: 'Turdus migratorius' },
-  { id: '4', common_name: 'Colibrí Garganta Rubí', scientific_name: 'Archilochus colubris' },
-  { id: '5', common_name: 'Paloma Huilota', scientific_name: 'Zenaida macroura' },
-  { id: '6', common_name: 'Águila Calva', scientific_name: 'Haliaeetus leucocephalus' },
-  { id: '7', common_name: 'Zenzontle', scientific_name: 'Mimus polyglottos' },
-];
+
 
 // Decodificador nativo
 function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
@@ -59,6 +51,22 @@ export function useRecordSighting(editingSightingId?: string) {
   
   const isEditMode = !!editingSightingId;
   const [editingSighting, setEditingSighting] = useState<any>(null);
+  
+  const [dbBirdsCatalog, setDbBirdsCatalog] = useState<{ id: string, common_name: string, scientific_name: string }[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    BirdRepository.getAll().then(birds => {
+      if (mounted) {
+        setDbBirdsCatalog(birds.map(b => ({
+          id: b.id,
+          common_name: b.common_name,
+          scientific_name: b.scientific_name
+        })));
+      }
+    }).catch(e => console.error("Failed to load birds catalog", e));
+    return () => { mounted = false; };
+  }, []);
   
   const [birdName, setBirdName] = useState('');
   const [notes, setNotes] = useState('');
@@ -532,7 +540,7 @@ export function useRecordSighting(editingSightingId?: string) {
     });
   };
 
-  const filteredBirds = MOCK_BIRDS_CATALOG.filter(b => 
+  const filteredBirds = dbBirdsCatalog.filter(b => 
     b.common_name.toLowerCase().includes(birdName.toLowerCase()) || 
     b.scientific_name.toLowerCase().includes(birdName.toLowerCase())
   );
@@ -555,7 +563,6 @@ export function useRecordSighting(editingSightingId?: string) {
     isLocked,
     canEdit,
     filteredBirds,
-    MOCK_BIRDS_CATALOG,
     mapRef,
     panY,
     backdropOpacity,

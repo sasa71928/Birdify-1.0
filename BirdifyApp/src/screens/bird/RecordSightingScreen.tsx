@@ -122,7 +122,6 @@ export default function RecordSightingScreen({ route }: { route: any }) {
     isLocked,
     canEdit,
     filteredBirds,
-    MOCK_BIRDS_CATALOG,
     mapRef,
     panY,
     backdropOpacity,
@@ -327,19 +326,21 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                   shadowRadius: 8
                 }}>
                   <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                    {MOCK_BIRDS_CATALOG.filter(b => b.common_name.toLowerCase().includes(birdName.toLowerCase()) || b.scientific_name.toLowerCase().includes(birdName.toLowerCase())).map((bird) => (
+                    {filteredBirds.map((bird) => (
                       <TouchableOpacity
                         key={bird.id}
                         style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border + '20' }}
-                        onPress={() => handleBirdSelect(bird)}
+                        onPress={() => {
+                          handleBirdSelect(bird);
+                        }}
                       >
                         <Text style={{ fontSize: 15, fontWeight: '500', color: colors.textPrimary }}>{bird.common_name}</Text>
                         <Text style={{ fontSize: 13, color: colors.textSecondary, fontStyle: 'italic' }}>{bird.scientific_name}</Text>
                       </TouchableOpacity>
                     ))}
-                    {MOCK_BIRDS_CATALOG.filter(b => b.common_name.toLowerCase().includes(birdName.toLowerCase()) || b.scientific_name.toLowerCase().includes(birdName.toLowerCase())).length === 0 && (
+                    {filteredBirds.length === 0 && (
                       <View style={{ padding: 12 }}>
-                        <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>No se encontraron especies.</Text>
+                        <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>Crear "{birdName}" como nueva especie</Text>
                       </View>
                     )}
                   </ScrollView>
