@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useOffline } from '../navigation/AppNavigator';
 import { ReactionRepository } from '../repositories/reaction.repository';
 import { CommentRepository } from '../repositories/comment.repository';
 import { SightingRepository } from '../repositories/sighting.repository';
@@ -56,6 +57,7 @@ const CAPTION_LIMIT = 100;
 const INITIAL_COMMENTS_DISPLAY = 5;
 
 function FeedItem({ post, onPostDeleted, onNavigateAway, isNew }: FeedItemProps) {
+  const isOffline = useOffline();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const { user } = useAuth();
@@ -193,6 +195,11 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
       return;
     }
 
+    if (isOffline && post.syncStatus !== 'pending') {
+      showToast('No puedes interactuar con esta publicación sin conexión.', 'error');
+      return;
+    }
+
     try {
       const parentId = replyingTo ? (replyingTo.parentId || replyingTo.id) : null;
       let finalContent = commentText.trim();
@@ -222,6 +229,11 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleLike = async () => {
     if (!user) {
       Alert.alert('Inicia Sesión', 'Debes iniciar sesión para reaccionar a las publicaciones.');
+      return;
+    }
+
+    if (isOffline && post.syncStatus !== 'pending') {
+      showToast('No puedes interactuar con esta publicación sin conexión.', 'error');
       return;
     }
 
@@ -454,10 +466,7 @@ const handleDeleteSighting = async () => {
   if (diffMinutes > 10 && post.syncStatus !== 'pending') {
     resetOptionsModal();
     setTimeout(() => {
-      Alert.alert(
-        'No se puede eliminar',
-        'Solo puedes eliminar avistamientos dentro de los 10 minutos después de publicarlos.'
-      );
+      showToast('Solo puedes eliminar avistamientos dentro de los 10 minutos después de publicarlos.', 'error');
     }, 350);
     return;
   }
@@ -774,12 +783,14 @@ const handleDeleteSighting = async () => {
                       <Text style={styles.commentText}>{comment.text}</Text>
                     </View>
                     
-                    <TouchableOpacity 
-                      onPress={() => setReplyingTo({ id: comment.id, username: comment.username, parentId: null })}
-                      style={styles.replyButton}
-                    >
-                      <Text style={styles.replyButtonText}>Responder</Text>
-                    </TouchableOpacity>
+                    {!(isOffline && post.syncStatus !== 'pending') && (
+                      <TouchableOpacity 
+                        onPress={() => setReplyingTo({ id: comment.id, username: comment.username, parentId: null })}
+                        style={styles.replyButton}
+                      >
+                        <Text style={styles.replyButtonText}>Responder</Text>
+                      </TouchableOpacity>
+                    )}
                     
                     {comment.replies && comment.replies.length > 0 && (
                       <View style={styles.repliesContainer}>
@@ -810,12 +821,14 @@ const handleDeleteSighting = async () => {
                                   </TouchableOpacity>
                                   <Text style={styles.commentText}>{reply.text}</Text>
                                 </View>
-                                <TouchableOpacity 
-                                  onPress={() => setReplyingTo({ id: reply.id, username: reply.username, parentId: comment.id })}
-                                  style={styles.replyButton}
-                                >
-                                  <Text style={styles.replyButtonText}>Responder</Text>
-                                </TouchableOpacity>
+                                {!(isOffline && post.syncStatus !== 'pending') && (
+                                  <TouchableOpacity 
+                                    onPress={() => setReplyingTo({ id: reply.id, username: reply.username, parentId: comment.id })}
+                                    style={styles.replyButton}
+                                  >
+                                    <Text style={styles.replyButtonText}>Responder</Text>
+                                  </TouchableOpacity>
+                                )}
                               </View>
                             ))}
                           </View>
@@ -850,24 +863,32 @@ const handleDeleteSighting = async () => {
                 </View>
               )}
               <View style={styles.inputRow}>
-                <TextInput
-                  style={styles.commentInput}
-                  placeholder={replyingTo ? "Escribe una respuesta..." : "Añade un comentario..."}
-                  value={commentText}
-                  onChangeText={setCommentText}
-                  multiline
-                />
-                <TouchableOpacity 
-                  style={[styles.sendButton, !commentText.trim() && styles.sendButtonDisabled]}
-                  onPress={handleCommentSubmit}
-                  disabled={!commentText.trim()}
-                >
-                  <Ionicons 
-                    name="send" 
-                    size={20} 
-                    color={commentText.trim() ? Colors.primary : Colors.textSecondary} 
-                  />
-                </TouchableOpacity>
+                {isOffline && post.syncStatus !== 'pending' ? (
+                  <Text style={[styles.commentInput, { color: Colors.textSecondary, textAlignVertical: 'center', paddingTop: 12 }]}>
+                    Comentarios desactivados sin conexión
+                  </Text>
+                ) : (
+                  <>
+                    <TextInput
+                      style={styles.commentInput}
+                      placeholder={replyingTo ? "Escribe una respuesta..." : "Añade un comentario..."}
+                      value={commentText}
+                      onChangeText={setCommentText}
+                      multiline
+                    />
+                    <TouchableOpacity 
+                      style={[styles.sendButton, !commentText.trim() && styles.sendButtonDisabled]}
+                      onPress={handleCommentSubmit}
+                      disabled={!commentText.trim()}
+                    >
+                      <Ionicons 
+                        name="send" 
+                        size={20} 
+                        color={commentText.trim() ? Colors.primary : Colors.textSecondary} 
+                      />
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             </View>
             </KeyboardAvoidingView>

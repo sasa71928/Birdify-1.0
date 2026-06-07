@@ -216,11 +216,11 @@ export const SightingRepository = {
         const placeholders = sightingIds.map(() => '?').join(',');
         localReactions = await db.getAllAsync<any>(
           `SELECT sighting_id, user_id FROM reactions WHERE sighting_id IN (${placeholders})`,
-          sightingIds
+          ...sightingIds
         );
         localComments = await db.getAllAsync<any>(
           `SELECT id, sighting_id FROM comments WHERE sighting_id IN (${placeholders})`,
-          sightingIds
+          ...sightingIds
         );
       }
 
@@ -283,43 +283,64 @@ export const SightingRepository = {
       comments: item.comments || [],
     }));
 
-    // Cachear en SQLite — sin pisar local_photo_path ni birds locales
-    for (const item of formattedData) {
-      db.runAsync(
-        `INSERT INTO sightings
-          (id, user_id, bird_id, description, latitude, longitude,
-           is_location_private, photo_url, created_at, updated_at, sync_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')
-         ON CONFLICT(id) DO UPDATE SET
-           bird_id     = excluded.bird_id,
-           photo_url   = excluded.photo_url,
-           sync_status = 'synced',
-           updated_at  = excluded.updated_at`,
-        [
-          item.id, item.user_id, item.bird_id, item.description,
-          item.latitude, item.longitude, item.is_location_private ? 1 : 0,
-          item.photo_url, item.created_at, item.updated_at,
-        ]
-      ).catch(() => {});
+    // Cachear en SQLite en segundo plano bloqueando el retorno para asegurar que termine
+    await Promise.all(formattedData.map(async (item) => {
+      try {
+        await db.runAsync(
+          `INSERT INTO sightings
+            (id, user_id, bird_id, description, latitude, longitude,
+             is_location_private, photo_url, created_at, updated_at, sync_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')
+           ON CONFLICT(id) DO UPDATE SET
+             bird_id     = excluded.bird_id,
+             photo_url   = excluded.photo_url,
+             sync_status = 'synced',
+             updated_at  = excluded.updated_at`,
+          [
+            item.id, item.user_id, item.bird_id, item.description,
+            item.latitude, item.longitude, item.is_location_private ? 1 : 0,
+            item.photo_url, item.created_at, item.updated_at,
+          ]
+        );
 
-        // Cachear ave para que el JOIN funcione offline
         if (item.bird) {
           const bird = Array.isArray(item.bird) ? item.bird[0] : item.bird;
           if (bird) {
-            db.runAsync(
+            await db.runAsync(
               `INSERT OR REPLACE INTO birds (id, common_name, scientific_name) VALUES (?, ?, ?)`,
               [bird.id, bird.common_name, bird.scientific_name]
-            ).catch(() => {});
+            );
           }
         }
-      if (item.user) {
-        db.runAsync(
-          `INSERT OR REPLACE INTO users (id, username, fullname, profile_pic_url, is_verified)
-           VALUES (?, ?, ?, ?, ?)`,
-          [item.user.id, item.user.username, item.user.fullname, item.user.profile_pic_url, item.user.is_verified ? 1 : 0]
-        ).catch(() => {});
+        if (item.user) {
+          await db.runAsync(
+            `INSERT OR REPLACE INTO users (id, username, fullname, profile_pic_url, is_verified)
+             VALUES (?, ?, ?, ?, ?)`,
+            [item.user.id, item.user.username, item.user.fullname, item.user.profile_pic_url, item.user.is_verified ? 1 : 0]
+          );
+        }
+
+        if (item.reactions && item.reactions.length > 0) {
+          for (const react of item.reactions) {
+            await db.runAsync(
+              `INSERT OR IGNORE INTO reactions (user_id, sighting_id) VALUES (?, ?)`,
+              [react.user_id, item.id]
+            );
+          }
+        }
+
+        if (item.comments && item.comments.length > 0) {
+          for (const comm of item.comments) {
+            await db.runAsync(
+              `INSERT OR IGNORE INTO comments (id, sighting_id) VALUES (?, ?)`,
+              [comm.id, item.id]
+            );
+          }
+        }
+      } catch (err) {
+        console.error('Error caching item in getFeed:', err);
       }
-    }
+    }));
 
     return formattedData;
   },
@@ -338,13 +359,29 @@ export const SightingRepository = {
          LIMIT ? OFFSET ?`,
         [userId, limit, page * limit]
       );
+      const sightingIds = rows.map(r => r.id);
+      
+      let localReactions: any[] = [];
+      let localComments: any[] = [];
+      if (sightingIds.length > 0) {
+        const placeholders = sightingIds.map(() => '?').join(',');
+        localReactions = await db.getAllAsync<any>(
+          `SELECT sighting_id, user_id FROM reactions WHERE sighting_id IN (${placeholders})`,
+          ...sightingIds
+        );
+        localComments = await db.getAllAsync<any>(
+          `SELECT id, sighting_id FROM comments WHERE sighting_id IN (${placeholders})`,
+          ...sightingIds
+        );
+      }
+
       return rows.map(r => ({
         ...r,
         photo_url: r.local_photo_path ?? r.photo_url,
         user: { id: r.user_id, username: r.username, fullname: r.fullname, profile_pic_url: r.profile_pic_url, is_verified: r.is_verified },
         bird: r.common_name ? { id: r.bird_id, common_name: r.common_name, scientific_name: r.scientific_name } : null,
-        reactions: [],
-        comments: [],
+        reactions: localReactions.filter(react => react.sighting_id === r.id),
+        comments: localComments.filter(comment => comment.sighting_id === r.id),
       }));
     }
 
@@ -373,13 +410,66 @@ export const SightingRepository = {
 
     const formattedData = data?.map(item => ({
       ...item,
-      user: item.users,
+      user: Array.isArray(item.users) ? item.users[0] : item.users,
       bird: item.birds,
       reactions: item.reactions || [],
       comments: item.comments || [],
+    })) || [];
+
+    // Cachear en SQLite bloqueando el retorno para asegurar que termine
+    await Promise.all(formattedData.map(async (item) => {
+      try {
+        await db.runAsync(
+          `INSERT INTO sightings
+            (id, user_id, bird_id, description, latitude, longitude,
+             is_location_private, photo_url, created_at, updated_at, sync_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')
+           ON CONFLICT(id) DO UPDATE SET
+             bird_id     = excluded.bird_id,
+             photo_url   = excluded.photo_url,
+             sync_status = 'synced',
+             updated_at  = excluded.updated_at`,
+          [
+            item.id, item.user_id, item.bird_id, item.description,
+            item.latitude, item.longitude, item.is_location_private ? 1 : 0,
+            item.photo_url, item.created_at, item.updated_at,
+          ]
+        );
+
+        if (item.bird) {
+          const bird = Array.isArray(item.bird) ? item.bird[0] : item.bird;
+          if (bird) {
+            await db.runAsync(
+              `INSERT OR REPLACE INTO birds (id, common_name, scientific_name) VALUES (?, ?, ?)`,
+              [bird.id, bird.common_name, bird.scientific_name]
+            );
+          }
+        }
+        if (item.user) {
+          await db.runAsync(
+            `INSERT OR REPLACE INTO users (id, username, fullname, profile_pic_url, is_verified)
+             VALUES (?, ?, ?, ?, ?)`,
+            [item.user.id, item.user.username, item.user.fullname, item.user.profile_pic_url, item.user.is_verified ? 1 : 0]
+          );
+        }
+
+        if (item.reactions && item.reactions.length > 0) {
+          for (const react of item.reactions) {
+            await db.runAsync(`INSERT OR IGNORE INTO reactions (user_id, sighting_id) VALUES (?, ?)`, [react.user_id, item.id]);
+          }
+        }
+
+        if (item.comments && item.comments.length > 0) {
+          for (const comm of item.comments) {
+            await db.runAsync(`INSERT OR IGNORE INTO comments (id, sighting_id) VALUES (?, ?)`, [comm.id, item.id]);
+          }
+        }
+      } catch (err) {
+        console.error('Error caching item in getByUserId:', err);
+      }
     }));
 
-    return formattedData || [];
+    return formattedData;
   },
 
 async delete(id: string): Promise<void> {

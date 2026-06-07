@@ -101,7 +101,7 @@ export const CommentRepository = {
         `SELECT c.*, u.username
          FROM comments c
          LEFT JOIN users u ON c.user_id = u.id
-         WHERE c.sighting_id = ?
+         WHERE c.sighting_id = ? AND c.content IS NOT NULL
          ORDER BY c.created_at ASC`,
         [sightingId]
       );
