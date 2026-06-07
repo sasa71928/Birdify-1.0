@@ -30,6 +30,7 @@ services:
       - ./config/pg-primary.conf:/etc/postgresql/postgresql.conf:ro
       - ./config/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
       - ./config/init-replication.sql:/docker-entrypoint-initdb.d/01-replication.sql:ro
+      - ./storage.sql:/docker-entrypoint-initdb.d/02-storage.sql:ro 
       - ./migration:/migration:ro
     command: >
       postgres
@@ -39,7 +40,6 @@ services:
   db-replica1:
     image: supabase/postgres:15.1.0.147
     container_name: db-replica1
-    user: postgres
     restart: unless-stopped
     depends_on:
       - db-primary
@@ -63,7 +63,6 @@ services:
   db-replica2:
     image: supabase/postgres:15.1.0.147
     container_name: db-replica2
-    user: postgres
     restart: unless-stopped
     depends_on:
       - db-primary
@@ -144,17 +143,27 @@ services:
       - birdify-net
     environment:
       APP_NAME: "realtime"
-      SECRET_KEY_BASE: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      ERL_AFLAGS: "-proto_dist inet_tcp"
+      ENABLE_TAILSCALE: "false"
+      DNS_NODES: "''"
       API_JWT_SECRET: ${JWT_SECRET}
-      JWT_SECRET: ${JWT_SECRET}
       DB_HOST: db-primary
       DB_PORT: 5432
       DB_USER: postgres
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
-      PORT: 4000
+      DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"
+      DB_ENC_KEY: "supabaserealtime"
+      PORT: "4000"
+      FLY_ALLOC_ID: "fly123"
+      FLY_APP_NAME: "realtime"
       REPLICATION_MODE: RLS
       REPLICATION_POLL_INTERVAL: 100
+      SECURE_CHANNELS: "true"
+      SLOT_NAME: "supabase_realtime_rls"
+      TEMPORARY_SLOT: "true"
+
 
   meta:
     image: supabase/postgres-meta:v0.68.0
