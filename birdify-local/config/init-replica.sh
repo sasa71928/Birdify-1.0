@@ -4,12 +4,6 @@ set -e
 # Asegurar que el directorio de datos pertenezca a postgres
 chown -R postgres:postgres "$PGDATA"
 
-# Esperar a que el primary esté listo
-until pg_isready -h db-primary -p 5432 -U postgres; do
-  echo "Esperando al primary..."
-  sleep 2
-done
-
 # Si ya está inicializada, arrancar directamente
 if [ -s "$PGDATA/PG_VERSION" ]; then
   echo "Réplica ya inicializada, arrancando..."
@@ -18,6 +12,12 @@ if [ -s "$PGDATA/PG_VERSION" ]; then
     -c config_file=/etc/postgresql/postgresql.conf \
     -c hba_file=/etc/postgresql/pg_hba.conf
 fi
+
+# Esperar a que el primary esté listo
+until pg_isready -h db-primary -p 5432 -U postgres -q; do
+  echo "Esperando al primary..."
+  sleep 2
+done
 
 # Limpiar directorio de datos
 rm -rf "$PGDATA"/*

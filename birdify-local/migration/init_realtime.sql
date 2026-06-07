@@ -98,12 +98,13 @@ SET jwt_secret = EXCLUDED.jwt_secret,
 --    DEBEN estar cifrados con AES-128-ECB usando DB_ENC_KEY y codificados en Base64.
 --    DB_ENC_KEY = 'supabaserealtime' (16 bytes)
 --    También el campo debe ser 'publication' (singular), NO 'publications'.
+DELETE FROM _realtime.extensions WHERE type = 'postgres_cdc_rls';
 INSERT INTO _realtime.extensions (type, settings, tenant_external_id)
 VALUES 
     (
         'postgres_cdc_rls',
         jsonb_build_object(
-            'db_host', 'VJb6856PDY9tokEekxQd/w==',
+            'db_host', 'cqOBtKRPHMK5ofWletRGrg==',
             'db_port', '+enMDFi1J/3IrrquHHwUmA==',
             'db_name', 'sWBpZNdjggEPTQVlI52Zfw==',
             'db_user', 'sWBpZNdjggEPTQVlI52Zfw==',
@@ -120,7 +121,7 @@ VALUES
     (
         'postgres_cdc_rls',
         jsonb_build_object(
-            'db_host', 'VJb6856PDY9tokEekxQd/w==',
+            'db_host', 'cqOBtKRPHMK5ofWletRGrg==',
             'db_port', '+enMDFi1J/3IrrquHHwUmA==',
             'db_name', 'sWBpZNdjggEPTQVlI52Zfw==',
             'db_user', 'sWBpZNdjggEPTQVlI52Zfw==',
@@ -137,7 +138,7 @@ VALUES
     (
         'postgres_cdc_rls',
         jsonb_build_object(
-            'db_host', 'VJb6856PDY9tokEekxQd/w==',
+            'db_host', 'cqOBtKRPHMK5ofWletRGrg==',
             'db_port', '+enMDFi1J/3IrrquHHwUmA==',
             'db_name', 'sWBpZNdjggEPTQVlI52Zfw==',
             'db_user', 'sWBpZNdjggEPTQVlI52Zfw==',
@@ -154,7 +155,7 @@ VALUES
     (
         'postgres_cdc_rls',
         jsonb_build_object(
-            'db_host', 'VJb6856PDY9tokEekxQd/w==',
+            'db_host', 'cqOBtKRPHMK5ofWletRGrg==',
             'db_port', '+enMDFi1J/3IrrquHHwUmA==',
             'db_name', 'sWBpZNdjggEPTQVlI52Zfw==',
             'db_user', 'sWBpZNdjggEPTQVlI52Zfw==',
@@ -171,7 +172,7 @@ VALUES
     (
         'postgres_cdc_rls',
         jsonb_build_object(
-            'db_host', 'VJb6856PDY9tokEekxQd/w==',
+            'db_host', 'cqOBtKRPHMK5ofWletRGrg==',
             'db_port', '+enMDFi1J/3IrrquHHwUmA==',
             'db_name', 'sWBpZNdjggEPTQVlI52Zfw==',
             'db_user', 'sWBpZNdjggEPTQVlI52Zfw==',
