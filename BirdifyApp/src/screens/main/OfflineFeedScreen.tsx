@@ -129,7 +129,7 @@ export default function OfflineFeedScreen() {
                 reactions: [],
                 comments: []
               },
-              user?.id
+              user
             );
             mappedPost.syncStatus = item.sync_status === 'synced' ? 'synced' : 'pending';
 
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, gap: 12 },
   emptyTitle: { fontSize: 17, fontFamily: 'PlusJakartaSans-SemiBold', textAlign: 'center' },
   emptyText: { fontSize: 14, fontFamily: 'PlusJakartaSans', textAlign: 'center', lineHeight: 20 },
-  list: { padding: 12, gap: 12 },
+  list: { padding: 12, gap: 12, paddingBottom: 100 },
   card: {
     backgroundColor: Colors.surface,
     borderRadius: 16,

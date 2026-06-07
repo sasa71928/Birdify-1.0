@@ -107,7 +107,10 @@ export default function RegisterScreen() {
         fullName
       );
 
-      showToast('Cuenta creada. Verifica tu correo electrónico si es requerido.', 'success');
+      showToast('¡Cuenta creada! Revisa tu bandeja de Inbucket (http://localhost:9000) para confirmarla.', 'success');
+      setTimeout(() => {
+        navigation.navigate('Login');
+      }, 3000);
     } catch (error: any) {
       showToast(error.message || 'Error al registrarse.', 'error');
     } finally {

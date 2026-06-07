@@ -317,7 +317,6 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                   borderWidth: 1,
                   borderColor: colors.border + '40',
                   borderRadius: 12,
-                  maxHeight: 180,
                   zIndex: 20,
                   elevation: 5,
                   shadowColor: '#000',
@@ -325,7 +324,11 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                   shadowOpacity: 0.1,
                   shadowRadius: 8
                 }}>
-                  <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                  <ScrollView 
+                    nestedScrollEnabled 
+                    keyboardShouldPersistTaps="handled"
+                    style={{ maxHeight: 250 }}
+                  >
                     {filteredBirds.map((bird) => (
                       <TouchableOpacity
                         key={bird.id}

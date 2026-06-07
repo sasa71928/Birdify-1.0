@@ -2,7 +2,7 @@
 CREATE ROLE anon NOLOGIN;
 CREATE ROLE authenticated NOLOGIN;
 CREATE ROLE service_role NOLOGIN;
-CREATE ROLE supabase_admin SUPERUSER NOLOGIN;
+CREATE ROLE supabase_admin SUPERUSER LOGIN PASSWORD 'postgres';
 
 -- 2. Crear roles administradores
 CREATE ROLE authenticator LOGIN NOINHERIT PASSWORD 'postgres';
@@ -11,6 +11,7 @@ CREATE ROLE supabase_storage_admin LOGIN NOINHERIT CREATEROLE PASSWORD 'postgres
 
 -- 3. Enlazar privilegios
 GRANT anon, authenticated, service_role, supabase_admin TO authenticator;
+GRANT anon, authenticated, service_role TO supabase_storage_admin;
 GRANT ALL ON SCHEMA public TO supabase_auth_admin;
 GRANT ALL ON SCHEMA public TO supabase_storage_admin;
 GRANT ALL ON SCHEMA public TO authenticator;

@@ -77,39 +77,114 @@ ON CONFLICT (version) DO NOTHING;
 -- 6. Registrar este servidor como tenant "realtime"
 --    El external_id DEBE coincidir con FLY_APP_NAME del docker-compose
 --    El jwt_secret DEBE coincidir con API_JWT_SECRET del docker-compose
+--    El external_id DEBE coincidir con el host de conexión (ej: 'realtime' para docker,
+--    'localhost' para conexiones locales, o la primera parte de la IP para red local, ej '192').
+--    El jwt_secret DEBE estar cifrado con AES-128-ECB usando DB_ENC_KEY ('supabaserealtime') y Base64.
+--    El secreto plano es 'KfJEyOYauucYvBV8PlETRISqhn44DR+L', el cual cifrado es:
+--    'VQJziivm5lAp/KuAZu0CeMnO0VujLfQxhFtOkV1XOmFPNrrhma6I8nd28t/mto4/'
 INSERT INTO _realtime.tenants (name, external_id, jwt_secret)
-VALUES (
-    'realtime-dev',
-    'realtime',
-    'KfJEyOYauucYvBV8PlETRISqhn44DR+L'
-)
+VALUES 
+    ('realtime-dev', 'realtime', 'VQJziivm5lAp/KuAZu0CeMnO0VujLfQxhFtOkV1XOmFPNrrhma6I8nd28t/mto4/'),
+    ('realtime-localhost', 'localhost', 'VQJziivm5lAp/KuAZu0CeMnO0VujLfQxhFtOkV1XOmFPNrrhma6I8nd28t/mto4/'),
+    ('realtime-192', '192', 'VQJziivm5lAp/KuAZu0CeMnO0VujLfQxhFtOkV1XOmFPNrrhma6I8nd28t/mto4/'),
+    ('realtime-127', '127', 'VQJziivm5lAp/KuAZu0CeMnO0VujLfQxhFtOkV1XOmFPNrrhma6I8nd28t/mto4/'),
+    ('realtime-192.168.0.104', '192.168.0.104', 'VQJziivm5lAp/KuAZu0CeMnO0VujLfQxhFtOkV1XOmFPNrrhma6I8nd28t/mto4/')
 ON CONFLICT (external_id) DO UPDATE
 SET jwt_secret = EXCLUDED.jwt_secret,
     updated_at = now();
 
--- 7. Registrar la extensión postgres_cdc_rls para el tenant
+-- 7. Registrar la extensión postgres_cdc_rls para los tenants
 --    IMPORTANTE: Los valores de db_host, db_port, db_name, db_user, db_password
 --    DEBEN estar cifrados con AES-128-ECB usando DB_ENC_KEY y codificados en Base64.
 --    DB_ENC_KEY = 'supabaserealtime' (16 bytes)
 --    También el campo debe ser 'publication' (singular), NO 'publications'.
 INSERT INTO _realtime.extensions (type, settings, tenant_external_id)
-VALUES (
-    'postgres_cdc_rls',
-    jsonb_build_object(
-        'db_host', 'VJb6856PDY9tokEekxQd/w==',
-        'db_port', '+enMDFi1J/3IrrquHHwUmA==',
-        'db_name', 'sWBpZNdjggEPTQVlI52Zfw==',
-        'db_user', 'sWBpZNdjggEPTQVlI52Zfw==',
-        'db_password', 'sWBpZNdjggEPTQVlI52Zfw==',
-        'region', 'us-east-1',
-        'publication', 'supabase_realtime',
-        'poll_interval_ms', 100,
-        'poll_max_record_bytes', 1048576,
-        'slot_name', 'supabase_realtime_rls',
-        'ssl_enforced', false
+VALUES 
+    (
+        'postgres_cdc_rls',
+        jsonb_build_object(
+            'db_host', 'VJb6856PDY9tokEekxQd/w==',
+            'db_port', '+enMDFi1J/3IrrquHHwUmA==',
+            'db_name', 'sWBpZNdjggEPTQVlI52Zfw==',
+            'db_user', 'sWBpZNdjggEPTQVlI52Zfw==',
+            'db_password', 'sWBpZNdjggEPTQVlI52Zfw==',
+            'region', 'us-east-1',
+            'publication', 'supabase_realtime',
+            'poll_interval_ms', 100,
+            'poll_max_record_bytes', 1048576,
+            'slot_name', 'supabase_realtime_rls',
+            'ssl_enforced', false
+        ),
+        'realtime'
     ),
-    'realtime'
-)
+    (
+        'postgres_cdc_rls',
+        jsonb_build_object(
+            'db_host', 'VJb6856PDY9tokEekxQd/w==',
+            'db_port', '+enMDFi1J/3IrrquHHwUmA==',
+            'db_name', 'sWBpZNdjggEPTQVlI52Zfw==',
+            'db_user', 'sWBpZNdjggEPTQVlI52Zfw==',
+            'db_password', 'sWBpZNdjggEPTQVlI52Zfw==',
+            'region', 'us-east-1',
+            'publication', 'supabase_realtime',
+            'poll_interval_ms', 100,
+            'poll_max_record_bytes', 1048576,
+            'slot_name', 'supabase_realtime_rls',
+            'ssl_enforced', false
+        ),
+        'localhost'
+    ),
+    (
+        'postgres_cdc_rls',
+        jsonb_build_object(
+            'db_host', 'VJb6856PDY9tokEekxQd/w==',
+            'db_port', '+enMDFi1J/3IrrquHHwUmA==',
+            'db_name', 'sWBpZNdjggEPTQVlI52Zfw==',
+            'db_user', 'sWBpZNdjggEPTQVlI52Zfw==',
+            'db_password', 'sWBpZNdjggEPTQVlI52Zfw==',
+            'region', 'us-east-1',
+            'publication', 'supabase_realtime',
+            'poll_interval_ms', 100,
+            'poll_max_record_bytes', 1048576,
+            'slot_name', 'supabase_realtime_rls',
+            'ssl_enforced', false
+        ),
+        '192'
+    ),
+    (
+        'postgres_cdc_rls',
+        jsonb_build_object(
+            'db_host', 'VJb6856PDY9tokEekxQd/w==',
+            'db_port', '+enMDFi1J/3IrrquHHwUmA==',
+            'db_name', 'sWBpZNdjggEPTQVlI52Zfw==',
+            'db_user', 'sWBpZNdjggEPTQVlI52Zfw==',
+            'db_password', 'sWBpZNdjggEPTQVlI52Zfw==',
+            'region', 'us-east-1',
+            'publication', 'supabase_realtime',
+            'poll_interval_ms', 100,
+            'poll_max_record_bytes', 1048576,
+            'slot_name', 'supabase_realtime_rls',
+            'ssl_enforced', false
+        ),
+        '127'
+    ),
+    (
+        'postgres_cdc_rls',
+        jsonb_build_object(
+            'db_host', 'VJb6856PDY9tokEekxQd/w==',
+            'db_port', '+enMDFi1J/3IrrquHHwUmA==',
+            'db_name', 'sWBpZNdjggEPTQVlI52Zfw==',
+            'db_user', 'sWBpZNdjggEPTQVlI52Zfw==',
+            'db_password', 'sWBpZNdjggEPTQVlI52Zfw==',
+            'region', 'us-east-1',
+            'publication', 'supabase_realtime',
+            'poll_interval_ms', 100,
+            'poll_max_record_bytes', 1048576,
+            'slot_name', 'supabase_realtime_rls',
+            'ssl_enforced', false
+        ),
+        '192.168.0.104'
+    )
 ON CONFLICT DO NOTHING;
 
 -- 8. Dar permisos al usuario postgres sobre el schema _realtime

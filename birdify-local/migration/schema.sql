@@ -1419,8 +1419,61 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 
 
 
+-- Fix para Supabase Meta (Studio) y Storage API en entorno local
+DO $$
+BEGIN
+    -- Añadir la columna is_anonymous si la tabla auth.users ya existe (Gotrue)
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'auth' AND table_name = 'users') THEN
+        ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS is_anonymous boolean DEFAULT false;
+    END IF;
+
+    -- Conceder BYPASSRLS a supabase_storage_admin si el rol existe (Storage API)
+    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_storage_admin') THEN
+        ALTER ROLE supabase_storage_admin BYPASSRLS;
+    END IF;
+END $$;
+-- Fix para permisos de tablas y RLS (local development sin politicas exportadas)
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+
+DO $$
+DECLARE
+    row record;
+BEGIN
+    FOR row IN SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+    LOOP
+        EXECUTE 'ALTER TABLE public.' || quote_ident(row.tablename) || ' DISABLE ROW LEVEL SECURITY';
+    END LOOP;
+END;
+$$;
+
+-- Fix para permisos de Storage API (local development sin politicas exportadas)
+GRANT USAGE ON SCHEMA storage TO anon, authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA storage TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA storage TO anon, authenticated;
+GRANT ALL ON ALL ROUTINES IN SCHEMA storage TO anon, authenticated;
+ALTER TABLE storage.buckets DISABLE ROW LEVEL SECURITY;
+ALTER TABLE storage.objects DISABLE ROW LEVEL SECURITY;
 
 
+-- Fix para roles authenticated y anon (Storage API)
+ALTER ROLE authenticated SET search_path = storage, public;
+ALTER ROLE anon SET search_path = storage, public;
 
+-- Fix para upserts de Storage API (faltaba el indice unico en name y bucket_id)
+CREATE UNIQUE INDEX IF NOT EXISTS objects_bucketid_name_key ON storage.objects (bucket_id, name);
 
+-- Fix para evitar aves duplicadas por nombre común
+ALTER TABLE ONLY "public"."birds" ADD CONSTRAINT "birds_common_name_key" UNIQUE ("common_name");
 
+-- Fix para Supabase Realtime (creación del schema y permisos)
+CREATE SCHEMA IF NOT EXISTS realtime;
+GRANT USAGE ON SCHEMA realtime TO postgres, anon, authenticated;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA realtime TO postgres, anon, authenticated;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA realtime TO postgres, anon, authenticated;
+
+-- Fix para Storage API (service_role no tenia search_path localmente)
+ALTER ROLE service_role SET search_path TO storage, public;
+GRANT USAGE ON SCHEMA storage TO service_role;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA storage TO service_role;

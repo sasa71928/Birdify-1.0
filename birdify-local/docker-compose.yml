@@ -31,6 +31,7 @@ services:
       - ./config/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
       - ./config/init-replication.sql:/docker-entrypoint-initdb.d/01-replication.sql:ro
       - ./storage.sql:/docker-entrypoint-initdb.d/02-storage.sql:ro 
+      - ./config/run-migrations.sql:/docker-entrypoint-initdb.d/03-run-migrations.sql:ro
       - ./migration:/migration:ro
     command: >
       postgres
@@ -132,7 +133,7 @@ services:
     environment:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: 9999
-      API_EXTERNAL_URL: http://${TU_IP_LOCAL}:8000
+      API_EXTERNAL_URL: http://${TU_IP_LOCAL}:8000/auth/v1
       GOTRUE_DB_DRIVER: postgres
       GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db-proxy:5432/${POSTGRES_DB}
       GOTRUE_SITE_URL: http://${TU_IP_LOCAL}:3000
@@ -226,13 +227,16 @@ services:
       SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       JWT_SECRET: ${JWT_SECRET}
       PGRST_JWT_SECRET: ${JWT_SECRET}
-      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db-proxy:5432/${POSTGRES_DB}?search_path=storage,public
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db-primary:5432/${POSTGRES_DB}
+      DB_SEARCH_PATH: storage,public
+      POSTGRES_SEARCH_PATH: storage,public
       FILE_SIZE_LIMIT: 52428800
       STORAGE_BACKEND: file
       FILE_STORAGE_BACKEND_PATH: /var/lib/storage
-      TENANT_ID: stub
+      
       REGION: local
       GLOBAL_S3_BUCKET: stub
+      TENANT_ID: storage
       ENABLE_IMAGE_TRANSFORMATION: "true"
       DB_SCHEMA: storage
       SCHEMA: storage

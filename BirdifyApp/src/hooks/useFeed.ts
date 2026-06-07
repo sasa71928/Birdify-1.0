@@ -14,7 +14,8 @@ interface FeedCache {
   userId?: string;
 }
 
-export function mapSightingToPost(sighting: any, currentUserId?: string): Post {
+export function mapSightingToPost(sighting: any, currentUserObjOrId?: any): Post {
+  const currentUserId = typeof currentUserObjOrId === 'string' ? currentUserObjOrId : currentUserObjOrId?.id;
   const timeDiff = Math.max(0, Date.now() - new Date(sighting.created_at).getTime());
   const minutesAgo = Math.floor(timeDiff / (1000 * 60));
   const hoursAgo = Math.floor(minutesAgo / 60);
@@ -37,6 +38,19 @@ export function mapSightingToPost(sighting: any, currentUserId?: string): Post {
   const rawUser = sighting.users || sighting.user;
   const userData = Array.isArray(rawUser) ? rawUser[0] : rawUser;
 
+  // Resolver nombre de usuario, con fallback al current user si es dueño
+  let resolvedUsername = userData?.username;
+  if (!resolvedUsername && currentUserId && sighting.user_id === currentUserId && typeof currentUserObjOrId === 'object') {
+    resolvedUsername = currentUserObjOrId?.user_metadata?.username || currentUserObjOrId?.email?.split('@')[0] || 'Yo';
+  }
+  resolvedUsername = resolvedUsername || 'Usuario';
+
+  let resolvedAvatar = userData?.profile_pic_url;
+  if (!resolvedAvatar && currentUserId && sighting.user_id === currentUserId && typeof currentUserObjOrId === 'object') {
+    resolvedAvatar = currentUserObjOrId?.user_metadata?.profile_pic_url;
+  }
+  resolvedAvatar = resolvedAvatar || 'https://gravatar.com/avatar/?d=mp';
+
   let photoUrl: string | string[] = sighting.photo_url || 'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&q=80&w=600';
 
   if (typeof photoUrl === 'string') {
@@ -58,8 +72,8 @@ export function mapSightingToPost(sighting: any, currentUserId?: string): Post {
   return {
     id: sighting.id,
     userId: sighting.user_id,
-    username: userData?.username || 'Usuario',
-    userAvatar: userData?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
+    username: resolvedUsername,
+    userAvatar: resolvedAvatar,
     location: locationText,
     image: photoUrl,
     tag: sighting.bird?.common_name || 'Ave Sin Identificar',
@@ -101,7 +115,7 @@ export function useFeed() {
 
     try {
       const sightings = await SightingRepository.getFeed(user?.id);
-      const mappedPosts = sightings.map(item => mapSightingToPost(item, user?.id));
+      const mappedPosts = sightings.map(item => mapSightingToPost(item, user));
       cacheRef.current = { posts: mappedPosts, timestamp: now, userId: user?.id };
       setPosts(mappedPosts);
       // Limpiar nuevos posts al recargar manualmente

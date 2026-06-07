@@ -162,10 +162,27 @@ export async function flushSyncQueue() {
 
         if (!error) {
           // 4. Actualizar bird local con ID real de Supabase para que el JOIN siga funcionando
-          await db.runAsync(
-            `UPDATE birds SET id = ? WHERE id = ?`,
-            [finalBirdId, sightingData.bird_id]
-          );
+          if (sightingData.bird_id !== finalBirdId) {
+            const existingLocalBird = await db.getFirstAsync<{ id: string }>(
+              `SELECT id FROM birds WHERE id = ? LIMIT 1`,
+              [finalBirdId]
+            );
+
+            if (existingLocalBird) {
+              // Ya existe el ave real localmente.
+              // Borramos el ave temporal para evitar duplicados y conflictos de PK.
+              await db.runAsync(
+                `DELETE FROM birds WHERE id = ?`,
+                [sightingData.bird_id]
+              );
+            } else {
+              // No existe el ave real, podemos renombrar el ID temporal al real.
+              await db.runAsync(
+                `UPDATE birds SET id = ? WHERE id = ?`,
+                [finalBirdId, sightingData.bird_id]
+              );
+            }
+          }
 
           // 5. Actualizar sighting — photo_url = URL Supabase, local_photo_path intacto
           await db.runAsync(

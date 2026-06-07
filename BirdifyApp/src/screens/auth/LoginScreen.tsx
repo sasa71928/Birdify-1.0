@@ -67,7 +67,11 @@ export default function LoginScreen() {
       // No necesitamos hacer navigation.navigate aquí porque el AuthProvider 
       // automáticamente cambiará las pantallas al detectar la sesión.
     } catch (error: any) {
-      showToast(error.message || 'Error al iniciar sesión.', 'error');
+      let msg = error.message || 'Error al iniciar sesión.';
+      if (msg.includes('Email not confirmed')) {
+        msg = 'Debes confirmar tu correo en Inbucket (http://localhost:9000) antes de iniciar sesión.';
+      }
+      showToast(msg, 'error');
     } finally {
       setIsLoading(false);
     }

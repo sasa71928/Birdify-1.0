@@ -3,3 +3,9 @@ CREATE POLICY "Auth Upload avatars" ON storage.objects FOR INSERT WITH CHECK (bu
 
 DROP POLICY IF EXISTS "Auth Upload birds" ON storage.objects;
 CREATE POLICY "Auth Upload birds" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'birds');
+
+DROP POLICY IF EXISTS "Auth Upload sightings" ON storage.objects;
+CREATE POLICY "Auth Upload sightings" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'sightings');
+
+DROP POLICY IF EXISTS "Auth Upload group-avatars" ON storage.objects;
+CREATE POLICY "Auth Upload group-avatars" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'group-avatars');

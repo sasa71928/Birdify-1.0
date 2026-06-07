@@ -15,6 +15,19 @@ export const BirdRepository = {
         if (!error && data) {
           // Guardar en SQLite en segundo plano
           try {
+            const remoteIds = data.map(b => b.id);
+            if (remoteIds.length > 0) {
+              // Eliminar aves locales cacheadas que ya no existen en Supabase (excluyendo temporales de offline)
+              // Las aves temporales offline contienen '_bird' y no tienen longitud de UUID (36 caracteres)
+              const placeholders = remoteIds.map(() => '?').join(',');
+              await db.runAsync(
+                `DELETE FROM birds 
+                 WHERE LENGTH(id) = 36 
+                   AND id NOT IN (${placeholders})`,
+                remoteIds
+              );
+            }
+
             for (const b of data) {
               await db.runAsync(
                 `INSERT OR REPLACE INTO birds (id, common_name, scientific_name, description, season, habitat_info, ideal_zones) VALUES (?, ?, ?, ?, ?, ?, ?)`,
