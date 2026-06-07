@@ -120,15 +120,15 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const optionsPanY = React.useRef(new Animated.Value(screenHeight)).current;
 
 
-  const loadComments = React.useCallback(async () => {
+  const loadComments = React.useCallback(async (showLoadingState = true) => {
     try {
-      setLoadingComments(true);
+      if (showLoadingState) setLoadingComments(true);
       const data = await CommentRepository.getBySightingId(post.id);
       setCommentsList(data);
     } catch (error) {
       console.error('Error cargando comentarios:', error);
     } finally {
-      setLoadingComments(false);
+      if (showLoadingState) setLoadingComments(false);
     }
   }, [post.id]);
 
@@ -160,9 +160,17 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   }, []);
 
   React.useEffect(() => {
+    let intervalId: NodeJS.Timeout;
     if (showComments) {
       loadComments();
+      // Refrescar silenciosamente los comentarios cada 3.5 minutos (210,000 ms)
+      intervalId = setInterval(() => {
+        loadComments(false); // asumiendo que loadComments puede tomar un flag para no mostrar loading, o simplemente llamarlo
+      }, 210000);
     }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [showComments, loadComments]);
 
   const toggleCommentExpansion = (commentId: string) => {

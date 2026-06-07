@@ -3,6 +3,7 @@ import db from '../lib/database';
 import { supabase } from '../lib/supabase';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
+import { DeviceEventEmitter } from 'react-native';
 
 export let isOnline = false;
 
@@ -64,15 +65,15 @@ function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
 }
 
 export async function flushSyncQueue() {
-  const rows = await db.getAllAsync<{
-    id: string;
-    table_name: string;
-    operation: string;
-    payload: string;
-    attempts: number;
-  }>(`SELECT * FROM sync_queue ORDER BY created_at ASC`);
+  const queue = await db.getAllAsync<any>(
+    `SELECT * FROM sync_queue ORDER BY created_at ASC`
+  );
 
-  for (const row of rows) {
+  if (queue.length === 0) return;
+
+  let syncedAnything = false;
+
+  for (const row of queue) {
     const payload = JSON.parse(row.payload);
     let error = null;
 
@@ -199,6 +200,7 @@ export async function flushSyncQueue() {
       if (!error) {
         await db.runAsync(`DELETE FROM sync_queue WHERE id = ?`, [row.id]);
         console.log(`Sincronizado: ${row.operation} en ${row.table_name}`);
+        syncedAnything = true;
       } else {
         throw error;
       }
@@ -210,6 +212,10 @@ export async function flushSyncQueue() {
         [row.id]
       );
     }
+  }
+
+  if (syncedAnything) {
+    DeviceEventEmitter.emit('sync_completed');
   }
 }
 export async function deletePendingSighting(sightingId: string): Promise<void> {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { DeviceEventEmitter } from 'react-native';
 import { SightingRepository } from '../repositories/sighting.repository';
 import { useAuth } from '../context/AuthContext';
 import FeedItem, { Post } from '../components/FeedItem';
@@ -129,6 +130,22 @@ export function useFeed() {
 
   useEffect(() => {
     initialLoad();
+
+    // Sincronización en "tiempo real" periódica (cada 3.5 minutos = 210,000 ms)
+    // para actualizar silenciosamente comentarios y reacciones en el feed
+    const intervalId = setInterval(() => {
+      loadFeed(true);
+    }, 210000);
+
+    // Recargar feed cuando la cola offline termina de sincronizarse
+    const syncListener = DeviceEventEmitter.addListener('sync_completed', () => {
+      loadFeed(true);
+    });
+
+    return () => {
+      clearInterval(intervalId);
+      syncListener.remove();
+    };
   }, []);
 
   return {

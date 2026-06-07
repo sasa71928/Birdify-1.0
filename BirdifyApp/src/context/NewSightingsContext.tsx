@@ -29,6 +29,7 @@ export function NewSightingsProvider({ children }: { children: React.ReactNode }
           table: 'sightings',
         },
         async (payload) => {
+          console.log('REALTIME SIGHTINGS EVENT RECEIVED:', payload);
           const newId = payload.new?.id;
           const authorId = payload.new?.user_id;
           if (!newId) return;
@@ -46,7 +47,9 @@ export function NewSightingsProvider({ children }: { children: React.ReactNode }
           setHasNewPosts(true);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('REALTIME SUBSCRIPTION STATUS (sightings-global):', status);
+      });
 
     subscriptionRef.current = channel;
 
