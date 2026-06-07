@@ -227,7 +227,7 @@ services:
       SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       JWT_SECRET: ${JWT_SECRET}
       PGRST_JWT_SECRET: ${JWT_SECRET}
-      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db-primary:5432/${POSTGRES_DB}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db-proxy:5432/${POSTGRES_DB}
       DB_SEARCH_PATH: storage,public
       POSTGRES_SEARCH_PATH: storage,public
       FILE_SIZE_LIMIT: 52428800
