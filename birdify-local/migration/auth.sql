@@ -12,7 +12,7 @@ SET session_replication_role = replica;
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
+-- SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -81,17 +81,17 @@ INSERT INTO "auth"."identities" ("provider_id", "user_id", "identity_data", "pro
 -- Data for Name: sessions; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
 --
 
-INSERT INTO "auth"."sessions" ("id", "user_id", "created_at", "updated_at", "factor_id", "aal", "not_after", "refreshed_at", "user_agent", "ip", "tag", "oauth_client_id", "refresh_token_hmac_key", "refresh_token_counter", "scopes") VALUES
-	('42e4d3f9-c4f3-4f38-baac-108a83d50364', 'c4c29d80-a62d-48f5-869f-cf03d90378fb', '2026-05-24 19:50:07.926499+00', '2026-05-24 19:50:07.926499+00', NULL, 'aal1', NULL, NULL, 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Mobile/15E148 Safari/604.1', '189.141.140.22', NULL, NULL, NULL, NULL, NULL),
-	('f9b73931-ac55-456c-9f5c-0790ac242139', '6ad088ba-0fbd-4180-80ae-a117b11afb4a', '2026-05-24 19:52:46.373138+00', '2026-05-24 19:52:46.373138+00', NULL, 'aal1', NULL, NULL, 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Mobile/15E148 Safari/604.1', '189.141.140.22', NULL, NULL, NULL, NULL, NULL),
-	('9e0d63ba-1f38-480c-b82f-2659445981f9', '6ad088ba-0fbd-4180-80ae-a117b11afb4a', '2026-05-24 19:52:59.79555+00', '2026-05-24 21:49:26.68698+00', NULL, 'aal1', NULL, '2026-05-24 21:49:26.68687', 'okhttp/4.12.0', '189.141.140.22', NULL, NULL, NULL, NULL, NULL),
-	('3d800da0-b3dd-4137-9563-3317b2c4bda5', '0f99790f-05a5-4049-8605-3180bbe889cb', '2026-05-31 18:16:23.31874+00', '2026-05-31 18:16:23.31874+00', NULL, 'aal1', NULL, NULL, 'okhttp/4.12.0', '187.223.83.34', NULL, NULL, NULL, NULL, NULL),
-	('b94ad47f-3c61-4844-b197-f711ded03e96', 'dc8e0ffd-57c0-4017-adbe-83e1b17cfea3', '2026-05-31 22:29:39.211765+00', '2026-05-31 22:29:39.211765+00', NULL, 'aal1', NULL, NULL, 'BirdifyApp/1 CFNetwork/3860.500.112 Darwin/25.4.0', '187.223.162.36', NULL, NULL, NULL, NULL, NULL),
-	('af2efd1d-2f3b-4c0d-ad92-32e59f1ca51e', 'dc8e0ffd-57c0-4017-adbe-83e1b17cfea3', '2026-05-31 23:04:15.166926+00', '2026-06-05 21:32:16.415777+00', NULL, 'aal1', NULL, '2026-06-05 21:32:16.415667', 'BirdifyApp/1 CFNetwork/3860.500.112 Darwin/25.4.0', '177.230.104.71', NULL, NULL, NULL, NULL, NULL),
-	('fb5d7a73-7b0a-46cb-8695-3844da073477', '0f99790f-05a5-4049-8605-3180bbe889cb', '2026-06-05 19:43:03.328245+00', '2026-06-06 01:23:05.462545+00', NULL, 'aal1', NULL, '2026-06-06 01:23:05.4624', 'okhttp/4.12.0', '187.223.132.170', NULL, NULL, NULL, NULL, NULL),
-	('56531d77-6de8-4719-bf06-518e4c35a343', '0f99790f-05a5-4049-8605-3180bbe889cb', '2026-05-31 19:21:19.936663+00', '2026-06-06 01:24:22.378498+00', NULL, 'aal1', NULL, '2026-06-06 01:24:22.378377', 'okhttp/4.12.0', '187.223.132.170', NULL, NULL, NULL, NULL, NULL),
-	('507a4e4e-dcad-472f-9c1b-ffd893695ba4', '7e96ecc2-2814-42da-bf7a-7d7a899e81ec', '2026-06-06 01:28:32.45066+00', '2026-06-06 01:28:32.45066+00', NULL, 'aal1', NULL, NULL, 'okhttp/4.12.0', '187.223.132.170', NULL, NULL, NULL, NULL, NULL),
-	('b24ee6fc-3c57-4395-8bb3-1757cf8a54a1', 'c4c29d80-a62d-48f5-869f-cf03d90378fb', '2026-05-24 19:50:27.403234+00', '2026-05-25 21:46:50.118045+00', NULL, 'aal1', NULL, '2026-05-25 21:46:50.117933', 'Expo/1017756 CFNetwork/3860.500.112 Darwin/25.4.0', '187.223.166.109', NULL, NULL, NULL, NULL, NULL);
+INSERT INTO "auth"."sessions" ("id", "user_id", "created_at", "updated_at", "factor_id", "aal", "not_after", "refreshed_at", "user_agent", "ip", "tag") VALUES
+	('42e4d3f9-c4f3-4f38-baac-108a83d50364', 'c4c29d80-a62d-48f5-869f-cf03d90378fb', '2026-05-24 19:50:07.926499+00', '2026-05-24 19:50:07.926499+00', NULL, 'aal1', NULL, NULL, 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Mobile/15E148 Safari/604.1', '189.141.140.22', NULL),
+	('f9b73931-ac55-456c-9f5c-0790ac242139', '6ad088ba-0fbd-4180-80ae-a117b11afb4a', '2026-05-24 19:52:46.373138+00', '2026-05-24 19:52:46.373138+00', NULL, 'aal1', NULL, NULL, 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Mobile/15E148 Safari/604.1', '189.141.140.22', NULL),
+	('9e0d63ba-1f38-480c-b82f-2659445981f9', '6ad088ba-0fbd-4180-80ae-a117b11afb4a', '2026-05-24 19:52:59.79555+00', '2026-05-24 21:49:26.68698+00', NULL, 'aal1', NULL, '2026-05-24 21:49:26.68687', 'okhttp/4.12.0', '189.141.140.22', NULL),
+	('3d800da0-b3dd-4137-9563-3317b2c4bda5', '0f99790f-05a5-4049-8605-3180bbe889cb', '2026-05-31 18:16:23.31874+00', '2026-05-31 18:16:23.31874+00', NULL, 'aal1', NULL, NULL, 'okhttp/4.12.0', '187.223.83.34', NULL),
+	('b94ad47f-3c61-4844-b197-f711ded03e96', 'dc8e0ffd-57c0-4017-adbe-83e1b17cfea3', '2026-05-31 22:29:39.211765+00', '2026-05-31 22:29:39.211765+00', NULL, 'aal1', NULL, NULL, 'BirdifyApp/1 CFNetwork/3860.500.112 Darwin/25.4.0', '187.223.162.36', NULL),
+	('af2efd1d-2f3b-4c0d-ad92-32e59f1ca51e', 'dc8e0ffd-57c0-4017-adbe-83e1b17cfea3', '2026-05-31 23:04:15.166926+00', '2026-06-05 21:32:16.415777+00', NULL, 'aal1', NULL, '2026-06-05 21:32:16.415667', 'BirdifyApp/1 CFNetwork/3860.500.112 Darwin/25.4.0', '177.230.104.71', NULL),
+	('fb5d7a73-7b0a-46cb-8695-3844da073477', '0f99790f-05a5-4049-8605-3180bbe889cb', '2026-06-05 19:43:03.328245+00', '2026-06-06 01:23:05.462545+00', NULL, 'aal1', NULL, '2026-06-06 01:23:05.4624', 'okhttp/4.12.0', '187.223.132.170', NULL),
+	('56531d77-6de8-4719-bf06-518e4c35a343', '0f99790f-05a5-4049-8605-3180bbe889cb', '2026-05-31 19:21:19.936663+00', '2026-06-06 01:24:22.378498+00', NULL, 'aal1', NULL, '2026-06-06 01:24:22.378377', 'okhttp/4.12.0', '187.223.132.170', NULL),
+	('507a4e4e-dcad-472f-9c1b-ffd893695ba4', '7e96ecc2-2814-42da-bf7a-7d7a899e81ec', '2026-06-06 01:28:32.45066+00', '2026-06-06 01:28:32.45066+00', NULL, 'aal1', NULL, NULL, 'okhttp/4.12.0', '187.223.132.170', NULL),
+	('b24ee6fc-3c57-4395-8bb3-1757cf8a54a1', 'c4c29d80-a62d-48f5-869f-cf03d90378fb', '2026-05-24 19:50:27.403234+00', '2026-05-25 21:46:50.118045+00', NULL, 'aal1', NULL, '2026-05-25 21:46:50.117933', 'Expo/1017756 CFNetwork/3860.500.112 Darwin/25.4.0', '187.223.166.109', NULL);
 
 
 --

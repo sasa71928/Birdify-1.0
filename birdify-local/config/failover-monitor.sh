@@ -2,7 +2,8 @@
 export PGPASSWORD=postgres
 PROMOTED=0
 
-echo "Failover monitor is running..."
+echo "Failover monitor is running. Waiting for initial startup..."
+sleep 20
 
 while true; do
   # Comprobar si db-primary está caído
