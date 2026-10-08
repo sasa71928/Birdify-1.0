@@ -33,11 +33,12 @@ yarn-error.*
 # local env files
 .env
 .env*.local
+birdify-local/.env
 
 # typescript
 *.tsbuildinfo
 
-# generated native folders
+# generated native folders  
 /ios
 /android
 
