@@ -35,6 +35,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 
 import { AuthService } from '../../services/auth.service';
 import AppToast from '../../components/AppToast';
+import { useSocialAuth } from '../../hooks/useSocialAuth';
 
 export default function RegisterScreen() {
   const navigation = useNavigation<RegisterNavProp>();
@@ -60,7 +61,7 @@ export default function RegisterScreen() {
     message: '',
     type: 'success',
   });
-  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     if (toastTimerRef.current) {
@@ -80,6 +81,11 @@ export default function RegisterScreen() {
     };
   }, []);
 
+  const { signInWith, loadingProvider, isSocialLoading } = useSocialAuth(
+    (msg) => showToast(msg, 'error')
+  );
+  const isBusy = isLoading || isSocialLoading;
+
   const handleRegister = async () => {
     if (
       !fullName.trim() ||
@@ -88,7 +94,23 @@ export default function RegisterScreen() {
       !password ||
       !confirmPassword
     ) {
-      showToast('Por favor ingresa todos los campos.', 'error');
+      showToast('Por favor completa todos los campos.', 'error');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      showToast('Por favor ingresa un correo electrónico válido.', 'error');
+      return;
+    }
+
+    if (username.trim().length < 3) {
+      showToast('El nombre de usuario debe tener al menos 3 caracteres.', 'error');
+      return;
+    }
+
+    if (password.length < 6) {
+      showToast('La contraseña debe tener al menos 6 caracteres.', 'error');
       return;
     }
 
@@ -107,7 +129,7 @@ export default function RegisterScreen() {
         fullName
       );
 
-      showToast('¡Cuenta creada! Revisa tu bandeja de Inbucket (http://localhost:9000) para confirmarla.', 'success');
+      showToast('¡Cuenta creada! Revisa tu correo electrónico para confirmarla.', 'success');
       setTimeout(() => {
         navigation.navigate('Login');
       }, 3000);
@@ -244,7 +266,7 @@ export default function RegisterScreen() {
                 marginBottom: 16,
               }}
               onPress={handleRegister}
-              disabled={isLoading}
+              disabled={isBusy}
             />
 
             <View style={shared.dividerRow}>
@@ -267,6 +289,9 @@ export default function RegisterScreen() {
                     color="#DB4437"
                   />
                 }
+                onPress={() => signInWith('google')}
+                loading={loadingProvider === 'google'}
+                disabled={isBusy}
               />
 
               <SocialButton
@@ -278,6 +303,9 @@ export default function RegisterScreen() {
                     color="#4267B2"
                   />
                 }
+                onPress={() => signInWith('facebook')}
+                loading={loadingProvider === 'facebook'}
+                disabled={isBusy}
               />
             </View>
 
