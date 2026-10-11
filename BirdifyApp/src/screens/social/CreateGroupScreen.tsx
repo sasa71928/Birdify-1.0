@@ -44,7 +44,7 @@ export default function CreateGroupScreen() {
     message: '',
     type: 'success',
   });
-  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     if (toastTimerRef.current) {
@@ -111,6 +111,7 @@ export default function CreateGroupScreen() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
+      exif: false,
     });
 
     if (!result.canceled) {
