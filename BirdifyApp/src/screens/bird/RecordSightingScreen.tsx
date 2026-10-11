@@ -230,7 +230,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                         paddingVertical: 2,
                         borderRadius: 6,
                       }}>
-                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>
+                        <Text style={{ color: colors.textOnPrimary, fontSize: 12, fontWeight: '600' }}>
                           {index + 1}/{imageUris.length}
                         </Text>
                       </View>
