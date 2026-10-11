@@ -39,6 +39,7 @@ export async function initDatabase() {
       is_location_private INTEGER DEFAULT 0,
       photo_url TEXT,
       local_photo_path TEXT,
+      sync_status TEXT DEFAULT 'synced',
       sighting_date TEXT,
       created_at TEXT,
       updated_at TEXT
@@ -79,14 +80,27 @@ export async function initDatabase() {
     );
   `);
 
-  // Migraciones
-  await db.execAsync(
-    `ALTER TABLE sightings ADD COLUMN sync_status TEXT DEFAULT 'synced'`
-  ).catch(() => {});
+  // Migraciones controladas por versión de esquema (A-03)
+  try {
+    const versionRow = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+    const currentVersion = versionRow?.user_version ?? 0;
 
-  await db.execAsync(
-    `ALTER TABLE sightings ADD COLUMN local_photo_path TEXT`
-  ).catch(() => {});
+    if (currentVersion < 1) {
+      try {
+        await db.execAsync(`ALTER TABLE sightings ADD COLUMN sync_status TEXT DEFAULT 'synced'`);
+      } catch {
+        // Columna ya existe
+      }
+      try {
+        await db.execAsync(`ALTER TABLE sightings ADD COLUMN local_photo_path TEXT`);
+      } catch {
+        // Columna ya existe
+      }
+      await db.execAsync('PRAGMA user_version = 1');
+    }
+  } catch (migErr) {
+    console.warn('[Database] Error comprobando versiones de migración SQLite:', migErr);
+  }
 }
 
 export default db;
