@@ -125,7 +125,7 @@ export const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#000',
   },
   modalContent: {
@@ -304,7 +304,7 @@ export const createStyles = (colors: any) => StyleSheet.create({
     marginVertical: Spacing.xs,
   },
   heartOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
