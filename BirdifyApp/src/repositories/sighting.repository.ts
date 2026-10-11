@@ -1,7 +1,5 @@
 import { supabase } from '../lib/supabase';
 import { Sighting } from '../types/models';
-import { PushNotificationSender } from '../services/push.sender';
-import { NotificationPreferencesService } from '../services/notification.preferences';
 import db from '../lib/database';
 import { isOnline, addToQueue, generateId } from '../services/syncService';
 
@@ -74,8 +72,6 @@ export const SightingRepository = {
 
     if (error) throw error;
 
-    this.notifyFollowers(sighting.user_id, data.id).catch(() => {});
-
     // Cachear sighting — conserva local_photo_path si ya existe
     db.runAsync(
       `INSERT INTO sightings
@@ -109,43 +105,6 @@ export const SightingRepository = {
     }
 
     return data;
-  },
-
-  async notifyFollowers(userId: string, sightingId: string): Promise<void> {
-    try {
-      const { data: followers } = await supabase
-        .from('follows')
-        .select('follower_id')
-        .eq('following_id', userId);
-
-      if (!followers || followers.length === 0) return;
-
-      const followerIds = followers.map((f: any) => f.follower_id);
-      const enabledIds: string[] = [];
-
-      for (const fid of followerIds) {
-        const enabled = await NotificationPreferencesService.isPushEnabled(fid, 'new_sighting');
-        if (enabled) enabledIds.push(fid);
-      }
-
-      if (enabledIds.length === 0) return;
-
-      const { data: user } = await supabase
-        .from('users')
-        .select('username, fullname')
-        .eq('id', userId)
-        .single();
-
-      const name = user?.fullname || user?.username || 'Alguien';
-
-      await PushNotificationSender.sendToUsers(enabledIds, {
-        title: 'Nuevo avistamiento',
-        body: `${name} publicó un nuevo avistamiento`,
-        data: { type: 'new_sighting', sightingId },
-      });
-    } catch (e) {
-      console.error('Error notifying followers:', e);
-    }
   },
 
   async update(id: string, changes: Partial<Omit<Sighting, 'id' | 'created_at' | 'updated_at'>>): Promise<Sighting> {
