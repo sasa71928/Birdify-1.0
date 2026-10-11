@@ -52,12 +52,15 @@ export const BirdRepository = {
   },
 
   async search(query: string): Promise<Bird[]> {
+    const sanitized = query.replace(/[%_,().\\*]/g, '').trim();
+    if (!sanitized) return [];
+
     if (isOnline) {
       try {
         const { data, error } = await supabase
           .from('birds')
           .select('*')
-          .or(`common_name.ilike.%${query}%,scientific_name.ilike.%${query}%`)
+          .or(`common_name.ilike.%${sanitized}%,scientific_name.ilike.%${sanitized}%`)
           .limit(10);
 
         if (!error && data) {
@@ -71,7 +74,7 @@ export const BirdRepository = {
     // Fallback a SQLite
     const localBirds = await db.getAllAsync<Bird>(
       `SELECT * FROM birds WHERE common_name LIKE ? OR scientific_name LIKE ? LIMIT 10`,
-      [`%${query}%`, `%${query}%`]
+      [`%${sanitized}%`, `%${sanitized}%`]
     );
     return localBirds;
   }
