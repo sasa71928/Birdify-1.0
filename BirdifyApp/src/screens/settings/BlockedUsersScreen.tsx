@@ -7,7 +7,7 @@ import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
 import { useAuth } from '../../context/AuthContext';
 import { UserBlockRepository } from '../../repositories/user_block.repository';
-import { handleError } from '../../utils/errorHandler';
+import { handleError, showSuccess } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
 
 interface BlockedUserItem {
@@ -57,7 +57,7 @@ export default function BlockedUsersScreen() {
       setUnblockingUserId(blockedId);
       await UserBlockRepository.unblock(user.id, blockedId);
       setBlockedUsers(prev => prev.filter(item => item.id !== blockedId));
-      handleError(`Desbloqueaste a @${username}`, setToast, 'Success');
+      showSuccess(`Desbloqueaste a @${username}`, setToast);
     } catch (error) {
       handleError(error, setToast, 'No se pudo desbloquear al usuario');
     } finally {
