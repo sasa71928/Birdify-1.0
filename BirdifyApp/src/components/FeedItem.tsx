@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useOffline } from '../navigation/AppNavigator';
+import { useOffline } from '../context/OfflineContext';
 import { ReactionRepository } from '../repositories/reaction.repository';
 import { CommentRepository } from '../repositories/comment.repository';
 import { SightingRepository } from '../repositories/sighting.repository';
@@ -168,7 +168,7 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   }, []);
 
   React.useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    let intervalId: ReturnType<typeof setTimeout>;
     if (showComments) {
       loadComments();
       // Refrescar silenciosamente los comentarios cada 1 minuto (60,000 ms)
