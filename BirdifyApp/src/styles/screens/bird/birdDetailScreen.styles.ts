@@ -47,7 +47,7 @@ export const createStyles = (colors: typeof Colors) =>
     },
 
     heroOverlay: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: 'transparent',
     },
 
