@@ -1,8 +1,8 @@
 import 'react-native-get-random-values';
+import './src/utils/logger';
 import React, { useEffect } from 'react';
 import { initDatabase } from './src/lib/database';
 import { initNetworkListener } from './src/services/syncService';
-import { initSupabaseClient } from './src/lib/supabase';
 import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -28,7 +28,7 @@ import { NewSightingsProvider } from './src/context/NewSightingsContext';
 import { UnreadMessagesProvider } from './src/context/UnreadMessagesContext';
 import { InteractionsProvider } from './src/context/InteractionsContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { OfflineProvider } from './src/navigation/AppNavigator';
+import { OfflineProvider } from './src/context/OfflineContext';
 
 // Configurar handler de notificaciones antes de que la app monte
 // Esto es requerido para que expo-notifications funcione correctamente en Android standalone
@@ -56,9 +56,8 @@ export default function App() {
   });
 
     useEffect(() => {
-    initSupabaseClient()
-      .then(() => initDatabase())
-      .then(() => console.log('✅ SQLite e inicialización de Supabase listas'))
+    initDatabase()
+      .then(() => console.log('✅ SQLite listo'))
       .catch(e => console.error('❌ Error al inicializar:', e));
 
     initNetworkListener();
