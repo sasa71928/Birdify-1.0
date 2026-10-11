@@ -26,17 +26,22 @@ export function InteractionsProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (!session?.user?.id) return;
 
-    const handleInteraction = async (payload: any, type: 'comment' | 'reaction') => {
+    // Cache local de IDs propios para filtrar en O(1) sin consultar la BD en cada interacción global
+    const mySightingIds = new Set<string>();
+    supabase
+      .from('sightings')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .then(({ data }) => {
+        data?.forEach((s: any) => mySightingIds.add(s.id));
+      });
+
+    const handleInteraction = (payload: any, type: 'comment' | 'reaction') => {
       const newRecord = payload.new;
       if (!newRecord || !newRecord.sighting_id) return;
+      if (newRecord.user_id === session.user.id) return;
 
-      const { data } = await supabase
-        .from('sightings')
-        .select('user_id')
-        .eq('id', newRecord.sighting_id)
-        .single();
-
-      if (data && data.user_id === session.user.id && newRecord.user_id !== session.user.id) {
+      if (mySightingIds.has(newRecord.sighting_id)) {
         const msg = type === 'comment' 
           ? 'Alguien ha comentado tu avistamiento.' 
           : 'A alguien le ha gustado tu avistamiento.';
