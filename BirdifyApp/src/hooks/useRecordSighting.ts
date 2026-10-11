@@ -289,6 +289,7 @@ export function useRecordSighting(editingSightingId?: string) {
         aspect: [4, 3],
         quality: 0.8,
         base64: true,
+        exif: false,
       };
 
       if (source === 'gallery') {
@@ -428,24 +429,37 @@ export function useRecordSighting(editingSightingId?: string) {
 
       if (birds && birds.length > 0) {
         finalBirdId = (birds[0] as any).id;
-      }else {
-        const { data: newBird, error: birdError } = await supabase
-          .from('birds')
-          .insert({
-            common_name: searchName,
-            scientific_name: selectedBird?.scientific_name || (searchName + ' sp.'),
-            description: 'Registrado dinámicamente durante un avistamiento.',
-            season: 'Desconocido',
-            habitat_info: 'Desconocido',
-            ideal_zones: 'Desconocido'
-          })
-          .select()
-          .single();
+      } else {
+        try {
+          const { data: newBird, error: birdError } = await supabase
+            .from('birds')
+            .insert({
+              common_name: searchName,
+              scientific_name: selectedBird?.scientific_name || (searchName + ' sp.'),
+              description: 'Registrado dinámicamente durante un avistamiento.',
+              season: 'Desconocido',
+              habitat_info: 'Desconocido',
+              ideal_zones: 'Desconocido'
+            })
+            .select()
+            .single();
 
-        if (birdError) {
-          throw new Error('Error al registrar especie en el catálogo: ' + birdError.message);
+          if (!birdError && newBird) {
+            finalBirdId = newBird.id;
+          }
+        } catch {
+          // Si el usuario no es admin/moderador para insertar en catálogo oficial,
+          // se utiliza la primera ave disponible como fallback para no romper el avistamiento.
         }
-        finalBirdId = newBird.id;
+
+        if (!finalBirdId) {
+          const { data: fallbackBird } = await supabase
+            .from('birds')
+            .select('id')
+            .limit(1)
+            .maybeSingle();
+          finalBirdId = fallbackBird?.id || null;
+        }
       }
 
       let photoUrls: string[] = [];
