@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment and sensitive keys
+.env
+.env.*
+!.env.example
+birdify-local/.env
+*.key
+*.pem
+*.jks
+*.keystore
+*.p8
+*.p12
+
+# Local SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+BirdifyApp/BirdifyApp.db
+
+# Expo & Builds
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+
+# Native folders (managed by prebuild)
+/ios
+/android
+
+# Temporary/Scratch Scripts
+replace_calls*.js
+insert_function.js
+create_test_user.js
+
+# Agent/IDE local configs
+.devin/
+.vscode/
+.DS_Store
+Thumbs.db
+npm-debug.*
+yarn-debug.*
+yarn-error.*
