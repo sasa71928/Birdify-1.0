@@ -3,6 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { NotificationService } from '../services/notification.service';
 import NetInfo from '@react-native-community/netinfo';
+import { clearLocalData } from '../services/syncService';
 
 interface AuthContextProps {
   user: User | null;
@@ -47,9 +48,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      await clearLocalData();
+      setUser(null);
+      setSession(null);
+    }
   };
 
   const ensurePublicProfile = async (authUser: User) => {
@@ -69,22 +74,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       // Si no existe el perfil bajo este ID ni este Email, o si el ID del perfil existente es diferente (usuario recreado)
       if (!existing || existing.id !== authUser.id) {
-        const rawUsername = authUser.user_metadata?.username || authUser.email?.split('@')[0] || `user_${authUser.id.substring(0, 8)}`;
-        const fullname = authUser.user_metadata?.fullname || null;
-        const profilePicUrl = authUser.user_metadata?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp';
+        const meta = authUser.user_metadata || {};
+        // Registro por email usa username/fullname/profile_pic_url;
+        // Google/Facebook envían full_name/name y avatar_url/picture.
+        const rawUsername = meta.username || authUser.email?.split('@')[0] || `user_${authUser.id.substring(0, 8)}`;
+        const fullname = meta.fullname || meta.full_name || meta.name || null;
+        const profilePicUrl = meta.profile_pic_url || meta.avatar_url || meta.picture || 'https://gravatar.com/avatar/?d=mp';
         
         // Sanitize username to match alphanumeric + underscores
-        const sanitizedUsername = rawUsername.toLowerCase().replace(/[^a-z0-9_]/g, '');
+        const sanitizedUsername =
+          rawUsername.toLowerCase().replace(/[^a-z0-9_]/g, '') || `user_${authUser.id.substring(0, 8)}`;
 
-        const { error: upsertError } = await supabase
-          .from('users')
-          .upsert({
-            id: authUser.id,
-            email: authUser.email,
-            username: sanitizedUsername,
-            fullname: fullname,
-            profile_pic_url: profilePicUrl,
-          }, { onConflict: 'email' });
+        const upsertProfile = (username: string) =>
+          supabase
+            .from('users')
+            .upsert({
+              id: authUser.id,
+              email: authUser.email,
+              username,
+              fullname: fullname,
+              profile_pic_url: profilePicUrl,
+            }, { onConflict: 'id' });
+
+        let { error: upsertError } = await upsertProfile(sanitizedUsername);
+
+        // Si el username ya está en uso (p.ej. dos cuentas Gmail con el mismo prefijo), añadimos sufijo
+        if (upsertError?.code === '23505' && /username/i.test(upsertError.message + (upsertError.details ?? ''))) {
+          ({ error: upsertError } = await upsertProfile(
+            `${sanitizedUsername.substring(0, 20)}_${authUser.id.substring(0, 6)}`
+          ));
+        }
 
         if (upsertError) {
           console.error('Error ensuring public user profile:', upsertError);
