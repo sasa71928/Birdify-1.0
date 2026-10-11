@@ -7,7 +7,7 @@ export const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.surface,
   },
   map: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     width: '100%',
     height: '100%',
   },
