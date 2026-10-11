@@ -13,7 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useTheme } from '../../context/ThemeContext';
-import { handleError } from '../../utils/errorHandler';
+import { handleError, showSuccess } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
 
 const THEMES = [
@@ -33,11 +33,11 @@ export default function ThemeSettingsScreen() {
     message: '',
     type: 'success',
   });
-  const navTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSave = () => {
     setTheme(selectedTheme);
-    handleError(`Birdify is now set to ${THEMES.find(t => t.id === selectedTheme)?.name}`, setToast, 'Theme Updated');
+    showSuccess(`Birdify is now set to ${THEMES.find(t => t.id === selectedTheme)?.name}`, setToast);
     navTimerRef.current = setTimeout(() => navigation.goBack(), 1000);
   };
 
