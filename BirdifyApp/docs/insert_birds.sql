@@ -1,0 +1,22 @@
+INSERT INTO public.birds (common_name, scientific_name, description, season, habitat_info, ideal_zones) VALUES
+('Águila Real', 'Aquila chrysaetos', 'Gran ave de presa de plumaje marrón oscuro y cabeza dorada.', 'Todo el año', 'Zonas montañosas y llanuras abiertas.', 'Montañas'),
+('Colibrí Orejivioleta', 'Colibri coruscans', 'Pequeño y vibrante, con plumaje verde y orejas violetas.', 'Primavera y Verano', 'Bosques tropicales y jardines.', 'Selvas y zonas húmedas'),
+('Tucán Toco', 'Ramphastos toco', 'Conocido por su enorme pico naranja y cuerpo negro.', 'Todo el año', 'Selvas y bosques tropicales.', 'Zonas tropicales'),
+('Guacamayo Rojo', 'Ara macao', 'Loro grande y colorido, principalmente rojo con alas azules y amarillas.', 'Todo el año', 'Selvas densas.', 'Zonas tropicales'),
+('Búho Nival', 'Bubo scandiacus', 'Ave rapaz nocturna de plumaje blanco.', 'Invierno', 'Tundra y zonas abiertas nevadas.', 'Tundra'),
+('Pingüino Emperador', 'Aptenodytes forsteri', 'Ave marina no voladora adaptada al frío extremo.', 'Todo el año', 'Hielo antártico.', 'Zonas polares'),
+('Flamenco Rosado', 'Phoenicopterus roseus', 'Ave zancuda de color rosa, pico curvado.', 'Verano', 'Lagunas saladas y humedales.', 'Humedales'),
+('Cóndor de los Andes', 'Vultur gryphus', 'Una de las aves voladoras más grandes del mundo, carroñera.', 'Todo el año', 'Altas montañas y costas.', 'Cordillera de los Andes'),
+('Pavo Real', 'Pavo cristatus', 'Conocido por la impresionante cola en forma de abanico de los machos.', 'Primavera', 'Bosques y zonas de cultivo.', 'Zonas templadas y cálidas'),
+('Cisne Cuellinegro', 'Cygnus melancoryphus', 'Cisne sudamericano blanco con cabeza y cuello negros.', 'Todo el año', 'Lagos y humedales de agua dulce.', 'Lagos patagónicos'),
+('Gorrión Común', 'Passer domesticus', 'Ave pequeña muy adaptada a entornos urbanos.', 'Todo el año', 'Zonas urbanas y rurales.', 'Ciudades y granjas'),
+('Ruiseñor', 'Luscinia megarhynchos', 'Famoso por su melodioso canto nocturno.', 'Primavera y Verano', 'Bosques frondosos y jardines espesos.', 'Zonas boscosas'),
+('Martín Pescador', 'Alcedo atthis', 'Ave pequeña, muy colorida, que pesca lanzándose al agua.', 'Todo el año', 'Ríos y lagos limpios.', 'Ríos'),
+('Pelícano Blanco', 'Pelecanus onocrotalus', 'Gran ave acuática con una bolsa debajo del pico para pescar.', 'Todo el año', 'Lagos, deltas y costas.', 'Costas'),
+('Golondrina Común', 'Hirundo rustica', 'Ave migratoria con cola ahorquillada.', 'Primavera y Verano', 'Campos abiertos cerca de construcciones humanas.', 'Zonas rurales'),
+('Avestruz', 'Struthio camelus', 'Ave no voladora de gran tamaño y rápida corredora.', 'Todo el año', 'Sabanas y zonas semidesérticas.', 'Sabana'),
+('Mirlo Común', 'Turdus merula', 'Ave oscura con pico amarillo, muy común en jardines.', 'Todo el año', 'Jardines, parques y bosques.', 'Zonas urbanas'),
+('Halcón Peregrino', 'Falco peregrinus', 'Ave de presa conocida por su extrema velocidad en picada.', 'Todo el año', 'Acantilados y también rascacielos.', 'Acantilados y ciudades'),
+('Cardenal Norteño', 'Cardinalis cardinalis', 'Ave cantora de color rojo brillante con cresta.', 'Todo el año', 'Jardines, bosques y matorrales.', 'Zonas arboladas'),
+('Gaviota Reidora', 'Chroicocephalus ridibundus', 'Ave marina que frecuenta costas y aguas interiores.', 'Todo el año', 'Zonas costeras y humedales.', 'Costas y lagos')
+ON CONFLICT DO NOTHING;
