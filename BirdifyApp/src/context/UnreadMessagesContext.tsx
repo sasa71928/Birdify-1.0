@@ -466,9 +466,10 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
 
     subscriptionRef.current = channel;
 
+    // Fallback sync timer: cada 3 minutos (180,000 ms) para ahorrar batería manteniendo Realtime activo
     syncTimerRef.current = setInterval(() => {
       refreshConversations();
-    }, 30000);
+    }, 180000);
 
     return () => {
       if (subscriptionRef.current) {
