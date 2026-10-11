@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StatusBar, TouchableOpacity } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { supabase } from '../../lib/supabase';
 
 // ── Componentes reutilizables ────────────────────────────────────────────────
 import AppButton    from '../../components/AppButton';
@@ -21,6 +22,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 
 import { AuthService } from '../../services/auth.service';
 import AppToast from '../../components/AppToast';
+import { useSocialAuth } from '../../hooks/useSocialAuth';
 
 export default function LoginScreen() {
   const navigation = useNavigation<LoginNavProp>();
@@ -35,7 +37,7 @@ export default function LoginScreen() {
     message: '',
     type: 'success',
   });
-  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     if (toastTimerRef.current) {
@@ -55,6 +57,11 @@ export default function LoginScreen() {
     };
   }, []);
 
+  const { signInWith, loadingProvider, isSocialLoading } = useSocialAuth(
+    (msg) => showToast(msg, 'error')
+  );
+  const isBusy = isLoading || isSocialLoading;
+
   const handleLogin = async () => {
     if (!email || !password) {
       showToast('Por favor ingresa tu usuario o correo y contraseña.', 'error');
@@ -69,7 +76,7 @@ export default function LoginScreen() {
     } catch (error: any) {
       let msg = error.message || 'Error al iniciar sesión.';
       if (msg.includes('Email not confirmed')) {
-        msg = 'Debes confirmar tu correo en Inbucket (http://localhost:9000) antes de iniciar sesión.';
+        msg = 'Debes confirmar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada.';
       }
       showToast(msg, 'error');
     } finally {
@@ -77,9 +84,24 @@ export default function LoginScreen() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    const trimmed = email.trim();
+    if (!trimmed || !trimmed.includes('@')) {
+      showToast('Ingresa tu correo electrónico arriba para restablecer tu contraseña.', 'error');
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmed);
+      if (error) throw error;
+      showToast('Enlace de recuperación enviado a tu correo.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Error al solicitar recuperación de contraseña.', 'error');
+    }
+  };
+
   // Link "¿Olvidaste?" que se pasa como labelRight al InputField
   const ForgotLink = (
-    <TouchableOpacity activeOpacity={0.7}>
+    <TouchableOpacity activeOpacity={0.7} onPress={handleForgotPassword}>
       <Text style={local.forgotLink}>¿Olvidaste tu contraseña?</Text>
     </TouchableOpacity>
   );
@@ -149,7 +171,7 @@ export default function LoginScreen() {
             color={colors.primary}
             style={{ marginBottom: 16 }}
             onPress={handleLogin}
-            disabled={isLoading}
+            disabled={isBusy}
           />
 
           <View style={shared.dividerRow}>
@@ -159,8 +181,20 @@ export default function LoginScreen() {
           </View>
 
           <View style={shared.socialRow}>
-            <SocialButton label="Google"   iconSymbol={<FontAwesome5 name="google" size={18} color="#DB4437" />} />
-            <SocialButton label="Facebook" iconSymbol={<FontAwesome5 name="facebook" size={18} color="#4267B2" />} />
+            <SocialButton
+              label="Google"
+              iconSymbol={<FontAwesome5 name="google" size={18} color="#DB4437" />}
+              onPress={() => signInWith('google')}
+              loading={loadingProvider === 'google'}
+              disabled={isBusy}
+            />
+            <SocialButton
+              label="Facebook"
+              iconSymbol={<FontAwesome5 name="facebook" size={18} color="#4267B2" />}
+              onPress={() => signInWith('facebook')}
+              loading={loadingProvider === 'facebook'}
+              disabled={isBusy}
+            />
           </View>
         </View>
 
