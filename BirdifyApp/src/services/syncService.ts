@@ -64,14 +64,20 @@ function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
   return arrayBuffer;
 }
 
+let isSyncing = false;
+
 export async function flushSyncQueue() {
-  const queue = await db.getAllAsync<any>(
-    `SELECT * FROM sync_queue ORDER BY created_at ASC`
-  );
+  if (isSyncing) return;
+  isSyncing = true;
 
-  if (queue.length === 0) return;
+  try {
+    const queue = await db.getAllAsync<any>(
+      `SELECT * FROM sync_queue ORDER BY created_at ASC`
+    );
 
-  let syncedAnything = false;
+    if (queue.length === 0) return;
+
+    let syncedAnything = false;
 
   for (const row of queue) {
     const payload = JSON.parse(row.payload);
@@ -200,11 +206,6 @@ export async function flushSyncQueue() {
       } else {
         if (row.operation === 'INSERT') {
           ({ error } = await supabase.from(row.table_name).insert(payload));
-          // Notificar owner si es un comentario
-          if (!error && row.table_name === 'comments') {
-            const { CommentRepository } = await import('../repositories/comment.repository');
-            CommentRepository.notifyOwner(payload.sighting_id, payload.user_id, payload.content).catch(() => {});
-          }
         } else if (row.operation === 'UPDATE') {
           ({ error } = await supabase.from(row.table_name).update(payload).eq('id', payload.id));
         } else if (row.operation === 'DELETE') {
@@ -231,10 +232,14 @@ export async function flushSyncQueue() {
     }
   }
 
-  if (syncedAnything) {
-    DeviceEventEmitter.emit('sync_completed');
+    if (syncedAnything) {
+      DeviceEventEmitter.emit('sync_completed');
+    }
+  } finally {
+    isSyncing = false;
   }
 }
+
 export async function deletePendingSighting(sightingId: string): Promise<void> {
   // 1. Borrar de sync_queue 
   await db.runAsync(
@@ -245,4 +250,23 @@ export async function deletePendingSighting(sightingId: string): Promise<void> {
   );
   // 2. Borrar de la tabla local
   await db.runAsync(`DELETE FROM sightings WHERE id = ?`, [sightingId]);
+}
+
+/**
+ * Limpia la caché local y la cola de sincronización al cerrar sesión
+ * para evitar fugas de información entre cuentas (V-03).
+ */
+export async function clearLocalData(): Promise<void> {
+  try {
+    await db.execAsync(`
+      DELETE FROM sync_queue;
+      DELETE FROM sightings;
+      DELETE FROM comments;
+      DELETE FROM reactions;
+      DELETE FROM follows;
+      DELETE FROM users;
+    `);
+  } catch (e) {
+    console.warn('[clearLocalData] Error limpiando base local:', e);
+  }
 }
