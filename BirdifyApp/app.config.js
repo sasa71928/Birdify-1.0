@@ -6,6 +6,8 @@ export default {
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'automatic',
+    // Esquema de deep link usado para volver a la app tras el login con Google/Facebook
+    scheme: 'birdify',
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
@@ -30,7 +32,7 @@ export default {
           apiKey: process.env.GOOGLE_MAPS_API_KEY || 'YOUR_GOOGLE_MAPS_API_KEY',
         },
       },
-      usesCleartextTraffic: true,
+      usesCleartextTraffic: false,
       newArchEnabled: true,
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
@@ -44,6 +46,9 @@ export default {
       'expo-notifications',
       'expo-mail-composer',
       'expo-sqlite',
+      'expo-secure-store',
+      'expo-web-browser',
+      'expo-status-bar',
       ['expo-system-ui', { backgroundColor: '#154212' }],
     ],
     extra: {
