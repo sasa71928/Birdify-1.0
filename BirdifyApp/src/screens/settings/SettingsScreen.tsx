@@ -10,7 +10,7 @@ import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useAuth } from '../../context/AuthContext';
 import * as DocumentPicker from 'expo-document-picker';
 import * as MailComposer from 'expo-mail-composer';
-import { handleError } from '../../utils/errorHandler';
+import { handleError, showSuccess } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
 type SettingsNavProp = NativeStackNavigationProp<RootStackParamList, 'Settings'>;
 
@@ -49,10 +49,6 @@ const SETTING_SECTIONS: SettingSection[] = [
       { id: '6', icon: 'help-circle-outline', label: 'Help & Support' },
       { id: '7', icon: 'information-circle-outline', label: 'About Birdify' },
     ],
-  },
-  {
-    title: 'Developer',
-    data: [{ id: '9', icon: 'server-outline', label: 'Server Configuration' }],
   },
   {
     title: 'Actions',
@@ -128,8 +124,6 @@ export default function SettingsScreen() {
       navigation.navigate('AboutBirdify' as any);
     } else if (item.id === 'verify') {
       setVerificationModalVisible(true);
-    } else if (item.id === '9') {
-      navigation.navigate('ServerConfig' as any);
     } else {
       console.log(`Navigating to ${item.label}`);
     }
@@ -233,7 +227,7 @@ export default function SettingsScreen() {
                             attachments: [selectedFile.uri],
                           });
                           if (status === 'sent') {
-                            handleError('Correo enviado correctamente', setToast, 'Solicitud enviada');
+                            showSuccess('Correo enviado correctamente', setToast);
                           } else {
                             handleError('El correo no se pudo enviar', setToast, 'Error');
                           }
