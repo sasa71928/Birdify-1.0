@@ -165,6 +165,7 @@ export default function EditProfileScreen() {
           aspect: [1, 1],
           quality: 0.8,
           base64: true, // Requerir base64 para evitar polyfills de Blob inestables en React Native
+          exif: false,
         });
       } else {
         result = await ImagePicker.launchCameraAsync({
@@ -173,6 +174,7 @@ export default function EditProfileScreen() {
           aspect: [1, 1],
           quality: 0.8,
           base64: true, // Requerir base64
+          exif: false,
         });
       }
 
