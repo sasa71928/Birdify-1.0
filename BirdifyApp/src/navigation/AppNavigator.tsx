@@ -34,12 +34,10 @@ import ThemeSettingsScreen from '../screens/settings/ThemeSettingsScreen';
 import HelpSupportScreen from '../screens/settings/HelpSupportScreen';
 import AboutBirdifyScreen from '../screens/settings/AboutBirdifyScreen';
 import BlockedUsersScreen from '../screens/settings/BlockedUsersScreen';
-import ServerConfigScreen from '../screens/settings/ServerConfigScreen';
 import { useAuth } from '../context/AuthContext';
 
-// ── OfflineContext ─────────────────────────────────────────────────────────────
-export const OfflineContext = createContext(false);
-export function useOffline() { return useContext(OfflineContext); }
+import { OfflineContext, OfflineProvider, useOffline } from '../context/OfflineContext';
+export { OfflineContext, OfflineProvider, useOffline };
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 export interface BirdSpeciesData {
@@ -99,7 +97,6 @@ export type RootStackParamList = {
   ThemeSettings: undefined;
   HelpSupport: undefined;
   AboutBirdify: undefined;
-  ServerConfig: undefined;
   MainTabs: { screen?: string; params?: { searchQuery?: string } };
 };
 
@@ -143,23 +140,6 @@ function MainTabs() {
   return isOffline ? <OfflineTabs /> : <OnlineTabs />;
 }
 
-export function OfflineProvider({ children }: { children: React.ReactNode }) {
-  const [online, setOnline] = useState(false);
-
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setOnline(!!state.isConnected);
-    });
-    NetInfo.fetch().then(state => setOnline(!!state.isConnected));
-    return unsubscribe;
-  }, []);
-
-  return (
-    <OfflineContext.Provider value={!online}>
-      {children}
-    </OfflineContext.Provider>
-  );
-}
 
 // ── AppNavigator ──────────────────────────────────────────────────────────────
 export default function AppNavigator() {
@@ -206,7 +186,6 @@ export default function AppNavigator() {
           <Stack.Screen name="ThemeSettings"        component={ThemeSettingsScreen} />
           <Stack.Screen name="HelpSupport"          component={HelpSupportScreen} />
           <Stack.Screen name="AboutBirdify"         component={AboutBirdifyScreen} />
-          <Stack.Screen name="ServerConfig"         component={ServerConfigScreen} />
         </>
       )}
     </Stack.Navigator>
