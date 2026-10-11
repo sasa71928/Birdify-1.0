@@ -946,6 +946,7 @@ export default function ChatScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 0.8,
+      exif: false,
     });
     if (!result.canceled) setSelectedImage(result.assets[0].uri);
   };
