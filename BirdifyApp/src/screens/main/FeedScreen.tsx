@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import FeedItem, { Post } from '../../components/FeedItem';
 import TopNavBar from '../../components/TopNavBar';
 import AppToast from '../../components/AppToast';
+import { FeedSkeleton } from '../../components/skeleton';
 import { createStyles } from '../../styles/screens/main/feedScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useFeed } from '../../hooks/useFeed';
@@ -65,9 +66,7 @@ export default function FeedScreen() {
       <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
       
       {isLoading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <FeedSkeleton />
       ) : posts.length === 0 ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <Text style={{ color: colors.textSecondary, fontSize: 16, textAlign: 'center' }}>

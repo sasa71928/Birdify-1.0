@@ -16,6 +16,7 @@ import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { createStyles } from '../../styles/screens/bird/birdDetailScreen.styles';
 
 import FeedItem from '../../components/FeedItem';
+import { SkeletonBone } from '../../components/skeleton';
 import { useBirdDetail } from '../../hooks/useBirdDetail';
 import AppToast from '../../components/AppToast';
 
@@ -159,7 +160,10 @@ export default function BirdDetailScreen() {
           </Text>
 
           {loading ? (
-            <ActivityIndicator color={colors.primary} />
+            <View style={{ gap: 12 }}>
+              <SkeletonBone width="100%" height={140} borderRadius={16} />
+              <SkeletonBone width="100%" height={140} borderRadius={16} />
+            </View>
           ) : posts.length === 0 ? (
             <Text style={{ color: colors.textSecondary }}>
               No hay avistamientos para esta especie.

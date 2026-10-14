@@ -15,6 +15,7 @@ import { createStyles } from '../styles/components/FeedItem.styles';
 import { useDynamicStyles } from '../hooks/useDynamicStyles';
 import PagerView from 'react-native-pager-view';
 import AppToast from './AppToast';
+import { CommentsSkeleton } from './skeleton';
 
 export interface Comment {
   id: string;
@@ -80,6 +81,7 @@ function FeedItem({ post, onPostDeleted, onNavigateAway, isNew }: FeedItemProps)
   const [showHeartAnimation, setShowHeartAnimation] = React.useState(false);
   const heartScale = React.useRef(new Animated.Value(0)).current;
   const heartOpacity = React.useRef(new Animated.Value(0)).current;
+  const heartAnimationRef = React.useRef<Animated.CompositeAnimation | null>(null);
   const lastTap = React.useRef(0);
   const [expandedComments, setExpandedComments] = React.useState<Record<string, boolean>>({});
   const [commentText, setCommentText] = React.useState('');
@@ -89,6 +91,13 @@ function FeedItem({ post, onPostDeleted, onNavigateAway, isNew }: FeedItemProps)
     parentId: string | null;
   } | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
+  const [imageLoaded, setImageLoaded] = React.useState<Record<number, boolean>>({});
+  const [imageError, setImageError] = React.useState<Record<number, boolean>>({});
+
+  React.useEffect(() => {
+    setImageLoaded({});
+    setImageError({});
+  }, [post.image]);
   const [showDeleteModal, setShowDeleteModal] = React.useState(false);
   const [showBlockModal, setShowBlockModal] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -256,50 +265,80 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     }
   };
 
+  const DOUBLE_TAP_DELAY = 380;
+
   const triggerHeartAnimation = () => {
+    if (heartAnimationRef.current) {
+      heartAnimationRef.current.stop();
+    }
+
     setShowHeartAnimation(true);
     heartScale.setValue(0);
     heartOpacity.setValue(0);
 
-    Animated.parallel([
+    const anim = Animated.parallel([
       Animated.sequence([
+        // 1. Pop rápido con efecto rebote elástico
         Animated.spring(heartScale, {
-          toValue: 1.2,
-          friction: 3,
+          toValue: 1.25,
+          friction: 4,
+          tension: 50,
           useNativeDriver: true,
         }),
+        // 2. Se estabiliza en tamaño natural
         Animated.timing(heartScale, {
           toValue: 1,
           duration: 100,
           useNativeDriver: true,
         }),
+        // 3. Pausa visible en pantalla
+        Animated.delay(220),
+        // 4. Se expande suavemente mientras se desvanece
+        Animated.timing(heartScale, {
+          toValue: 1.35,
+          duration: 250,
+          useNativeDriver: true,
+        }),
       ]),
       Animated.sequence([
+        // Aparición rápida
         Animated.timing(heartOpacity, {
           toValue: 1,
-          duration: 200,
+          duration: 140,
           useNativeDriver: true,
         }),
+        // Mantener visible
+        Animated.delay(320),
+        // Desvanecimiento suave
         Animated.timing(heartOpacity, {
           toValue: 0,
-          duration: 500,
-          delay: 400,
+          duration: 250,
           useNativeDriver: true,
         }),
       ]),
-    ]).start(() => setShowHeartAnimation(false));
+    ]);
+
+    heartAnimationRef.current = anim;
+    anim.start(({ finished }) => {
+      if (finished) {
+        setShowHeartAnimation(false);
+      }
+    });
   };
 
   const handleImageTap = () => {
     const now = Date.now();
-    if (now - lastTap.current < 300) {
-      // Double tap
+    if (now - lastTap.current < DOUBLE_TAP_DELAY) {
+      // Doble tap: dar like si todavía no lo tiene
       if (!liked) {
         handleLike();
       }
+      // Siempre reproducir la animación visual de corazón
       triggerHeartAnimation();
+      lastTap.current = 0;
+    } else {
+      lastTap.current = now;
     }
-    lastTap.current = now;
   };
 
   const handleShare = async () => {
@@ -387,6 +426,7 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
       useNativeDriver: true,
     }).start(() => {
       setShowComments(false);
+      setCommentsList([]); // Liberar memoria y asegurar que los comentarios se carguen frescos bajo demanda
     });
   };
 
@@ -616,47 +656,127 @@ const handleDeleteSighting = async () => {
         </TouchableOpacity>
       </View>
 
-      {totalImages > 1 && (
-        <View style={styles.imageCounter}>
-          <Text style={styles.imageCounterText}>
-            {currentImageIndex + 1} / {totalImages}
-          </Text>
-        </View>
-      )}
-      
+      {/* Media Carousel with Double-Tap Heart Animation */}
+      <View style={styles.mediaWrapper}>
+        <PagerView
+          ref={pagerRef}
+          style={styles.imageContainer}
+          initialPage={0}
+          scrollEnabled={true}
+          offscreenPageLimit={1}
+          overdrag={false}
+          onPageSelected={(e) => setCurrentImageIndex(e.nativeEvent.position)}
+        >
+          {images.map((img, index) => {
+            const isImgLoaded = Boolean(imageLoaded[index]);
+            const isImgError = Boolean(imageError[index] || !img);
 
-      {/* Image Content */}
-      <PagerView
-        ref={pagerRef}
-        style={styles.imageContainer}
-        initialPage={0}
-        scrollEnabled={true}
-        offscreenPageLimit={1}
-        overdrag={false}
-        onPageSelected={(e) => setCurrentImageIndex(e.nativeEvent.position)}
-      >
-        {images.map((img, index) => (
-          <View key={index} style={{ flex: 1 }}>
-            <TouchableWithoutFeedback onPress={handleImageTap}>
-              <Image source={{ uri: img }} style={styles.postImage} fadeDuration={0} resizeMode="cover" />
-            </TouchableWithoutFeedback>
+            return (
+              <View key={index} style={styles.pageItem}>
+                <TouchableWithoutFeedback onPress={handleImageTap}>
+                  <View style={{ width: '100%', height: '100%', position: 'relative' }}>
+                    {/* Placeholder estilizado: visible mientras carga o si no se encuentra la imagen */}
+                    {(!isImgLoaded || isImgError) && (
+                      <View style={styles.placeholderContainer} pointerEvents="none">
+                        <View style={styles.placeholderGlow} />
+                        <View style={styles.placeholderIconWrapper}>
+                          <MaterialCommunityIcons
+                            name="feather"
+                            size={36}
+                            color={isDark ? '#A3D494' : colors.primary}
+                          />
+                        </View>
+                        <Text style={styles.placeholderBadgeText}>
+                          {isImgError ? 'Avistamiento de ave' : 'Cargando fotografía'}
+                        </Text>
+                        <Text style={styles.placeholderBirdTitle} numberOfLines={2}>
+                          {post.tag || 'Ave sin identificar'}
+                        </Text>
+                        {isImgError ? (
+                          <View style={styles.placeholderStatusPill}>
+                            <Ionicons name="image-outline" size={13} color={colors.textSecondary} />
+                            <Text style={styles.placeholderStatusText}>Fotografía no disponible</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.placeholderStatusPill}>
+                            <ActivityIndicator size="small" color={colors.primary} />
+                            <Text style={styles.placeholderStatusText}>Cargando imagen...</Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+
+                    {/* Imagen real */}
+                    {Boolean(img) && !isImgError && (
+                      <Image
+                        source={{ uri: img }}
+                        style={[
+                          styles.postImage,
+                          { opacity: isImgLoaded ? 1 : 0 },
+                        ]}
+                        fadeDuration={180}
+                        resizeMode="cover"
+                        onLoad={() => {
+                          setImageLoaded(prev => ({ ...prev, [index]: true }));
+                        }}
+                        onError={() => {
+                          setImageError(prev => ({ ...prev, [index]: true }));
+                        }}
+                      />
+                    )}
+                  </View>
+                </TouchableWithoutFeedback>
+              </View>
+            );
+          })}
+        </PagerView>
+
+        {/* Double-tap animated heart (pointerEvents="none" ensures it NEVER blocks swipe/scroll) */}
+        {showHeartAnimation && (
+          <View style={styles.heartOverlay} pointerEvents="none">
+            <Animated.View
+              style={[
+                styles.heartAnimated,
+                {
+                  transform: [{ scale: heartScale }],
+                  opacity: heartOpacity,
+                },
+              ]}
+            >
+              <Ionicons
+                name="heart"
+                size={110}
+                color="#FF2E63"
+                style={styles.heartIcon}
+              />
+            </Animated.View>
           </View>
-        ))}
-      </PagerView>
-      {/* Dots indicator */}
+        )}
+
+        {/* Image Counter (e.g., 1 / 3) */}
         {totalImages > 1 && (
-          <View style={styles.dotsContainer}>
+          <View style={styles.imageCounter} pointerEvents="none">
+            <Text style={styles.imageCounterText}>
+              {currentImageIndex + 1} / {totalImages}
+            </Text>
+          </View>
+        )}
+
+        {/* Carousel Dots indicator */}
+        {totalImages > 1 && (
+          <View style={styles.dotsContainer} pointerEvents="none">
             {images.map((_, index) => (
               <View
                 key={index}
                 style={[
                   styles.dot,
-                  currentImageIndex === index && styles.activeDot
+                  currentImageIndex === index && styles.activeDot,
                 ]}
               />
             ))}
           </View>
         )}
+      </View>
 
       {/* Actions */}
       <View style={styles.actions}>
@@ -756,10 +876,7 @@ const handleDeleteSighting = async () => {
               showsVerticalScrollIndicator={false}
             >
               {loadingComments ? (
-                <View style={{ paddingVertical: 40, justifyContent: 'center', alignItems: 'center' }}>
-                  <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={{ marginTop: 10, color: Colors.textSecondary, fontSize: 13 }}>Cargando comentarios...</Text>
-                </View>
+                <CommentsSkeleton count={4} />
               ) : commentsList.length === 0 ? (
                 <View style={{ paddingVertical: 40, justifyContent: 'center', alignItems: 'center' }}>
                   <Ionicons name="chatbubbles-outline" size={32} color={colors.primary + '80'} />

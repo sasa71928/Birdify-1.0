@@ -1,17 +1,51 @@
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { isRunningInExpoGo } from 'expo';
+
+// Cargar expo-notifications dinámicamente SOLO fuera de Expo Go.
+// En Expo SDK 53+, simplemente importar 'expo-notifications' en Expo Go
+// en Android lanza un error fatal en tiempo de inicio ("Runtime not ready").
+let NotificationsModule: typeof import('expo-notifications') | null = null;
+
+function getNotificationsModule() {
+  if (isRunningInExpoGo()) {
+    return null;
+  }
+  if (!NotificationsModule) {
+    try {
+      NotificationsModule = require('expo-notifications');
+      NotificationsModule?.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        }),
+      });
+    } catch (e) {
+      console.warn('[NotificationService] No se pudo cargar expo-notifications:', e);
+    }
+  }
+  return NotificationsModule;
+}
 
 export class NotificationService {
   static async register(): Promise<string | null> {
     try {
-      if (Constants.appOwnership === 'expo') {
-        console.log('Push notifications no disponibles en Expo Go');
+      if (isRunningInExpoGo()) {
+        console.log('[NotificationService] Push notifications no están soportadas en Expo Go (removidas en SDK 53+).');
         return null;
       }
+
+      const Notifications = getNotificationsModule();
+      if (!Notifications) {
+        return null;
+      }
+
       if (!Device.isDevice) {
-        console.log('Debes usar un dispositivo físico');
+        console.log('Debes usar un dispositivo físico para notificaciones push');
         return null;
       }
 
@@ -57,7 +91,7 @@ export class NotificationService {
       );
       return tokenData.data ?? null;
     } catch (error) {
-      console.error('Error en NotificationService.register:', error);
+      console.warn('[NotificationService] No se pudo registrar push notifications:', error);
       return null;
     }
   }

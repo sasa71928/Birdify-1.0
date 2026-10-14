@@ -20,6 +20,7 @@ import { createStyles } from '../../styles/screens/main/feedScreen.styles';
 import { useAuth } from '../../context/AuthContext';
 import { deletePendingSighting } from '../../services/syncService';
 import FeedItem from '../../components/FeedItem';
+import { FeedSkeleton } from '../../components/skeleton';
 import { mapSightingToPost } from '../../hooks/useFeed';
 
 interface LocalSighting {
@@ -104,9 +105,7 @@ export default function OfflineFeedScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-        </View>
+        <FeedSkeleton />
       ) : sightings.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="binoculars-outline" size={48} color={Colors.textSecondary} />

@@ -24,6 +24,7 @@ import AppToast from '../../components/AppToast';
 import { useAuth } from '../../context/AuthContext';
 import { FollowRepository } from '../../repositories/follow.repository';
 import { ConversationRepository } from '../../repositories/conversation.repository';
+import { MessagesSkeleton } from '../../components/skeleton';
 import { handleError } from '../../utils/errorHandler';
 
 export default function MessagesScreen() {
@@ -227,9 +228,7 @@ export default function MessagesScreen() {
         </TouchableOpacity>
 
         {loading && threads.length === 0 ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
+          <MessagesSkeleton />
         ) : (
           <View style={{ flex: 1 }}>
             <FlatList

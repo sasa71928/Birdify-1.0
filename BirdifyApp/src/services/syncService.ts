@@ -144,15 +144,28 @@ export async function flushSyncQueue() {
                 }));
 
               const arrayBuffer = decodeBase64ToArrayBuffer(base64);
-              const { error: uploadError } = await supabase.storage
-                .from('sightings')
+              let bucketName = 'Sightings';
+              let { error: uploadError } = await supabase.storage
+                .from(bucketName)
                 .upload(fileName, arrayBuffer, {
                   contentType: `image/${ext === 'png' ? 'png' : 'jpeg'}`,
                   upsert: true,
                 });
+
+              if (uploadError && (uploadError as any).code === 'NoSuchBucket') {
+                bucketName = 'sightings';
+                const retry = await supabase.storage
+                  .from(bucketName)
+                  .upload(fileName, arrayBuffer, {
+                    contentType: `image/${ext === 'png' ? 'png' : 'jpeg'}`,
+                    upsert: true,
+                  });
+                uploadError = retry.error;
+              }
+
               if (uploadError) throw uploadError;
 
-              const { data: { publicUrl } } = supabase.storage.from('sightings').getPublicUrl(fileName);
+              const { data: { publicUrl } } = supabase.storage.from(bucketName).getPublicUrl(fileName);
               photoUrls.push(publicUrl);
             }
           }

@@ -19,6 +19,7 @@ import { createStyles } from '../../styles/screens/main/dictionaryScreen.styles'
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useDictionary } from '../../hooks/useDictionary';
 import AppToast from '../../components/AppToast';
+import { DictionarySkeleton } from '../../components/skeleton';
 
 export default function DictionaryScreen() {
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
@@ -93,9 +94,7 @@ export default function DictionaryScreen() {
 
         {/* LIST */}
         {loading ? (
-          <View style={{ flex: 1, justifyContent: 'center' }}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
+          <DictionarySkeleton />
         ) : (
           <SectionList
             style={styles.listContent}

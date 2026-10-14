@@ -31,6 +31,7 @@ import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useExplore } from '../../hooks/useExplore';
 import { mapBird } from '../../utils/mapBird';
 import AppToast from '../../components/AppToast';
+import { ExploreSkeleton } from '../../components/skeleton';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Explore'>;
 
@@ -175,16 +176,7 @@ export default function ExploreScreen() {
 
   if (loading) {
     return (
-      <View
-        style={[
-          styles.container,
-          {
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: colors.surface,
-          },
-        ]}
-      >
+      <View style={styles.container}>
         <StatusBar
           barStyle={
             isDark
@@ -192,11 +184,7 @@ export default function ExploreScreen() {
               : 'dark-content'
           }
         />
-
-        <ActivityIndicator
-          size="large"
-          color={colors.primary}
-        />
+        <ExploreSkeleton />
       </View>
     );
   }

@@ -474,19 +474,33 @@ export function useRecordSighting(editingSightingId?: string) {
           const fileName = `${user.id}/${Date.now()}_${i}.${fileExt}`;
           const arrayBuffer = decodeBase64ToArrayBuffer(base64);
 
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('sightings')
+          let bucketName = 'Sightings';
+          let { data: uploadData, error: uploadError } = await supabase.storage
+            .from(bucketName)
             .upload(fileName, arrayBuffer, {
               contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
               upsert: true,
             });
+
+          // Si el bucket fue creado en minúsculas 'sightings', reintentar
+          if (uploadError && (uploadError as any).code === 'NoSuchBucket') {
+            bucketName = 'sightings';
+            const retry = await supabase.storage
+              .from(bucketName)
+              .upload(fileName, arrayBuffer, {
+                contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+                upsert: true,
+              });
+            uploadData = retry.data;
+            uploadError = retry.error;
+          }
 
           if (uploadError) {
             throw new Error('Error al subir imagen: ' + uploadError.message);
           }
 
           const { data: { publicUrl } } = supabase.storage
-            .from('sightings')
+            .from(bucketName)
             .getPublicUrl(fileName);
 
           photoUrls.push(publicUrl);

@@ -21,6 +21,7 @@ import { Typography, Spacing, Radius, Shadows, Colors } from '../../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TopNavBar from '../../components/TopNavBar';
 import BottomNavBar from '../../components/BottomNavBar';
+import { ProfileSkeleton } from '../../components/skeleton';
 import FeedItem, { Post } from '../../components/FeedItem';
 import { createStyles } from '../../styles/screens/social/profileScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
@@ -439,9 +440,7 @@ const userData = profile ? {
     return (
       <SafeAreaView style={shared.safe}>
         <TopNavBar />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface }}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <ProfileSkeleton />
         <BottomNavBar />
       </SafeAreaView>
     );
