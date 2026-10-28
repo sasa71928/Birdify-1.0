@@ -1,45 +1,49 @@
 # Dependencies
 node_modules/
-package-lock.json
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Metro
+.metro-health-check*
 
 # Environment and sensitive keys
 .env
 .env.*
 !.env.example
-birdify-local/.env
 *.key
 *.pem
 *.jks
 *.keystore
 *.p8
 *.p12
+*.mobileprovision
 
 # Local SQLite databases
 *.db
+*.db-*
 *.sqlite
 *.sqlite3
-BirdifyApp/BirdifyApp.db
 
-# Expo & Builds
-.expo/
-dist/
-web-build/
-*.tsbuildinfo
-
-# Native folders (managed by prebuild)
+# Native folders (managed by Expo CNG / prebuild)
 /ios
 /android
+.kotlin/
+*.orig.*
 
-# Temporary/Scratch Scripts
-replace_calls*.js
-insert_function.js
-create_test_user.js
+# TypeScript & Build caches
+*.tsbuildinfo
 
-# Agent/IDE local configs
+# Debug logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# IDE & OS
 .devin/
 .vscode/
 .DS_Store
 Thumbs.db
-npm-debug.*
-yarn-debug.*
-yarn-error.*
