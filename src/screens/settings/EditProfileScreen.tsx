@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   StatusBar,
   TextInput,
   Image,
-  Alert,
   ActivityIndicator,
   Modal,
   StyleSheet,
@@ -26,43 +25,6 @@ import { supabase } from '../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { handleError, showSuccess } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
-
-function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const lookup = new Uint8Array(256);
-  for (let i = 0; i < chars.length; i++) {
-    lookup[chars.charCodeAt(i)] = i;
-  }
-  
-  let bufferLength = base64.length * 0.75;
-  if (base64[base64.length - 1] === '=') {
-    bufferLength--;
-    if (base64[base64.length - 2] === '=') {
-      bufferLength--;
-    }
-  }
-
-  const arrayBuffer = new ArrayBuffer(bufferLength);
-  const bytes = new Uint8Array(arrayBuffer);
-
-  let p = 0;
-  for (let i = 0; i < base64.length; i += 4) {
-    const base641 = lookup[base64.charCodeAt(i)];
-    const base642 = lookup[base64.charCodeAt(i + 1)];
-    const base643 = lookup[base64.charCodeAt(i + 2)];
-    const base644 = lookup[base64.charCodeAt(i + 3)];
-
-    bytes[p++] = (base641 << 2) | (base642 >> 4);
-    if (p < bufferLength) {
-      bytes[p++] = ((base642 & 15) << 4) | (base643 >> 2);
-    }
-    if (p < bufferLength) {
-      bytes[p++] = ((base643 & 3) << 6) | (base644 & 63);
-    }
-  }
-
-  return arrayBuffer;
-}
 
 export default function EditProfileScreen() {
   const navigation = useNavigation();
@@ -111,7 +73,7 @@ export default function EditProfileScreen() {
             toValue: 0,
             useNativeDriver: true,
             tension: 50,
-            friction: 8
+            friction: 8,
           }).start();
         }
       },
@@ -130,7 +92,7 @@ export default function EditProfileScreen() {
         toValue: 0,
         useNativeDriver: true,
         tension: 50,
-        friction: 8
+        friction: 8,
       }).start();
     } else {
       panY.setValue(screenHeight);
@@ -152,31 +114,22 @@ export default function EditProfileScreen() {
       } else {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') {
-          handleError('Permiso denegado', setToast, 'Necesitamos acceso a tu c├ímara para tomar la foto.');
+          handleError('Permiso denegado', setToast, 'Necesitamos acceso a tu cámara para tomar la foto.');
           return;
         }
       }
 
-      let result;
-      if (source === 'gallery') {
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: 'images',
-          allowsEditing: true,
-          aspect: [1, 1],
-          quality: 0.8,
-          base64: true, // Requerir base64 para evitar polyfills de Blob inestables en React Native
-          exif: false,
-        });
-      } else {
-        result = await ImagePicker.launchCameraAsync({
-          mediaTypes: 'images',
-          allowsEditing: true,
-          aspect: [1, 1],
-          quality: 0.8,
-          base64: true, // Requerir base64
-          exif: false,
-        });
-      }
+      const pickerOptions: ImagePicker.ImagePickerOptions = {
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        exif: false,
+      };
+
+      const result = source === 'gallery'
+        ? await ImagePicker.launchImageLibraryAsync(pickerOptions)
+        : await ImagePicker.launchCameraAsync(pickerOptions);
 
       if (result.canceled || !result.assets || result.assets.length === 0) {
         return;
@@ -184,24 +137,22 @@ export default function EditProfileScreen() {
 
       const selectedAsset = result.assets[0];
       const imageUri = selectedAsset.uri;
-      const base64 = selectedAsset.base64;
-
-      if (!base64) {
-        throw new Error('No se pudo decodificar la imagen seleccionada en base64.');
-      }
 
       setIsSaving(true);
-      
-      const fileExt = imageUri.split('.').pop() || 'jpg';
+
+      const rawExt = (imageUri.split('.').pop() || 'jpg').toLowerCase().split('?')[0];
+      const fileExt = rawExt === 'png' || rawExt === 'webp' ? rawExt : 'jpg';
+      const contentType = fileExt === 'png' ? 'image/png' : fileExt === 'webp' ? 'image/webp' : 'image/jpeg';
       const fileName = `${user!.id}/${Date.now()}.${fileExt}`;
 
-      // Decodificamos de base64 a ArrayBuffer de forma estable y nativa en JS
-      const arrayBuffer = decodeBase64ToArrayBuffer(base64);
+      // Lectura binaria directa desde URI sin retener cadenas Base64 en el heap JS (AUD-022)
+      const response = await fetch(imageUri);
+      const arrayBuffer = await response.arrayBuffer();
 
-      const { data, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(fileName, arrayBuffer, {
-          contentType: `image/${fileExt === 'png' ? 'png' : 'jpeg'}`,
+          contentType,
           upsert: true,
         });
 
@@ -216,7 +167,7 @@ export default function EditProfileScreen() {
       setAvatar(publicUrl);
       showSuccess('Foto de perfil cargada correctamente', setToast);
     } catch (error: any) {
-      handleError(error, setToast, `Detalle t├®cnico: ${error.message || error.error_description || 'Problema de red o de permisos del bucket.'}`);
+      handleError(error, setToast, `Detalle técnico: ${error.message || error.error_description || 'Problema de red o de permisos del bucket.'}`);
     } finally {
       setIsSaving(false);
     }
@@ -231,7 +182,7 @@ export default function EditProfileScreen() {
         if (data) {
           setFullname(data.fullname || '');
           setUsername(data.username || '');
-          setEmail(data.email || '');
+          setEmail(user.email || data.email || '');
           setBio(data.bio || '');
           setAvatar(data.profile_pic_url || '');
         }
@@ -254,8 +205,8 @@ export default function EditProfileScreen() {
     setIsSaving(true);
     try {
       const sanitizedUsername = username.trim().toLowerCase().replace('@', '');
-      
-      // 1. Validar que el username no est├® duplicado
+
+      // 1. Validar que el username no esté duplicado
       const { data: existingUser, error: checkError } = await supabase
         .from('users')
         .select('id')
@@ -265,7 +216,7 @@ export default function EditProfileScreen() {
 
       if (checkError) throw checkError;
       if (existingUser) {
-        handleError('Este nombre de usuario ya est├í siendo usado por otra persona', setToast, 'Nombre ocupado');
+        handleError('Este nombre de usuario ya está siendo usado por otra persona', setToast, 'Nombre ocupado');
         setIsSaving(false);
         return;
       }
@@ -285,8 +236,8 @@ export default function EditProfileScreen() {
         data: {
           username: sanitizedUsername,
           fullname: fullname.trim(),
-          profile_pic_url: finalAvatar
-        }
+          profile_pic_url: finalAvatar,
+        },
       });
 
       if (authError) throw authError;
@@ -294,13 +245,13 @@ export default function EditProfileScreen() {
       showSuccess('Tu perfil ha sido actualizado correctamente', setToast);
       navigation.goBack();
     } catch (error: any) {
-      handleError(error, setToast, error.message || 'Ocurri├│ un problema guardando los cambios');
+      handleError(error, setToast, error.message || 'Ocurrió un problema guardando los cambios');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const modalStyles = StyleSheet.create({
+  const modalStyles = useMemo(() => StyleSheet.create({
     modalOverlay: {
       flex: 1,
       backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -369,7 +320,7 @@ export default function EditProfileScreen() {
       fontWeight: '600',
       fontFamily: 'PlusJakartaSans-SemiBold',
     },
-  });
+  }), [colors]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -378,7 +329,12 @@ export default function EditProfileScreen() {
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Volver"
+        >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Editar Perfil</Text>
@@ -400,6 +356,8 @@ export default function EditProfileScreen() {
               style={styles.avatarContainer} 
               activeOpacity={0.8}
               onPress={handleSelectAvatarSource}
+              accessibilityRole="button"
+              accessibilityLabel="Cambiar foto de perfil"
             >
               {avatar ? (
                 <Image source={{ uri: avatar }} style={styles.avatarImage} />
@@ -438,24 +396,24 @@ export default function EditProfileScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Correo Electr├│nico (Solo Lectura)</Text>
+              <Text style={styles.inputLabel}>Correo Electrónico (Solo Lectura)</Text>
               <TextInput
                 style={[styles.input, { opacity: 0.6, backgroundColor: colors.componentBase }]}
                 value={email}
                 editable={false}
-                placeholder="Tu correo electr├│nico"
+                placeholder="Tu correo electrónico"
                 placeholderTextColor={colors.placeholder}
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Biograf├¡a</Text>
+              <Text style={styles.inputLabel}>Biografía</Text>
               <TextInput
                 style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
                 value={bio}
                 onChangeText={setBio}
                 multiline
-                placeholder="Cu├®ntanos un poco sobre ti..."
+                placeholder="Cuéntanos un poco sobre ti..."
                 placeholderTextColor={colors.placeholder}
               />
             </View>
@@ -465,9 +423,11 @@ export default function EditProfileScreen() {
               activeOpacity={0.8}
               onPress={handleSave}
               disabled={isSaving}
+              accessibilityRole="button"
+              accessibilityLabel="Guardar cambios del perfil"
             >
               <Text style={styles.saveBtnText}>
-                {isSaving ? "Guardando cambios..." : "Guardar Cambios"}
+                {isSaving ? 'Guardando cambios...' : 'Guardar Cambios'}
               </Text>
             </TouchableOpacity>
 
@@ -476,6 +436,8 @@ export default function EditProfileScreen() {
               activeOpacity={0.8}
               onPress={() => navigation.goBack()}
               disabled={isSaving}
+              accessibilityRole="button"
+              accessibilityLabel="Cancelar edición"
             >
               <Text style={styles.cancelBtnText}>Cancelar</Text>
             </TouchableOpacity>
@@ -504,7 +466,7 @@ export default function EditProfileScreen() {
           <Animated.View
             style={[
               StyleSheet.absoluteFill,
-              { backgroundColor: '#000', opacity: backdropOpacity }
+              { backgroundColor: '#000', opacity: backdropOpacity },
             ]}
           >
             <TouchableOpacity 
@@ -525,13 +487,12 @@ export default function EditProfileScreen() {
           <Animated.View 
             style={[modalStyles.sheetContainer, { transform: [{ translateY: panY }] }]}
           >
-            {/* Indicador de barra de arrastre enfocado para capturar el toque */}
             <View {...panResponder.panHandlers} style={{ width: '100%', alignItems: 'center', paddingVertical: 15, marginTop: -10 }}>
               <View style={modalStyles.dragIndicator} />
             </View>
             
             <Text style={modalStyles.sheetTitle}>Cambiar foto de perfil</Text>
-            <Text style={modalStyles.sheetSubtitle}>Selecciona c├│mo quieres actualizar tu foto:</Text>
+            <Text style={modalStyles.sheetSubtitle}>Selecciona cómo quieres actualizar tu foto:</Text>
 
             <View style={modalStyles.optionsContainer}>
               <TouchableOpacity 
@@ -543,7 +504,7 @@ export default function EditProfileScreen() {
                 }}
               >
                 <Ionicons name="camera" size={20} color={colors.canvasPure} style={modalStyles.optionIcon} />
-                <Text style={modalStyles.optionText}>Tomar Foto con C├ímara</Text>
+                <Text style={modalStyles.optionText}>Tomar Foto con Cámara</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -555,7 +516,7 @@ export default function EditProfileScreen() {
                 }}
               >
                 <Ionicons name="images" size={20} color={colors.canvasPure} style={modalStyles.optionIcon} />
-                <Text style={modalStyles.optionText}>Seleccionar de Galer├¡a</Text>
+                <Text style={modalStyles.optionText}>Seleccionar de Galería</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -576,4 +537,3 @@ export default function EditProfileScreen() {
     </SafeAreaView>
   );
 }
-

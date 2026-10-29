@@ -27,7 +27,7 @@ export function mapSightingToPost(sighting: any, currentUserObjOrId?: any): Post
   } else if (hoursAgo >= 1 && hoursAgo < 24) {
     timeAgoStr = `Hace ${hoursAgo} hora${hoursAgo === 1 ? '' : 's'}`;
   } else if (daysAgo >= 1) {
-    timeAgoStr = `Hace ${daysAgo} d├¡a${daysAgo === 1 ? '' : 's'}`;
+    timeAgoStr = `Hace ${daysAgo} día${daysAgo === 1 ? '' : 's'}`;
   }
 
   const reactionsList = sighting.reactions || [];
@@ -38,7 +38,7 @@ export function mapSightingToPost(sighting: any, currentUserObjOrId?: any): Post
   const rawUser = sighting.users || sighting.user;
   const userData = Array.isArray(rawUser) ? rawUser[0] : rawUser;
 
-  // Resolver nombre de usuario, con fallback al current user si es due├▒o
+  // Resolver nombre de usuario, con fallback al current user si es dueño
   let resolvedUsername = userData?.username;
   if (!resolvedUsername && currentUserId && sighting.user_id === currentUserId && typeof currentUserObjOrId === 'object') {
     resolvedUsername = currentUserObjOrId?.user_metadata?.username || currentUserObjOrId?.email?.split('@')[0] || 'Yo';
@@ -64,7 +64,7 @@ export function mapSightingToPost(sighting: any, currentUserObjOrId?: any): Post
     }
   }
 
-  let locationText = 'Ubicaci├│n Privada';
+  let locationText = 'Ubicación Privada';
   if (!sighting.is_location_private && sighting.latitude && sighting.longitude) {
     locationText = `${sighting.latitude.toFixed(4)}, ${sighting.longitude.toFixed(4)}`;
   }
@@ -85,8 +85,8 @@ export function mapSightingToPost(sighting: any, currentUserObjOrId?: any): Post
     commentsList: [],
     hasLiked,
     createdAt: sighting.created_at,
-    latitude: sighting.latitude,
-    longitude: sighting.longitude,
+    latitude: sighting.is_location_private ? undefined : sighting.latitude,
+    longitude: sighting.is_location_private ? undefined : sighting.longitude,
   };
 }
 
@@ -145,7 +145,7 @@ export function useFeed() {
   useEffect(() => {
     initialLoad();
 
-    // Sincronizaci├│n pasiva peri├│dica (5 minutos = 300,000 ms) para ahorrar bater├¡a y datos
+    // Sincronización pasiva periódica (5 minutos = 300,000 ms) para ahorrar batería y datos
     const intervalId = setInterval(() => {
       loadFeed(true);
     }, 300000);

@@ -67,4 +67,6 @@ export interface Follow {
   created_at: string;
 }
 
-export type UpdateProfileDTO = Partial<Omit<User, 'id' | 'created_at' | 'email'>>;
+export type UpdateProfileDTO = Partial<
+  Omit<User, 'id' | 'created_at' | 'email' | 'is_verified' | 'user_level'>
+>;
