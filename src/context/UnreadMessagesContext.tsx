@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { ConversationRepository } from '../repositories/conversation.repository';
-import { MessageRepository } from '../repositories/message.repository';
+import { MessageRepository, CHAT_IMAGE_PREFIX } from '../repositories/message.repository';
 import { useAuth } from './AuthContext';
 import { supabase } from '../lib/supabase';
 import { ChatThread } from '../navigation/AppNavigator';
 import { Message } from '../types/message';
-import { OfflineContext } from '../navigation/AppNavigator';
+import { OfflineContext } from './OfflineContext';
 import NetInfo from '@react-native-community/netinfo';
 
 interface UnreadMessagesContextType {
@@ -84,7 +84,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
             ? (c.avatar_url || 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=100')
             : (other?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp');
 
-        const lastMessageText = item.lastMessage?.content || (item.lastMessage?.image_url ? '­ƒôÀ Foto' : '');
+        const lastMessageText = item.lastMessage?.content || (item.lastMessage?.image_url ? '📷 Foto' : '');
         const displayMessage = c.is_group && item.lastMessage?.sender
           ? `${item.lastMessage.sender.fullname || item.lastMessage.sender.username}: ${lastMessageText}`
           : lastMessageText;
@@ -136,20 +136,20 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
     try {
       const { messages: rows, hasMore } = await MessageRepository.listPaginated(conversationId, 50);
 
-      // Reverse DESC ÔåÆ ASC para FlatList (viejos arriba, nuevos abajo)
+      // Reverse DESC → ASC para FlatList (viejos arriba, nuevos abajo)
       const reversedRows = [...rows].reverse();
 
-      // Traer ├║ltimo mensaje le├¡do desde la nueva tabla
+      // Traer último mensaje leído desde la nueva tabla
       const lastReadId = await ConversationRepository.getLastReadMessageId(conversationId, user.id);
 
-      // Determinar cu├íles mensajes est├ín le├¡dos
+      // Determinar cuáles mensajes están leídos
       let readCutoffIndex = -1;
       if (lastReadId) {
         const lastReadIndex = reversedRows.findIndex((r) => r.id === lastReadId);
         if (lastReadIndex !== -1) {
           readCutoffIndex = lastReadIndex;
         } else {
-          // lastReadId no est├í en el batch: comparar por created_at
+          // lastReadId no está en el batch: comparar por created_at
           const { data: lastReadMsg } = await supabase
             .from('messages')
             .select('created_at')
@@ -157,7 +157,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
             .single();
           if (lastReadMsg?.created_at) {
             const lastReadDate = new Date(lastReadMsg.created_at).getTime();
-            // El ├║ltimo mensaje le├¡do es el m├ís reciente cuyo created_at <= lastReadDate
+            // El último mensaje leído es el más reciente cuyo created_at <= lastReadDate
             for (let i = reversedRows.length - 1; i >= 0; i--) {
               if (reversedRows[i].created_at && new Date(reversedRows[i].created_at!).getTime() <= lastReadDate) {
                 readCutoffIndex = i;
@@ -196,6 +196,20 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
   const appendRealtimeMessage = useCallback((convId: string, payload: any) => {
     if (!user) return;
 
+    if (payload.image_url && String(payload.image_url).startsWith(CHAT_IMAGE_PREFIX)) {
+      MessageRepository.resolveChatImageUrl(payload.image_url).then((signedUrl) => {
+        if (!signedUrl) return;
+        setMessagesMap((prev) => {
+          const list = prev[convId];
+          if (!list) return prev;
+          return {
+            ...prev,
+            [convId]: list.map((m) => (m.id === payload.id ? { ...m, image: signedUrl } : m)),
+          };
+        });
+      });
+    }
+
     const newMessage: Message = {
       id: payload.id,
       text: payload.content || '',
@@ -203,7 +217,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
         ? new Date(payload.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         : '',
       isMine: payload.sender_id === user.id,
-      image: payload.image_url || undefined,
+      image: payload.image_url && !String(payload.image_url).startsWith(CHAT_IMAGE_PREFIX) ? payload.image_url : undefined,
       senderName: undefined, // Se enriquece con fetch separado si es grupo
       senderAvatar: undefined,
       replyToId: payload.reply_to_id || undefined,
@@ -215,7 +229,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
     };
 
     setMessagesMap(prev => {
-      if (!prev[convId]) return prev; // Si no est├í en memoria, no tocar
+      if (!prev[convId]) return prev; // Si no está en memoria, no tocar
       const existing = prev[convId];
       // Evitar duplicados
       if (existing.some(m => m.id === payload.id)) return prev;
@@ -228,7 +242,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
     const existing = messagesMap[conversationId];
     if (!existing || existing.length === 0) return;
 
-    // El primer mensaje del array es el m├ís viejo cargado; usarlo como cursor
+    // El primer mensaje del array es el más viejo cargado; usarlo como cursor
     const oldestMessageId = existing[0].id;
 
     try {
@@ -243,7 +257,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
         return;
       }
 
-      // Reverse DESC ÔåÆ ASC
+      // Reverse DESC → ASC
       const reversedRows = [...rows].reverse();
 
       const lastReadId = await ConversationRepository.getLastReadMessageId(conversationId, user.id);
@@ -307,7 +321,16 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
   }, [refreshConversations]);
 
   useEffect(() => {
-    if (!user|| isOffline) {
+    if (!user) {
+      setConversations([]);
+      setMessagesMap({});
+      setHasMoreMap({});
+      setUnreadCount(0);
+      setHasNewMessage(false);
+      setConversationsLoading(false);
+      return;
+    }
+    if (isOffline) {
       setConversationsLoading(false);
       return;
     }
@@ -331,7 +354,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
           const oldLastReadId = (payload.old as any)?.last_read_message_id;
           const newLastReadId = (payload.new as any)?.last_read_message_id;
 
-          // Si last_read_message_id cambi├│, actualizar contador de no le├¡dos
+          // Si last_read_message_id cambió, actualizar contador de no leídos
           if (convId && oldLastReadId !== newLastReadId && newLastReadId) {
             console.log('[UnreadMessagesContext] last_read_message_id changed:', { oldLastReadId, newLastReadId });
             setConversations((prev) => {
@@ -342,7 +365,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
               const conv = { ...updated[convIndex] };
 
               // Recalcular unreadCount basado en el nuevo last_read_message_id
-              // Esto es una aproximaci├│n; refreshConversations dar├í el valor exacto
+              // Esto es una aproximación; refreshConversations dará el valor exacto
               if ((conv.unreadCount || 0) > 0) {
                 conv.unreadCount = Math.max(0, (conv.unreadCount || 0) - 1);
               }
@@ -387,8 +410,8 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
 
               // Actualizar lastMessage con datos del payload
               // Nota: realtime payload no incluye relaciones join (sender),
-              // as├¡ que usamos solo el contenido disponible
-              const lastMessageText = newMessage.content || (newMessage.image_url ? '­ƒôÀ Foto' : '');
+              // así que usamos solo el contenido disponible
+              const lastMessageText = newMessage.content || (newMessage.image_url ? '📷 Foto' : '');
               const displayMessage = conv.isGroup
                 ? `Nuevo mensaje: ${lastMessageText}`
                 : lastMessageText;
@@ -466,7 +489,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
 
     subscriptionRef.current = channel;
 
-    // Fallback sync timer: cada 3 minutos (180,000 ms) para ahorrar bater├¡a manteniendo Realtime activo
+    // Fallback sync timer: cada 3 minutos (180,000 ms) para ahorrar batería manteniendo Realtime activo
     syncTimerRef.current = setInterval(() => {
       refreshConversations();
     }, 180000);

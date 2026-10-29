@@ -3,7 +3,6 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { supabase } from '../lib/supabase';
 import { ConversationRepository } from '../repositories/conversation.repository';
-import { ProfileRepository } from '../repositories/profile.repository';
 import { FollowRepository } from '../repositories/follow.repository';
 import { useAuth } from '../context/AuthContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -13,59 +12,78 @@ import { handleError } from '../utils/errorHandler';
 type EditGroupNavProp = NativeStackNavigationProp<RootStackParamList, 'EditGroup'>;
 type EditGroupRouteProp = RouteProp<RootStackParamList, 'EditGroup'>;
 
+interface EditableGroupUser {
+  id: string;
+  username: string;
+  fullname: string | null;
+  profile_pic_url: string | null;
+}
+
 export function useEditGroup() {
   const navigation = useNavigation<EditGroupNavProp>();
   const route = useRoute<EditGroupRouteProp>();
   const { conversationId } = route.params;
   const { user } = useAuth();
-  
+
   const [groupName, setGroupName] = useState('');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<EditableGroupUser[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
 
   useEffect(() => {
-    loadGroupData();
-    loadUsers();
-  }, [conversationId]);
+    loadGroupAndUsers();
+  }, [conversationId, user?.id]);
 
-  const loadGroupData = async () => {
+  const loadGroupAndUsers = async () => {
     try {
       setLoading(true);
-      const conversation = await ConversationRepository.getById(conversationId);
+      const [conversation, following] = await Promise.all([
+        ConversationRepository.getById(conversationId),
+        user?.id ? FollowRepository.getFollowing(user.id) : Promise.resolve([]),
+      ]);
+
+      const mergedById = new Map<string, EditableGroupUser>();
+
+      // FollowRepository.getFollowing ya retorna objetos { id, username, fullname, profile_pic_url } (AUD-015)
+      for (const followedUser of following as EditableGroupUser[]) {
+        if (followedUser?.id && followedUser.id !== user?.id) {
+          mergedById.set(followedUser.id, followedUser);
+        }
+      }
+
       if (conversation) {
         setGroupName(conversation.name || '');
         setDescription(conversation.description || '');
         setImage(conversation.avatar_url || null);
-        
+
         const members = conversation.members || [];
-        const memberIds = members.map((m: any) => m.user_id);
+        const memberIds = members.map((m) => m.user_id);
         setSelected(new Set(memberIds));
+
+        // Conservar también en la lista los miembros actuales aunque el admin no los siga
+        for (const member of members) {
+          const memberProfile = member.users;
+          if (memberProfile?.id && memberProfile.id !== user?.id && !mergedById.has(memberProfile.id)) {
+            mergedById.set(memberProfile.id, {
+              id: memberProfile.id,
+              username: memberProfile.username,
+              fullname: memberProfile.fullname,
+              profile_pic_url: memberProfile.profile_pic_url,
+            });
+          }
+        }
       }
+
+      setUsers(Array.from(mergedById.values()));
     } catch (error) {
       handleError(error, setToast, 'Error loading group data');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadUsers = async () => {
-    try {
-      const allUsers = await ProfileRepository.getAll();
-      const following = await FollowRepository.getFollowing(user?.id || '');
-      const followingIds = new Set(following.map((f: any) => f.following_id));
-      
-      const filteredUsers = allUsers.filter((u: any) => 
-        u.id !== user?.id && followingIds.has(u.id)
-      );
-      setUsers(filteredUsers);
-    } catch (error) {
-      handleError(error, setToast, 'Error loading users');
     }
   };
 
@@ -77,7 +95,7 @@ export function useEditGroup() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -93,27 +111,26 @@ export function useEditGroup() {
     if (!canSave || !user || saving) return;
     try {
       setSaving(true);
-      
+
       let finalAvatarUrl = image;
-      if (image && image.startsWith('file://')) {
+      if (image && !image.startsWith('http://') && !image.startsWith('https://')) {
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (!authUser?.id) {
           handleError('User not authenticated', setToast, 'User not authenticated');
           throw new Error('User not authenticated');
         }
-        const fileName = `${authUser.id}/${Date.now()}.jpg`;
-        
-        const formData = new FormData();
-        formData.append('file', {
-          uri: image,
-          type: 'image/jpeg',
-          name: fileName,
-        } as any);
+        const rawExt = (image.split('.').pop() || 'jpg').toLowerCase().split('?')[0];
+        const ext = rawExt === 'png' || rawExt === 'webp' ? rawExt : 'jpg';
+        const contentType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+        const fileName = `${authUser.id}/${Date.now()}.${ext}`;
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const response = await fetch(image);
+        const arrayBuffer = await response.arrayBuffer();
+
+        const { error: uploadError } = await supabase.storage
           .from('group-avatars')
-          .upload(fileName, formData, {
-            contentType: 'image/jpeg',
+          .upload(fileName, arrayBuffer, {
+            contentType,
             upsert: true,
           });
 
@@ -124,11 +141,9 @@ export function useEditGroup() {
             .from('group-avatars')
             .getPublicUrl(fileName);
           finalAvatarUrl = publicUrl;
-          console.log('Group avatar uploaded successfully:', publicUrl);
         }
       }
 
-      console.log('Updating conversation with avatar_url:', finalAvatarUrl);
       await ConversationRepository.updateConversation(conversationId, {
         name: groupName.trim(),
         description: description.trim() || undefined,
@@ -136,14 +151,14 @@ export function useEditGroup() {
       });
 
       const currentMembers = await ConversationRepository.getConversationMembers(conversationId);
-      const currentMemberIds = new Set(currentMembers.map((m: any) => m.user_id));
-      
-      const newMembers = Array.from(selected).filter(id => !currentMemberIds.has(id));
+      const currentMemberIds = new Set(currentMembers.map((m) => m.user_id));
+
+      const newMembers = Array.from(selected).filter((id) => !currentMemberIds.has(id));
       if (newMembers.length > 0) {
         await ConversationRepository.addConversationMembers(conversationId, newMembers);
       }
 
-      const removedMembers = Array.from(currentMemberIds).filter(id => !selected.has(id) && id !== user.id);
+      const removedMembers = Array.from(currentMemberIds).filter((id) => !selected.has(id) && id !== user.id);
       if (removedMembers.length > 0) {
         await ConversationRepository.removeConversationMembers(conversationId, removedMembers);
       }
@@ -182,7 +197,6 @@ export function useEditGroup() {
   });
 
   return {
-    // State
     groupName,
     description,
     image,
@@ -195,15 +209,11 @@ export function useEditGroup() {
     filteredUsers,
     canSave,
     navigation,
-    
-    // Setters
     setGroupName,
     setDescription,
     setImage,
     setSearchQuery,
     setToast,
-    
-    // Actions
     pickImage,
     handleSave,
     showToast,

@@ -1,15 +1,14 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useContext } from 'react';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ConversationRepository } from '../repositories/conversation.repository';
 import { UserBlockRepository } from '../repositories/user_block.repository';
 import { useAuth } from '../context/AuthContext';
 import { useUnreadMessages } from '../context/UnreadMessagesContext';
+import { OfflineContext } from '../context/OfflineContext';
 import { RootStackParamList, ChatThread } from '../navigation/AppNavigator';
-import { Dimensions } from 'react-native';
 import { handleError } from '../utils/errorHandler';
-import { useContext } from 'react';
-import { OfflineContext } from '../navigation/AppNavigator';
+
 type MessagesNavProp = NativeStackNavigationProp<RootStackParamList, 'Messages'>;
 
 export function useMessages() {
@@ -31,13 +30,12 @@ export function useMessages() {
     await refreshConversations();
   }, [refreshConversations]);
 
-  // Refrescar silenciosamente al entrar a la pantalla
   useFocusEffect(
     React.useCallback(() => {
-      if (user && !isOffline) {   // !isOffline
+      if (user && !isOffline) {
         refreshConversations();
       }
-    }, [user, refreshConversations, isOffline]) 
+    }, [user, refreshConversations, isOffline])
   );
 
   const handleDeleteConversation = async (conversationId: string) => {
@@ -74,6 +72,12 @@ export function useMessages() {
 
   const handleOptionPress = (option: string) => {
     setOptionsVisible(false);
+    if (option === 'leaveGroup' && selectedConversation) {
+      // Conservar selectedConversation hasta que el usuario confirme o cancele el modal (AUD-015)
+      setShowLeaveModal(true);
+      return;
+    }
+
     if (option === 'delete' && selectedConversation) {
       handleDeleteConversation(selectedConversation.id);
     } else if (option === 'open' && selectedConversation) {
@@ -82,8 +86,6 @@ export function useMessages() {
       navigation.navigate('EditGroup', { conversationId: selectedConversation.id });
     } else if (option === 'blockUser' && selectedConversation) {
       handleBlockUser(selectedConversation.id);
-    } else if (option === 'leaveGroup' && selectedConversation) {
-      setShowLeaveModal(true);
     }
     setSelectedConversation(null);
   };
@@ -100,6 +102,14 @@ export function useMessages() {
     } finally {
       setLeaving(false);
       setShowLeaveModal(false);
+      setSelectedConversation(null);
+    }
+  };
+
+  const handleSetShowLeaveModal = (visible: boolean) => {
+    setShowLeaveModal(visible);
+    if (!visible) {
+      setSelectedConversation(null);
     }
   };
 
@@ -127,7 +137,6 @@ export function useMessages() {
   };
 
   return {
-    // State
     loading: conversationsLoading,
     threads: conversations,
     deleteModalVisible,
@@ -139,17 +148,13 @@ export function useMessages() {
     leaving,
     toast,
     navigation,
-    
-    // Setters
     setDeleteModalVisible,
     setConversationToDelete,
     setOptionsVisible,
     setSelectedConversation,
     setMenuPosition,
-    setShowLeaveModal,
+    setShowLeaveModal: handleSetShowLeaveModal,
     setToast,
-    
-    // Actions
     load,
     confirmDelete,
     handleLongPress,

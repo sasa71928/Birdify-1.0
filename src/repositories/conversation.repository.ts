@@ -44,6 +44,17 @@ export interface ConversationListItem {
 export const ConversationRepository = {
   async listForUser(userId: string, page = 0, limit = 30): Promise<ConversationListItem[]> {
     const from = page * limit;
+    const { data: summaryRows, error: summaryError } = await supabase.rpc(
+      'get_user_conversations_summary',
+      { p_limit: limit, p_offset: from }
+    );
+    if (!summaryError && Array.isArray(summaryRows)) {
+      return summaryRows.map((row: any) => ({
+        conversation: row.conversation as Conversation,
+        lastMessage: row.last_message || undefined,
+        unread: Number(row.unread_count || 0),
+      }));
+    }
     const to = from + limit - 1;
 
     // Fetch membership + conversation + members
@@ -103,9 +114,10 @@ export const ConversationRepository = {
     // Fetch last messages (best-effort)
     const { data: messages, error: msgError } = await supabase
       .from('messages')
-      .select('conversation_id, sender_id, content, image_url, created_at, sender:users (username, fullname)')
+      .select('id, conversation_id, sender_id, content, image_url, created_at, sender:users (username, fullname)')
       .in('conversation_id', conversationIds)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(Math.max(conversationIds.length * 10, 100));
 
     if (msgError) throw msgError;
 
@@ -402,7 +414,7 @@ export const ConversationRepository = {
     if (error) throw error;
   },
 
-  // ÔöÇÔöÇ conversation_member_states (├║ltimo mensaje le├¡do) ÔöÇÔöÇ
+  // ── conversation_member_states (último mensaje leído) ──
   async getLastReadMessageId(conversationId: string, userId: string): Promise<string | null> {
     const { data, error } = await supabase
       .from('conversation_member_states')
@@ -446,7 +458,7 @@ export const ConversationRepository = {
     const lastReadId = stateData?.last_read_message_id;
 
     if (!lastReadId) {
-      // No hay mensaje le├¡do: contar todos los mensajes que no son m├¡os
+      // No hay mensaje leído: contar todos los mensajes que no son míos
       const { count, error } = await supabase
         .from('messages')
         .select('*', { count: 'exact', head: true })
@@ -457,7 +469,7 @@ export const ConversationRepository = {
       return count || 0;
     }
 
-    // Traer created_at del ├║ltimo mensaje le├¡do
+    // Traer created_at del último mensaje leído
     const { data: lastReadMsg } = await supabase
       .from('messages')
       .select('created_at')
@@ -475,7 +487,7 @@ export const ConversationRepository = {
       return count || 0;
     }
 
-    // Contar mensajes no m├¡os despu├®s del ├║ltimo le├¡do
+    // Contar mensajes no míos después del último leído
     const { count, error } = await supabase
       .from('messages')
       .select('*', { count: 'exact', head: true })
@@ -487,7 +499,7 @@ export const ConversationRepository = {
     return count || 0;
   },
 
-  // ÔöÇÔöÇ Posici├│n visible del scroll ÔöÇÔöÇ
+  // ── Posición visible del scroll ──
   async getVisibleMessageId(conversationId: string, userId: string): Promise<string | null> {
     const { data, error } = await supabase
       .from('conversation_member_states')
