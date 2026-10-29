@@ -22,7 +22,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList, OfflineContext } from '../../navigation/AppNavigator';
+import { RootStackParamList } from '../../navigation/AppNavigator';
+import { OfflineContext } from '../../context/OfflineContext';
 import MapView, { Marker } from 'react-native-maps';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TopNavBar from '../../components/TopNavBar';
@@ -146,7 +147,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
     showToast,
   } = useRecordSighting(editingSightingId);
 
-  const modalStyles = StyleSheet.create({
+  const modalStyles = useMemo(() => StyleSheet.create({
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     dismissArea: { flex: 1 },
     sheetContainer: {
@@ -161,7 +162,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
     optionBtn: { width: '100%', height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
     optionIcon: { marginRight: 10 },
     optionText: { color: colors.canvasPure, fontSize: 15, fontWeight: '600' }
-  });
+  }), [colors]);
 
   
 

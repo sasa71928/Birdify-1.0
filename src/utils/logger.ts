@@ -1,29 +1,33 @@
 /**
  * Logger seguro para producción:
- * Silencia mensajes e inspección de objetos en builds de producción (__DEV__ === false)
- * para evitar exposición de datos en consola/adb logcat y optimizar el rendimiento JS (C-03).
+ * Silencia mensajes, advertencias y trazas crudas en builds de producción (__DEV__ === false)
+ * para evitar exposición de tokens, correos o metadatos en adb logcat / consola del sistema (AUD-024).
  */
 if (!__DEV__) {
   console.log = () => {};
   console.info = () => {};
   console.debug = () => {};
+  console.warn = () => {};
+  console.error = () => {};
 }
 
 export const logger = {
-  log: (...args: any[]) => {
+  log: (...args: unknown[]) => {
     if (__DEV__) {
       console.log(...args);
     }
   },
-  warn: (...args: any[]) => {
+  warn: (...args: unknown[]) => {
     if (__DEV__) {
       console.warn(...args);
     }
   },
-  error: (...args: any[]) => {
-    console.error(...args);
+  error: (...args: unknown[]) => {
+    if (__DEV__) {
+      console.error(...args);
+    }
   },
-  info: (...args: any[]) => {
+  info: (...args: unknown[]) => {
     if (__DEV__) {
       console.info(...args);
     }

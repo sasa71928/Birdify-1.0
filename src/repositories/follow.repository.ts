@@ -4,7 +4,7 @@ export const FollowRepository = {
   async isFollowing(followerId: string, followingId: string): Promise<boolean> {
     const { data, error } = await supabase
       .from('follows')
-      .select('*')
+      .select('follower_id')
       .eq('follower_id', followerId)
       .eq('following_id', followingId)
       .maybeSingle();
@@ -14,6 +14,24 @@ export const FollowRepository = {
       return false;
     }
     return !!data;
+  },
+
+  async getFollowingIds(followerId: string): Promise<Set<string>> {
+    const { data, error } = await supabase
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', followerId);
+
+    if (error) {
+      console.error('Error in getFollowingIds:', error);
+      return new Set<string>();
+    }
+
+    return new Set<string>(
+      (data ?? [])
+        .map((row: { following_id?: string | null }) => row.following_id)
+        .filter((id): id is string => Boolean(id))
+    );
   },
 
   async follow(followerId: string, followingId: string): Promise<void> {
@@ -79,5 +97,5 @@ export const FollowRepository = {
     ]);
 
     return aFollowsB && bFollowsA;
-  }
+  },
 };

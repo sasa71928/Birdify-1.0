@@ -15,6 +15,7 @@ import { createStyles } from '../styles/components/FeedItem.styles';
 import { useDynamicStyles } from '../hooks/useDynamicStyles';
 import PagerView from 'react-native-pager-view';
 import AppToast from './AppToast';
+import ReportModal from './ReportModal';
 import { CommentsSkeleton } from './skeleton';
 
 export interface Comment {
@@ -100,6 +101,7 @@ function FeedItem({ post, onPostDeleted, onNavigateAway, isNew }: FeedItemProps)
   }, [post.image]);
   const [showDeleteModal, setShowDeleteModal] = React.useState(false);
   const [showBlockModal, setShowBlockModal] = React.useState(false);
+  const [showReportModal, setShowReportModal] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isBlocking, setIsBlocking] = React.useState(false);
   const [toast, setToast] = React.useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
@@ -200,12 +202,12 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleCommentSubmit = async () => {
     if (!commentText.trim()) return;
     if (!user) {
-      Alert.alert('Inicia Sesi├│n', 'Debes iniciar sesi├│n para comentar.');
+      Alert.alert('Inicia Sesión', 'Debes iniciar sesión para comentar.');
       return;
     }
 
     if (isOffline && post.syncStatus !== 'pending') {
-      showToast('No puedes interactuar con esta publicaci├│n sin conexi├│n.', 'error');
+      showToast('No puedes interactuar con esta publicación sin conexión.', 'error');
       return;
     }
 
@@ -231,23 +233,23 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
       setCommentsCount(prev => prev + 1);
       
     } catch (error) {
-      Alert.alert('Error', 'No se pudo publicar tu comentario. Int├®ntalo de nuevo.');
+      Alert.alert('Error', 'No se pudo publicar tu comentario. Inténtalo de nuevo.');
     }
   };
 
   const handleLike = async () => {
     if (!user) {
-      Alert.alert('Inicia Sesi├│n', 'Debes iniciar sesi├│n para reaccionar a las publicaciones.');
+      Alert.alert('Inicia Sesión', 'Debes iniciar sesión para reaccionar a las publicaciones.');
       return;
     }
 
     if (isOffline && post.syncStatus !== 'pending') {
-      showToast('No puedes interactuar con esta publicaci├│n sin conexi├│n.', 'error');
+      showToast('No puedes interactuar con esta publicación sin conexión.', 'error');
       return;
     }
 
     const wasLiked = liked;
-    // Actualizaci├│n de UI Optimista
+    // Actualización de UI Optimista
     setLiked(!wasLiked);
     setLikesCount(prev => wasLiked ? prev - 1 : prev + 1);
 
@@ -261,7 +263,7 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
       // Revertir si el servidor de Supabase arroja error
       setLiked(wasLiked);
       setLikesCount(prev => wasLiked ? prev + 1 : prev - 1);
-      Alert.alert('Reacci├│n no registrada', 'Hubo un error de conexi├│n con la base de datos.');
+      Alert.alert('Reacción no registrada', 'Hubo un error de conexión con la base de datos.');
     }
   };
 
@@ -278,14 +280,14 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const anim = Animated.parallel([
       Animated.sequence([
-        // 1. Pop r├ípido con efecto rebote el├ístico
+        // 1. Pop rápido con efecto rebote elástico
         Animated.spring(heartScale, {
           toValue: 1.25,
           friction: 4,
           tension: 50,
           useNativeDriver: true,
         }),
-        // 2. Se estabiliza en tama├▒o natural
+        // 2. Se estabiliza en tamaño natural
         Animated.timing(heartScale, {
           toValue: 1,
           duration: 100,
@@ -301,7 +303,7 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
         }),
       ]),
       Animated.sequence([
-        // Aparici├│n r├ípida
+        // Aparición rápida
         Animated.timing(heartOpacity, {
           toValue: 1,
           duration: 140,
@@ -329,11 +331,11 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleImageTap = () => {
     const now = Date.now();
     if (now - lastTap.current < DOUBLE_TAP_DELAY) {
-      // Doble tap: dar like si todav├¡a no lo tiene
+      // Doble tap: dar like si todavía no lo tiene
       if (!liked) {
         handleLike();
       }
-      // Siempre reproducir la animaci├│n visual de coraz├│n
+      // Siempre reproducir la animación visual de corazón
       triggerHeartAnimation();
       lastTap.current = 0;
     } else {
@@ -343,7 +345,7 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleShare = async () => {
     try {
-      const shareMessage = `┬íMira este incre├¡ble avistamiento en Birdify!\n\nSe avist├│ un ${post.tag} por @${post.username}\n\n${currentImage}`;
+      const shareMessage = `¡Mira este increíble avistamiento en Birdify!\n\nSe avistó un ${post.tag} por @${post.username}\n\n${currentImage}`;
 
       const result = await Share.share({
         message: shareMessage,
@@ -506,7 +508,7 @@ const handleDeleteSighting = async () => {
   if (diffMinutes > 10 && post.syncStatus !== 'pending') {
     resetOptionsModal();
     setTimeout(() => {
-      showToast('Solo puedes eliminar avistamientos dentro de los 10 minutos despu├®s de publicarlos.', 'error');
+      showToast('Solo puedes eliminar avistamientos dentro de los 10 minutos después de publicarlos.', 'error');
     }, 350);
     return;
   }
@@ -536,7 +538,7 @@ const handleDeleteSighting = async () => {
 
   const handleBlockUser = async () => {
     if (!user) {
-      Alert.alert('Inicia Sesi├│n', 'Debes iniciar sesi├│n para bloquear usuarios.');
+      Alert.alert('Inicia Sesión', 'Debes iniciar sesión para bloquear usuarios.');
       return;
     }
 
@@ -631,14 +633,14 @@ const handleDeleteSighting = async () => {
                   </View>
                 )}
               </View>
-            <TouchableOpacity onPress={() => {
-              if (post.latitude && post.longitude) {
+            <TouchableOpacity disabled={post.latitude == null || post.longitude == null || post.location === 'Ubicación Privada'} onPress={() => {
+              if (post.latitude != null && post.longitude != null && post.location !== 'Ubicación Privada') {
                 const targetSighting = {
                   id: post.id,
                   latitude: post.latitude,
                   longitude: post.longitude,
                 };
-                // Si Explore est├í en el navigator actual (tab), navegar directamente.
+                // Si Explore está en el navigator actual (tab), navegar directamente.
                 // Si no (ej. desde modal de Profile en stack), navegar a MainTabs -> Explore.
                 if (navigation.getState().routeNames.includes('Explore')) {
                   navigation.navigate('Explore', { targetSighting });
@@ -687,7 +689,7 @@ const handleDeleteSighting = async () => {
                           />
                         </View>
                         <Text style={styles.placeholderBadgeText}>
-                          {isImgError ? 'Avistamiento de ave' : 'Cargando fotograf├¡a'}
+                          {isImgError ? 'Avistamiento de ave' : 'Cargando fotografía'}
                         </Text>
                         <Text style={styles.placeholderBirdTitle} numberOfLines={2}>
                           {post.tag || 'Ave sin identificar'}
@@ -695,7 +697,7 @@ const handleDeleteSighting = async () => {
                         {isImgError ? (
                           <View style={styles.placeholderStatusPill}>
                             <Ionicons name="image-outline" size={13} color={colors.textSecondary} />
-                            <Text style={styles.placeholderStatusText}>Fotograf├¡a no disponible</Text>
+                            <Text style={styles.placeholderStatusText}>Fotografía no disponible</Text>
                           </View>
                         ) : (
                           <View style={styles.placeholderStatusPill}>
@@ -823,7 +825,7 @@ const handleDeleteSighting = async () => {
               style={styles.seeMore} 
               onPress={() => setIsCaptionExpanded(!isCaptionExpanded)}
             >
-              {" "}{isCaptionExpanded ? "ver menos" : "ver m├ís"}
+              {" "}{isCaptionExpanded ? "ver menos" : "ver más"}
             </Text>
           )}
         </Text>
@@ -881,7 +883,7 @@ const handleDeleteSighting = async () => {
                 <View style={{ paddingVertical: 40, justifyContent: 'center', alignItems: 'center' }}>
                   <Ionicons name="chatbubbles-outline" size={32} color={colors.primary + '80'} />
                   <Text style={{ marginTop: 10, color: Colors.textSecondary, fontSize: 14, textAlign: 'center' }}>
-                    A├║n no hay comentarios.{"\n"}┬íS├® el primero en compartir tu opini├│n!
+                    Aún no hay comentarios.{"\n"}¡Sé el primero en compartir tu opinión!
                   </Text>
                 </View>
               ) : (
@@ -961,7 +963,7 @@ const handleDeleteSighting = async () => {
                   style={styles.loadMoreButton}
                   onPress={() => setVisibleCommentsCount(prev => prev + 5)}
                 >
-                  <Text style={styles.loadMoreText}>Cargar m├ís comentarios</Text>
+                  <Text style={styles.loadMoreText}>Cargar más comentarios</Text>
                 </TouchableOpacity>
               )}
             </ScrollView>
@@ -982,13 +984,13 @@ const handleDeleteSighting = async () => {
               <View style={styles.inputRow}>
                 {isOffline && post.syncStatus !== 'pending' ? (
                   <Text style={[styles.commentInput, { color: Colors.textSecondary, textAlignVertical: 'center', paddingTop: 12 }]}>
-                    Comentarios desactivados sin conexi├│n
+                    Comentarios desactivados sin conexión
                   </Text>
                 ) : (
                   <>
                     <TextInput
                       style={styles.commentInput}
-                      placeholder={replyingTo ? "Escribe una respuesta..." : "A├▒ade un comentario..."}
+                      placeholder={replyingTo ? "Escribe una respuesta..." : "Añade un comentario..."}
                       value={commentText}
                       onChangeText={setCommentText}
                       multiline
@@ -1050,7 +1052,7 @@ const handleDeleteSighting = async () => {
                 <>
                   <TouchableOpacity style={styles.optionItem} onPress={handleEditSighting}>
                     <Ionicons name="pencil-outline" size={22} color={Colors.textPrimary} />
-                    <Text style={styles.optionText}>Editar publicaci├│n</Text>
+                    <Text style={styles.optionText}>Editar publicación</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.optionItem} onPress={handleDeleteSighting}>
                     <Ionicons name="trash-outline" size={22} color="#FF5252" />
@@ -1062,6 +1064,10 @@ const handleDeleteSighting = async () => {
 
               {!isOwnPost && (
                 <>
+                  <TouchableOpacity style={styles.optionItem} onPress={() => { resetOptionsModal(); setShowReportModal(true); }}>
+                    <Ionicons name="flag-outline" size={22} color="#FF9800" />
+                    <Text style={styles.optionText}>Reportar publicación</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity style={styles.optionItem} onPress={handleBlockUser}>
                     <Ionicons name="ban-outline" size={22} color="#FF5252" />
                     <Text style={[styles.optionText, { color: '#FF5252' }]}>Bloquear usuario</Text>
@@ -1133,7 +1139,7 @@ const handleDeleteSighting = async () => {
                 fontFamily: Typography.fontFamilyBody,
                 lineHeight: Typography.lineHeight.normal
               }}>
-                ┬┐Est├ís seguro de que deseas eliminar este avistamiento? Esta acci├│n no se puede deshacer.
+                ¿Estás seguro de que deseas eliminar este avistamiento? Esta acción no se puede deshacer.
               </Text>
             </View>
 
@@ -1192,6 +1198,18 @@ const handleDeleteSighting = async () => {
       </Modal>
 
       {/* Block User Confirmation Modal */}
+      {user?.id && (
+        <ReportModal
+          visible={showReportModal}
+          reporterId={user.id}
+          sightingId={post.id}
+          reportedUserId={post.userId || null}
+          targetLabel={`@${post.username}`}
+          onClose={() => setShowReportModal(false)}
+          onSuccess={() => showToast('Reporte enviado. Gracias por ayudar a mantener segura la comunidad.', 'success')}
+          onError={(msg) => showToast(msg, 'error')}
+        />
+      )}
       <Modal
         visible={showBlockModal}
         animationType="fade"
@@ -1246,7 +1264,7 @@ const handleDeleteSighting = async () => {
                 lineHeight: Typography.lineHeight.normal,
                 marginBottom: Spacing.sm
               }}>
-                No podr├ín ver tu perfil ni tu actividad. Puedes desbloquearlos en tu configuraci├│n.
+                No podrán ver tu perfil ni tu actividad. Puedes desbloquearlos en tu configuración.
               </Text>
             </View>
 

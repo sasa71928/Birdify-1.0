@@ -3,23 +3,24 @@ import { View, Text, ScrollView, StatusBar, TouchableOpacity } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as Linking from 'expo-linking';
 import { supabase } from '../../lib/supabase';
 
-// ÔöÇÔöÇ Componentes reutilizables ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
-import AppButton    from '../../components/AppButton';
-import InputField   from '../../components/InputField';
+// ── Componentes reutilizables ────────────────────────────────────────────────
+import AppButton from '../../components/AppButton';
+import InputField from '../../components/InputField';
 import SocialButton from '../../components/SocialButton';
+import LegalModal, { LegalDocumentType } from '../../components/LegalModal';
 
-// ÔöÇÔöÇ Estilos ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── Estilos ───────────────────────────────────────────────────────────────────
 import { createStyles } from '../../styles/screens/auth/loginScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
-// ÔöÇÔöÇ Navegaci├│n ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── Navegación ────────────────────────────────────────────────────────────────
 import { RootStackParamList } from '../../navigation/AppNavigator';
 type LoginNavProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
-
 import { AuthService } from '../../services/auth.service';
 import AppToast from '../../components/AppToast';
 import { useSocialAuth } from '../../hooks/useSocialAuth';
@@ -27,11 +28,12 @@ import { useSocialAuth } from '../../hooks/useSocialAuth';
 export default function LoginScreen() {
   const navigation = useNavigation<LoginNavProp>();
   const { shared, screen: local, colors, isDark } = useDynamicStyles(createStyles);
-  
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [remember, setRemember] = useState(false);
+  const [remember, setRemember] = useState(true);
+  const [legalDoc, setLegalDoc] = useState<LegalDocumentType>(null);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
     message: '',
@@ -45,7 +47,7 @@ export default function LoginScreen() {
     }
     setToast({ visible: true, message, type });
     toastTimerRef.current = setTimeout(() => {
-      setToast(prev => ({ ...prev, visible: false }));
+      setToast((prev) => ({ ...prev, visible: false }));
     }, 3600);
   };
 
@@ -64,19 +66,17 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      showToast('Por favor ingresa tu usuario o correo y contrase├▒a.', 'error');
+      showToast('Por favor ingresa tu usuario o correo y contraseña.', 'error');
       return;
     }
-    
+
     setIsLoading(true);
     try {
-      await AuthService.signIn(email, password);
-      // No necesitamos hacer navigation.navigate aqu├¡ porque el AuthProvider 
-      // autom├íticamente cambiar├í las pantallas al detectar la sesi├│n.
+      await AuthService.signIn(email, password, remember);
     } catch (error: any) {
-      let msg = error.message || 'Error al iniciar sesi├│n.';
+      let msg = error.message || 'Error al iniciar sesión.';
       if (msg.includes('Email not confirmed')) {
-        msg = 'Debes confirmar tu correo antes de iniciar sesi├│n. Revisa tu bandeja de entrada.';
+        msg = 'Debes confirmar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada.';
       }
       showToast(msg, 'error');
     } finally {
@@ -87,22 +87,22 @@ export default function LoginScreen() {
   const handleForgotPassword = async () => {
     const trimmed = email.trim();
     if (!trimmed || !trimmed.includes('@')) {
-      showToast('Ingresa tu correo electr├│nico arriba para restablecer tu contrase├▒a.', 'error');
+      showToast('Ingresa tu correo electrónico arriba para restablecer tu contraseña.', 'error');
       return;
     }
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(trimmed);
+      const redirectTo = Linking.createURL('auth/reset-password');
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmed, { redirectTo });
       if (error) throw error;
-      showToast('Enlace de recuperaci├│n enviado a tu correo.', 'success');
+      showToast('Si el correo está registrado, recibirás un enlace de recuperación.', 'success');
     } catch (err: any) {
-      showToast(err.message || 'Error al solicitar recuperaci├│n de contrase├▒a.', 'error');
+      showToast(err.message || 'Error al solicitar recuperación de contraseña.', 'error');
     }
   };
 
-  // Link "┬┐Olvidaste?" que se pasa como labelRight al InputField
   const ForgotLink = (
     <TouchableOpacity activeOpacity={0.7} onPress={handleForgotPassword}>
-      <Text style={local.forgotLink}>┬┐Olvidaste tu contrase├▒a?</Text>
+      <Text style={local.forgotLink}>¿Olvidaste tu contraseña?</Text>
     </TouchableOpacity>
   );
 
@@ -112,41 +112,39 @@ export default function LoginScreen() {
         visible={toast.visible}
         message={toast.message}
         type={toast.type}
-        onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+        onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
+      <LegalModal documentType={legalDoc} onClose={() => setLegalDoc(null)} />
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-
-      {/*<ScreenHeader />*/}
 
       <ScrollView
         contentContainerStyle={shared.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* ÔöÇÔöÇ Hero ÔöÇÔöÇ */}
+        {/* ── Hero ── */}
         <View style={shared.heroSection}>
           <Text style={local.heroTitle}>Bienvenido</Text>
           <Text style={shared.heroSubtitle}>
-            Contin├║a tu viaje de observaci├│n hoy.
+            Continúa tu viaje de observación hoy.
           </Text>
         </View>
 
-        {/* ÔöÇÔöÇ Formulario ÔöÇÔöÇ */}
+        {/* ── Formulario ── */}
         <View style={shared.card}>
           <InputField
             label="Usuario o Correo"
-            placeholder="Usuario o correo electr├│nico"
+            placeholder="Usuario o correo electrónico"
             iconSymbol={<Ionicons name="person-outline" size={20} color={colors.textSecondary} />}
             keyboardType="email-address"
             value={email}
             onChangeText={setEmail}
           />
 
-          {/* Contrase├▒a con link "┬┐Olvidaste?" inline en el label */}
           <InputField
-            label="Contrase├▒a"
+            label="Contraseña"
             labelRight={ForgotLink}
-            placeholder="ÔÇóÔÇóÔÇóÔÇóÔÇóÔÇóÔÇóÔÇó"
+            placeholder="••••••••"
             iconSymbol={<Ionicons name="lock-closed-outline" size={20} color={colors.textSecondary} />}
             secureTextEntry
             showToggle
@@ -154,20 +152,22 @@ export default function LoginScreen() {
             onChangeText={setPassword}
           />
 
-          {/* Recordarme en este dispositivo */}
           <TouchableOpacity
             style={local.rememberRow}
             onPress={() => setRemember(!remember)}
             activeOpacity={0.8}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: remember }}
+            accessibilityLabel="Recordarme en este dispositivo"
           >
             <View style={[local.checkbox, remember && local.checkboxChecked]}>
-              {remember && <Text style={local.checkmark}>Ô£ô</Text>}
+              {remember && <Text style={local.checkmark}>✓</Text>}
             </View>
             <Text style={local.rememberText}>Recordarme en este dispositivo</Text>
           </TouchableOpacity>
 
           <AppButton
-            label={isLoading ? "Iniciando..." : "Iniciar Sesi├│n ÔåÆ"}
+            label={isLoading ? 'Iniciando...' : 'Iniciar Sesión →'}
             color={colors.primary}
             style={{ marginBottom: 16 }}
             onPress={handleLogin}
@@ -198,25 +198,29 @@ export default function LoginScreen() {
           </View>
         </View>
 
-        {/* ÔöÇÔöÇ Link de registro ÔöÇÔöÇ */}
+        {/* ── Link de registro ── */}
         <TouchableOpacity
           style={shared.navRow}
           activeOpacity={0.7}
           onPress={() => navigation.navigate('Register')}
         >
-          <Text style={shared.navText}>┬┐No tienes cuenta? </Text>
-          <Text style={shared.navLink}>Reg├¡strate</Text>
+          <Text style={shared.navText}>¿No tienes cuenta? </Text>
+          <Text style={shared.navLink}>Regístrate</Text>
         </TouchableOpacity>
 
-        {/* ÔöÇÔöÇ Pie legal ÔöÇÔöÇ */}
+        {/* ── Pie legal ── */}
         <Text style={local.legalText}>
-          Al iniciar sesi├│n, aceptas nuestros{' '}
-          <Text style={local.legalLink}>T├®rminos de Servicio</Text>
-          {' '}y{' '}
-          <Text style={local.legalLink}>Pol├¡tica de Privacidad</Text>.
+          Al iniciar sesión, aceptas nuestros{' '}
+          <Text style={local.legalLink} onPress={() => setLegalDoc('terms')}>
+            Términos de Servicio
+          </Text>{' '}
+          y{' '}
+          <Text style={local.legalLink} onPress={() => setLegalDoc('privacy')}>
+            Política de Privacidad
+          </Text>
+          .
         </Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
-

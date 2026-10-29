@@ -39,12 +39,13 @@ import { UserBlockRepository } from '../../repositories/user_block.repository';
 import { ConversationRepository } from '../../repositories/conversation.repository';
 import { handleError } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
+import ReportModal from '../../components/ReportModal';
 import { Message } from '../../types/message';
 
 type ChatNavProp = NativeStackNavigationProp<RootStackParamList, 'Chat'>;
 type ChatRouteProp = RouteProp<RootStackParamList, 'Chat'>;
 
-// ÔöÇÔöÇ SwipeableMessage ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── SwipeableMessage ──────────────────────────────────────────────────────────
 const SwipeableMessage = React.memo(
   ({
     children,
@@ -85,7 +86,7 @@ const SwipeableMessage = React.memo(
   }
 );
 
-// ÔöÇÔöÇ MessageItem ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── MessageItem ───────────────────────────────────────────────────────────────
 const MessageItem = React.memo(
   ({
     item,
@@ -280,7 +281,7 @@ const MessageItem = React.memo(
   }
 );
 
-// ÔöÇÔöÇ ChatScreen ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── ChatScreen ────────────────────────────────────────────────────────────────
 export default function ChatScreen() {
   const navigation = useNavigation<ChatNavProp>();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
@@ -295,10 +296,10 @@ export default function ChatScreen() {
     appendRealtimeMessage,
   } = useUnreadMessages();
 
-  // ÔöÇÔöÇ Mensajes desde el contexto global (├║nica fuente de verdad) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Mensajes desde el contexto global (única fuente de verdad) ─────────────
   const messages = messagesMap[conversationId] ?? [];
 
-  // ÔöÇÔöÇ Estado de UI ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Estado de UI ───────────────────────────────────────────────────────────
   const [input, setInput] = useState('');
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -309,6 +310,7 @@ export default function ChatScreen() {
   const [otherUserId, setOtherUserId] = useState<string | null>(null);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [conversationExists, setConversationExists] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
@@ -322,17 +324,17 @@ export default function ChatScreen() {
     type: 'success' | 'error';
   }>({ visible: false, message: '', type: 'success' });
 
-  // ÔöÇÔöÇ Estado de scroll inicial ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Estado de scroll inicial ───────────────────────────────────────────────
   // headerReady: datos del header cargados (nombre, avatar)
   // readStatusLoaded: lastReadMessageId y visibleMessageId cargados desde BD
-  // scrollDone: el scroll inicial ya se ejecut├│
+  // scrollDone: el scroll inicial ya se ejecutó
   const [headerReady, setHeaderReady] = useState(false);
   const [readStatusLoaded, setReadStatusLoaded] = useState(false);
   const [scrollDone, setScrollDone] = useState(false);
   const [lastReadMessageId, setLastReadMessageId] = useState<string | null>(null);
   const [visibleMessageId, setVisibleMessageId] = useState<string | null>(null);
 
-  // ÔöÇÔöÇ Refs ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Refs ───────────────────────────────────────────────────────────────────
   const listRef = useRef<FlatList>(null);
   const loadingMore = useRef(false);
   const initialScrollDone = useRef(false);
@@ -356,7 +358,7 @@ export default function ChatScreen() {
   const overlayPulse = useRef(new Animated.Value(0)).current;
   const overlayLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  // Cach├® de header para evitar re-fetches innecesarios
+  // Caché de header para evitar re-fetches innecesarios
   const conversationCache = useRef<
     Map<
       string,
@@ -369,7 +371,7 @@ export default function ChatScreen() {
     >
   >(new Map());
 
-  // ÔöÇÔöÇ Cleanup on unmount ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Cleanup on unmount ─────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       if (visibleMessageTimeout.current) clearTimeout(visibleMessageTimeout.current);
@@ -377,7 +379,7 @@ export default function ChatScreen() {
     };
   }, []);
 
-  // ÔöÇÔöÇ Reset al cambiar de conversaci├│n ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Reset al cambiar de conversación ──────────────────────────────────────
   useEffect(() => {
     initialScrollDone.current = false;
     flatListReady.current = false;
@@ -391,7 +393,7 @@ export default function ChatScreen() {
     overlayOpacity.setValue(1);
   }, [conversationId]);
 
-  // ÔöÇÔöÇ Animaci├│n bot├│n scroll-to-bottom ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Animación botón scroll-to-bottom ──────────────────────────────────────
   useEffect(() => {
     Animated.spring(scrollButtonAnim, {
       toValue: showScrollButton ? 1 : 0,
@@ -401,7 +403,7 @@ export default function ChatScreen() {
     }).start();
   }, [showScrollButton]);
 
-  // ÔöÇÔöÇ Animaci├│n overlay de carga ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Animación overlay de carga ─────────────────────────────────────────────
   const overlayReady = headerReady && scrollDone;
   useEffect(() => {
     if (!overlayReady) {
@@ -437,7 +439,7 @@ export default function ChatScreen() {
     }
   }, [overlayReady]);
 
-  // ÔöÇÔöÇ Toast helper ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Toast helper ───────────────────────────────────────────────────────────
   const showToast = (message: string, type: 'success' | 'error') => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setToast({ visible: true, message, type });
@@ -447,14 +449,14 @@ export default function ChatScreen() {
     );
   };
 
-  // ÔöÇÔöÇ markConversationAsRead ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
-  // Marca como le├¡do el ├║ltimo mensaje ajeno visible.
+  // ── markConversationAsRead ─────────────────────────────────────────────────
+  // Marca como leído el último mensaje ajeno visible.
   // Se llama: (1) al terminar el scroll inicial, (2) cuando llega un mensaje
-  // nuevo y el usuario est├í al fondo, (3) al ganar el foco.
+  // nuevo y el usuario está al fondo, (3) al ganar el foco.
   const markConversationAsRead = useCallback(async () => {
     if (!user || messages.length === 0) return;
 
-    // Buscar el ├║ltimo mensaje que NO sea m├¡o (el que el receptor debe "leer")
+    // Buscar el último mensaje que NO sea mío (el que el receptor debe "leer")
     let lastIncomingMsg: Message | null = null;
     for (let i = messages.length - 1; i >= 0; i--) {
       if (!messages[i].isMine) {
@@ -463,7 +465,7 @@ export default function ChatScreen() {
       }
     }
 
-    // Si todos los mensajes son m├¡os no hay nada que marcar
+    // Si todos los mensajes son míos no hay nada que marcar
     if (!lastIncomingMsg) return;
 
     // Evitar llamadas repetidas con el mismo ID
@@ -481,7 +483,7 @@ export default function ChatScreen() {
     }
   }, [user?.id, messages, conversationId, lastReadMessageId]);
 
-  // ÔöÇÔöÇ CAMBIO 3: funci├│n central de scroll ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── CAMBIO 3: función central de scroll ───────────────────────────────────
   // Ejecuta el scroll si el FlatList ya hizo su layout; si no, guarda el
   // target como pendiente para ejecutarlo en onLayout.
   const executeScroll = useCallback(
@@ -508,7 +510,7 @@ export default function ChatScreen() {
       };
 
       if (!flatListReady.current) {
-        // FlatList no est├í listo: guardar el target para cuando haga onLayout
+        // FlatList no está listo: guardar el target para cuando haga onLayout
         pendingScrollTarget.current = { index: targetIndex, viewPosition };
         return;
       }
@@ -521,7 +523,7 @@ export default function ChatScreen() {
     []
   );
 
-  // ÔöÇÔöÇ performInitialScroll ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── performInitialScroll ───────────────────────────────────────────────────
   const performInitialScroll = useCallback(() => {
     if (initialScrollDone.current) return;
 
@@ -540,7 +542,7 @@ export default function ChatScreen() {
         lastReadIdx !== -1 && lastReadIdx < messages.length - 1;
 
       if (hasUnread) {
-        // Primer mensaje no le├¡do (posici├│n tipo WhatsApp)
+        // Primer mensaje no leído (posición tipo WhatsApp)
         targetIndex = lastReadIdx + 1;
         viewPosition = 0.35;
       } else if (visibleMessageId) {
@@ -561,11 +563,11 @@ export default function ChatScreen() {
     executeScroll(targetIndex, viewPosition);
   }, [messages, lastReadMessageId, visibleMessageId, executeScroll]);
 
-  // ÔöÇÔöÇ CAMBIO 1: Carga principal ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── CAMBIO 1: Carga principal ──────────────────────────────────────────────
   // Orden garantizado:
   //   1. Cargar conv + lastReadId + visibleId en paralelo
-  //   2. setReadStatusLoaded(true)  ÔåÉ ANTES de fetchMessages
-  //   3. Cargar mensajes si no est├ín en memoria
+  //   2. setReadStatusLoaded(true)  ← ANTES de fetchMessages
+  //   3. Cargar mensajes si no están en memoria
   useEffect(() => {
     let mounted = true;
     initialScrollDone.current = false;
@@ -575,7 +577,7 @@ export default function ChatScreen() {
     const hasGlobal = !!messagesMap[conversationId];
     const cached = conversationCache.current.get(conversationId);
 
-    // Aplicar cach├® de header inmediatamente si existe
+    // Aplicar caché de header inmediatamente si existe
     if (cached) {
       setHeaderTitle(cached.title);
       setHeaderAvatar(cached.avatar);
@@ -589,7 +591,7 @@ export default function ChatScreen() {
     const load = async () => {
       if (!user) return;
       try {
-        // ÔöÇÔöÇ PASO 1: datos de posici├│n + conv en paralelo ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ── PASO 1: datos de posición + conv en paralelo ─────────────────────
         const [convResult, lastReadId, visibleId] = await Promise.all([
           cached
             ? Promise.resolve(null)
@@ -610,7 +612,7 @@ export default function ChatScreen() {
 
         if (!mounted) return;
 
-        // Procesar conv si no estaba en cach├®
+        // Procesar conv si no estaba en caché
         if (convResult) {
           if (convResult.error) throw convResult.error;
 
@@ -618,7 +620,7 @@ export default function ChatScreen() {
             setConversationExists(false);
             setLoading(false);
             setHeaderReady(true);
-            // ÔöÇÔöÇ PASO 2 (conv no existe): marcar readStatus para no bloquear scroll
+            // ── PASO 2 (conv no existe): marcar readStatus para no bloquear scroll
             setLastReadMessageId(lastReadId);
             setVisibleMessageId(visibleId);
             setReadStatusLoaded(true);
@@ -674,7 +676,7 @@ export default function ChatScreen() {
           }
         }
 
-        // ÔöÇÔöÇ PASO 2: establecer estado de posici├│n ANTES de cargar mensajes ÔöÇÔöÇÔöÇ
+        // ── PASO 2: establecer estado de posición ANTES de cargar mensajes ───
         // Este es el cambio clave: readStatusLoaded=true ANTES de fetchMessages
         if (mounted) {
           setLastReadMessageId(lastReadId);
@@ -682,14 +684,14 @@ export default function ChatScreen() {
           setReadStatusLoaded(true);
         }
 
-        // ÔöÇÔöÇ PASO 3: cargar mensajes solo si no est├ín en memoria ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ── PASO 3: cargar mensajes solo si no están en memoria ───────────────
         if (!hasGlobal) {
           await fetchMessages(conversationId);
           // fetchMessages actualiza messagesMap en el contexto, lo que dispara
-          // el useEffect de scroll a trav├®s de la dependencia [messages]
+          // el useEffect de scroll a través de la dependencia [messages]
         }
-        // Si hasGlobal=true, los mensajes ya est├ín y el useEffect de scroll
-        // se disparar├í inmediatamente al ver readStatusLoaded=true
+        // Si hasGlobal=true, los mensajes ya están y el useEffect de scroll
+        // se disparará inmediatamente al ver readStatusLoaded=true
 
         if (mounted) setLoading(false);
       } catch (e) {
@@ -710,8 +712,8 @@ export default function ChatScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, user?.id]);
 
-  // ÔöÇÔöÇ useEffect del scroll inicial ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
-  // Dispara performInitialScroll cuando todas las condiciones est├ín listas:
+  // ── useEffect del scroll inicial ──────────────────────────────────────────
+  // Dispara performInitialScroll cuando todas las condiciones están listas:
   //   - headerReady: header cargado
   //   - readStatusLoaded: posiciones cargadas (CAMBIO 1: ahora ocurre antes que fetchMessages)
   //   - messages.length > 0: mensajes disponibles
@@ -739,17 +741,17 @@ export default function ChatScreen() {
     messagesMap,
   ]);
 
-  // Si headerReady llega despu├®s de que el scroll ya termin├│
+  // Si headerReady llega después de que el scroll ya terminó
   useEffect(() => {
     if (headerReady && initialScrollDone.current && !scrollDone) {
       setScrollDone(true);
     }
   }, [headerReady, scrollDone]);
 
-  // ÔöÇÔöÇ Refresh del header al recuperar foco ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Refresh del header al recuperar foco ─────────────────────────────────
   useFocusEffect(
     useCallback(() => {
-      // Marcar como le├¡do cada vez que el usuario vuelve al chat
+      // Marcar como leído cada vez que el usuario vuelve al chat
       if (initialScrollDone.current) {
         markConversationAsRead();
       }
@@ -800,36 +802,36 @@ export default function ChatScreen() {
     }, [conversationId, user?.id, markConversationAsRead])
   );
 
-  // ÔöÇÔöÇ Scroll + marcar le├¡do al recibir mensajes en tiempo real ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Scroll + marcar leído al recibir mensajes en tiempo real ─────────────
   useEffect(() => {
     if (messages.length === 0 || !initialScrollDone.current) return;
     const lastMessage = messages[messages.length - 1];
     if (lastMessage?.isMine) return;
 
     if (isNearBottomRef.current) {
-      // Usuario est├í al fondo: hacer scroll autom├ítico y marcar le├¡do
+      // Usuario está al fondo: hacer scroll automático y marcar leído
       const timeoutId = setTimeout(() => {
         listRef.current?.scrollToEnd({ animated: true });
       }, 100);
       markConversationAsRead();
       return () => clearTimeout(timeoutId);
     } else {
-      // Usuario est├í scrolleado hacia arriba: marcar le├¡do igualmente
-      // porque el chat est├í abierto y activo
+      // Usuario está scrolleado hacia arriba: marcar leído igualmente
+      // porque el chat está abierto y activo
       markConversationAsRead();
     }
   }, [messages, markConversationAsRead]);
 
-  // ÔöÇÔöÇ Marcar como le├¡do al completar el scroll inicial ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
-  // scrollDone es estado React ÔåÆ dispara el efecto de forma fiable.
-  // Al abrir el chat el usuario YA est├í viendo los mensajes, marcamos le├¡do
-  // sin necesidad de comprobar isNearBottomRef (que a├║n es false en este punto).
+  // ── Marcar como leído al completar el scroll inicial ──────────────────────
+  // scrollDone es estado React → dispara el efecto de forma fiable.
+  // Al abrir el chat el usuario YA está viendo los mensajes, marcamos leído
+  // sin necesidad de comprobar isNearBottomRef (que aún es false en este punto).
   useEffect(() => {
     if (!scrollDone || !headerReady || messages.length === 0) return;
     markConversationAsRead();
   }, [scrollDone, headerReady, messages, markConversationAsRead]);
 
-  // ÔöÇÔöÇ Helpers de scroll ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Helpers de scroll ─────────────────────────────────────────────────────
   const checkScrollPosition = useCallback(
     (offsetY: number, contentH: number, layoutH: number) => {
       if (contentH <= layoutH) {
@@ -842,14 +844,14 @@ export default function ChatScreen() {
     []
   );
 
-  // ÔöÇÔöÇ messageIndexMap para onViewableItemsChanged ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── messageIndexMap para onViewableItemsChanged ───────────────────────────
   const messageIndexMap = React.useMemo(() => {
     const map = new Map<string, number>();
     messages.forEach((m, idx) => map.set(m.id, idx));
     return map;
   }, [messages]);
 
-  // ÔöÇÔöÇ onViewableItemsChanged ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── onViewableItemsChanged ────────────────────────────────────────────────
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: Array<{ item: Message }> }) => {
       if (!initialScrollDone.current) return;
@@ -886,13 +888,13 @@ export default function ChatScreen() {
     minimumViewTime: 500,
   }).current;
 
-  // ÔöÇÔöÇ sendMessage ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── sendMessage ───────────────────────────────────────────────────────────
   const sendMessage = async () => {
     const text = input.trim();
     if (!text && !selectedImage) return;
     if (!user) return;
     if (!conversationExists) {
-      showToast('La conversaci├│n no existe.', 'error');
+      showToast('La conversación no existe.', 'error');
       return;
     }
     if (otherUserId) {
@@ -931,19 +933,19 @@ export default function ChatScreen() {
     }
   };
 
-  // ÔöÇÔöÇ pickImage ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── pickImage ─────────────────────────────────────────────────────────────
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       handleError(
         'Permiso denegado',
         setToast,
-        'Se necesita permiso para acceder a la galer├¡a.'
+        'Se necesita permiso para acceder a la galería.'
       );
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.8,
       exif: false,
@@ -951,12 +953,12 @@ export default function ChatScreen() {
     if (!result.canceled) setSelectedImage(result.assets[0].uri);
   };
 
-  // ÔöÇÔöÇ handleBlockFromChat ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── handleBlockFromChat ───────────────────────────────────────────────────
   const handleBlockFromChat = async () => {
     if (!user || !otherUserId) return;
     try {
       await UserBlockRepository.block(user.id, otherUserId);
-      showToast('Usuario bloqueado. Ya no recibir├ís sus mensajes.', 'success');
+      showToast('Usuario bloqueado. Ya no recibirás sus mensajes.', 'success');
       setTimeout(() => navigation.goBack(), 700);
     } catch (e) {
       handleError(e, setToast, 'No se pudo bloquear al usuario.');
@@ -965,7 +967,7 @@ export default function ChatScreen() {
     }
   };
 
-  // ÔöÇÔöÇ handleLeaveGroup ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── handleLeaveGroup ──────────────────────────────────────────────────────
   const handleLeaveGroup = async () => {
     if (!user || leaving) return;
     try {
@@ -982,7 +984,7 @@ export default function ChatScreen() {
     }
   };
 
-  // ÔöÇÔöÇ scrollToMessage (para replies) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── scrollToMessage (para replies) ────────────────────────────────────────
   const scrollToMessage = useCallback(
     (replyToId: string) => {
       const index = messages.findIndex((msg) => msg.id === replyToId);
@@ -1012,7 +1014,7 @@ export default function ChatScreen() {
     [messages, highlightBorderWidth]
   );
 
-  // ÔöÇÔöÇ renderMessage ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── renderMessage ─────────────────────────────────────────────────────────
   const renderMessage = useCallback(
     ({ item, index }: { item: Message; index: number }) => {
       const previousMessageCreatedAt =
@@ -1048,8 +1050,8 @@ export default function ChatScreen() {
 
   const keyExtractor = useCallback((item: Message) => item.id, []);
 
-  // ÔöÇÔöÇ CAMBIO 2: onLayout del FlatList ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
-  // Cuando el FlatList est├í listo f├¡sicamente, ejecutar cualquier scroll pendiente
+  // ── CAMBIO 2: onLayout del FlatList ───────────────────────────────────────
+  // Cuando el FlatList está listo físicamente, ejecutar cualquier scroll pendiente
   const handleFlatListLayout = useCallback(() => {
     if (flatListReady.current) return; // Ya estaba listo
     flatListReady.current = true;
@@ -1082,7 +1084,7 @@ export default function ChatScreen() {
     });
   }, []);
 
-  // ÔöÇÔöÇ CAMBIO 4: onScrollToIndexFailed mejorado ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── CAMBIO 4: onScrollToIndexFailed mejorado ──────────────────────────────
   // Hace scrollToEnd primero para forzar el render de items, luego reintenta
   const handleScrollToIndexFailed = useCallback(
     (info: { index: number; averageItemLength: number; highestMeasuredFrameIndex: number }) => {
@@ -1112,9 +1114,9 @@ export default function ChatScreen() {
     [messages.length]
   );
 
-  // ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ─────────────────────────────────────────────────────────────────────────
   // RENDER
-  // ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <AppToast
@@ -1125,7 +1127,7 @@ export default function ChatScreen() {
       />
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      {/* ÔöÇÔöÇ Header ÔöÇÔöÇ */}
+      {/* ── Header ── */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backBtn}
@@ -1169,7 +1171,7 @@ export default function ChatScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ÔöÇÔöÇ Messages + Input ÔöÇÔöÇ */}
+      {/* ── Messages + Input ── */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1199,7 +1201,7 @@ export default function ChatScreen() {
                 contentSize.height ?? 0,
                 layoutMeasurement.height ?? 0
               );
-              // Cargar mensajes m├ís viejos al llegar al tope
+              // Cargar mensajes más viejos al llegar al tope
               if (
                 contentOffset.y < 100 &&
                 hasMoreMap[conversationId] &&
@@ -1296,7 +1298,7 @@ export default function ChatScreen() {
             </Animated.View>
           )}
 
-          {/* Bot├│n scroll-to-bottom */}
+          {/* Botón scroll-to-bottom */}
           <Animated.View
             pointerEvents={showScrollButton ? 'auto' : 'none'}
             style={{
@@ -1340,7 +1342,7 @@ export default function ChatScreen() {
           </Animated.View>
         </View>
 
-        {/* ÔöÇÔöÇ Input bar ÔöÇÔöÇ */}
+        {/* ── Input bar ── */}
         <View style={styles.inputContainer}>
           {replyingTo && (
             <View style={styles.replyPreviewBar}>
@@ -1431,7 +1433,7 @@ export default function ChatScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      {/* ÔöÇÔöÇ Options modal ÔöÇÔöÇ */}
+      {/* ── Options modal ── */}
       {optionsVisible && (
         <View
           style={{
@@ -1509,6 +1511,16 @@ export default function ChatScreen() {
                 </TouchableOpacity>
               </>
             ) : !isGroup && otherUserId ? (
+              <>
+              <TouchableOpacity
+                onPress={() => { setOptionsVisible(false); setShowReportModal(true); }}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}
+              >
+                <Ionicons name="flag-outline" size={22} color="#FF9800" />
+                <Text style={{ marginLeft: 10, color: colors.textPrimary, fontWeight: '700' }}>
+                  Reportar usuario
+                </Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleBlockFromChat}
                 style={{
@@ -1528,6 +1540,7 @@ export default function ChatScreen() {
                   Bloquear usuario
                 </Text>
               </TouchableOpacity>
+              </>
             ) : null}
 
             <TouchableOpacity
@@ -1557,7 +1570,7 @@ export default function ChatScreen() {
         </View>
       )}
 
-      {/* ÔöÇÔöÇ Leave Group modal ÔöÇÔöÇ */}
+      {/* ── Leave Group modal ── */}
       <Modal
         visible={showLeaveModal}
         transparent
@@ -1605,7 +1618,7 @@ export default function ChatScreen() {
                 lineHeight: 22,
               }}
             >
-              ┬┐Est├ís seguro de que quieres salir de este grupo? Ya no podr├ís
+              ¿Estás seguro de que quieres salir de este grupo? Ya no podrás
               ver ni enviar mensajes.
             </Text>
             <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -1660,7 +1673,18 @@ export default function ChatScreen() {
         </View>
       </Modal>
 
-      {/* ÔöÇÔöÇ Full screen image modal ÔöÇÔöÇ */}
+      {/* ── Full screen image modal ── */}
+      {user?.id && otherUserId && (
+        <ReportModal
+          visible={showReportModal}
+          reporterId={user.id}
+          reportedUserId={otherUserId}
+          targetLabel={headerTitle}
+          onClose={() => setShowReportModal(false)}
+          onSuccess={() => showToast('Reporte enviado correctamente.', 'success')}
+          onError={(msg) => showToast(msg, 'error')}
+        />
+      )}
       <Modal
         visible={fullScreenImage !== null}
         transparent

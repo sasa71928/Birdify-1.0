@@ -39,7 +39,7 @@ const SETTING_SECTIONS: SettingSection[] = [
   {
     title: 'Preferences',
     data: [
-      { id: '4', icon: 'globe-outline', label: 'Language' },
+
       { id: '5', icon: 'moon-outline', label: 'Theme' },
     ],
   },
@@ -174,8 +174,8 @@ export default function SettingsScreen() {
         >
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
             <View style={{ margin: 20, backgroundColor: colors.canvasPure, padding: 35, borderRadius: 20, elevation: 5 }}>
-              <Text style={{ fontSize: 18, marginBottom: 15, fontWeight: 'bold', color: colors.textPrimary, textAlign: 'center' }}>Solicitar verificaci├│n</Text>
-              <Text style={{ marginBottom: 15, color: colors.textSecondary, textAlign: 'center' }}>Sube un PDF o imagen que acredite tu experiencia como ornit├│logo o bi├│logo.</Text>
+              <Text style={{ fontSize: 18, marginBottom: 15, fontWeight: 'bold', color: colors.textPrimary, textAlign: 'center' }}>Solicitar verificación</Text>
+              <Text style={{ marginBottom: 15, color: colors.textSecondary, textAlign: 'center' }}>Sube un PDF o imagen que acredite tu experiencia como ornitólogo o biólogo.</Text>
 
               <TouchableOpacity
                 style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary + '20', borderRadius: 8, alignItems: 'center', marginBottom: 15 }}
@@ -222,8 +222,8 @@ export default function SettingsScreen() {
                         try {
                           const { status } = await MailComposer.composeAsync({
                             recipients: ['authbirdify@gmail.com'],
-                            subject: 'Solicitud de verificaci├│n - ' + session?.user?.email,
-                            body: `Adjunto mi documento de verificaci├│n (${selectedFile.name}).`,
+                            subject: 'Solicitud de verificación - ' + session?.user?.email,
+                            body: `Adjunto mi documento de verificación (${selectedFile.name}).`,
                             attachments: [selectedFile.uri],
                           });
                           if (status === 'sent') {

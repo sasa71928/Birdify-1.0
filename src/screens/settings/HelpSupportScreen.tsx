@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
   StatusBar,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,8 +13,6 @@ import { useNavigation } from '@react-navigation/native';
 import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { Spacing } from '../../theme';
-
-import { Linking, Alert } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { handleError } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
@@ -22,17 +21,20 @@ const FAQS = [
   {
     id: '1',
     question: 'How do I record a bird sighting?',
-    answer: 'Go to the Record tab in the main menu, take a photo or select one from your gallery, and fill in the bird details.',
+    answer:
+      'Tap the + button in the bottom navigation bar, take a photo or select one from your gallery, choose the bird species, and publish your sighting.',
   },
   {
     id: '2',
     question: 'Can I use the app offline?',
-    answer: 'Yes! You can download offline packages in the Data & Storage section of settings.',
+    answer:
+      'Yes! When you lose internet connection, Birdify automatically switches to Offline Mode so you can record sightings locally and sync them once you are back online.',
   },
   {
     id: '3',
     question: 'How do I change my privacy settings?',
-    answer: 'Navigate to Settings > Privacy & Security to control who can see your sightings.',
+    answer:
+      'Navigate to Settings > Privacy & Security to enable Private Profile, manage blocked users, or mark individual sighting locations as private.',
   },
 ];
 
@@ -53,33 +55,26 @@ export default function HelpSupportScreen() {
   };
 
   const handleContactSupport = async () => {
-  const subject = `Birdify Support Request - ${user?.email || 'Unknown User'}`;
+    const subject = `Birdify Support Request - ${user?.email || 'Unknown User'}`;
+    const body = `Describe your issue here, including steps to reproduce if applicable:\n\nDevice:\nApp Version: 1.0.4\n`;
+    const emailUrl =
+      `mailto:birdifysupport@gmail.com` +
+      `?subject=${encodeURIComponent(subject)}` +
+      `&body=${encodeURIComponent(body)}`;
 
-  const body = `Describe your issue here, including steps to reproduce if applicable:
-
-  Device:
-  App Version:
-    `;
-
-  const emailUrl =
-    `mailto:birdifysupport@gmail.com` +
-    `?subject=${encodeURIComponent(subject)}` +
-    `&body=${encodeURIComponent(body)}`;
-
-  const supported = await Linking.canOpenURL(emailUrl);
-
-  if (supported) {
-    await Linking.openURL(emailUrl);
-  } else {
-    handleError('No se encontr├│ una aplicaci├│n de correo disponible', setToast, 'Error');
-  }
-};
+    const supported = await Linking.canOpenURL(emailUrl);
+    if (supported) {
+      await Linking.openURL(emailUrl);
+    } else {
+      handleError('No se encontró una aplicación de correo disponible', setToast, 'Error');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
@@ -139,9 +134,7 @@ export default function HelpSupportScreen() {
           </View>
           <Ionicons name="lock-closed-outline" size={18} color={colors.placeholder} />
         </TouchableOpacity>
-
       </ScrollView>
     </SafeAreaView>
   );
 }
-

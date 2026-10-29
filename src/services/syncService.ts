@@ -7,19 +7,21 @@ import { DeviceEventEmitter } from 'react-native';
 
 export let isOnline = false;
 
+const MAX_SYNC_ATTEMPTS = 5;
+
 export function generateId(): string {
   return uuidv4();
 }
 
 export function initNetworkListener() {
-  NetInfo.addEventListener(state => {
-    isOnline = !!state.isConnected;
+  NetInfo.addEventListener((state) => {
+    isOnline = state.isConnected !== false && state.isInternetReachable !== false;
     if (isOnline) {
       flushSyncQueue().catch(console.error);
     }
   });
-  NetInfo.fetch().then(state => {
-    isOnline = !!state.isConnected;
+  NetInfo.fetch().then((state) => {
+    isOnline = state.isConnected !== false && state.isInternetReachable !== false;
     if (isOnline) {
       flushSyncQueue().catch(console.error);
     }
@@ -38,32 +40,6 @@ export async function addToQueue(
   );
 }
 
-function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const lookup = new Uint8Array(256);
-  for (let i = 0; i < chars.length; i++) {
-    lookup[chars.charCodeAt(i)] = i;
-  }
-  let bufferLength = base64.length * 0.75;
-  if (base64[base64.length - 1] === '=') {
-    bufferLength--;
-    if (base64[base64.length - 2] === '=') bufferLength--;
-  }
-  const arrayBuffer = new ArrayBuffer(bufferLength);
-  const bytes = new Uint8Array(arrayBuffer);
-  let p = 0;
-  for (let i = 0; i < base64.length; i += 4) {
-    const b1 = lookup[base64.charCodeAt(i)];
-    const b2 = lookup[base64.charCodeAt(i + 1)];
-    const b3 = lookup[base64.charCodeAt(i + 2)];
-    const b4 = lookup[base64.charCodeAt(i + 3)];
-    bytes[p++] = (b1 << 2) | (b2 >> 4);
-    if (p < bufferLength) bytes[p++] = ((b2 & 15) << 4) | (b3 >> 2);
-    if (p < bufferLength) bytes[p++] = ((b3 & 3) << 6) | (b4 & 63);
-  }
-  return arrayBuffer;
-}
-
 let isSyncing = false;
 
 export async function flushSyncQueue() {
@@ -71,179 +47,186 @@ export async function flushSyncQueue() {
   isSyncing = true;
 
   try {
+    // AUD-011: Limitar reintentos a MAX_SYNC_ATTEMPTS para evitar bucles infinitos ante errores permanentes de RLS/validación
     const queue = await db.getAllAsync<any>(
-      `SELECT * FROM sync_queue ORDER BY created_at ASC`
+      `SELECT * FROM sync_queue WHERE COALESCE(attempts, 0) < ? ORDER BY created_at ASC`,
+      [MAX_SYNC_ATTEMPTS]
     );
 
     if (queue.length === 0) return;
 
     let syncedAnything = false;
 
-  for (const row of queue) {
-    const payload = JSON.parse(row.payload);
-    let error = null;
+    for (const row of queue) {
+      const payload = JSON.parse(row.payload);
+      let error = null;
 
-    try {
-      if (row.table_name === 'sightings') {
-        const { _localImagePaths, _localImagePath, _birdName, _scientificName, ...sightingData } = payload;
-        
-        if (row.operation === 'INSERT') {
-          // 1. Buscar o crear ave en Supabase
-          let finalBirdId = sightingData.bird_id;
-        const { data: birds } = await supabase
-          .from('birds')
-          .select('id')
-          .ilike('common_name', _birdName)
-          .limit(1);
+      try {
+        if (row.table_name === 'sightings') {
+          const { _localImagePaths, _localImagePath, _birdName, _scientificName, ...sightingData } = payload;
 
-        if (birds && birds.length > 0) {
-          finalBirdId = birds[0].id;
-        } else {
-          const { data: newBird, error: birdError } = await supabase
-            .from('birds')
-            .insert({
-              common_name: _birdName,
-              scientific_name: _scientificName || _birdName + ' sp.',
-              description: 'Registrado offline.',
-              season: 'Desconocido',
-              habitat_info: 'Desconocido',
-              ideal_zones: 'Desconocido',
-            })
-            .select()
-            .single();
-          if (birdError) throw birdError;
-          finalBirdId = newBird.id;
-        }
+          if (row.operation === 'INSERT') {
+            // 1. Resolver bird_id válido en catálogo de Supabase
+            let finalBirdId: string | null = sightingData.bird_id ?? null;
 
-        // 2. Subir imagen a Supabase Storage
-        let photoUrls: string[] = [];
-          if (_localImagePaths || _localImagePath) {
-            let pathsArray: string[] = [];
-            
-            try {
-              if (_localImagePaths) {
-                pathsArray = JSON.parse(_localImagePaths);
-              } else if (_localImagePath) {
-                pathsArray = [_localImagePath];
+            if (_birdName && (!finalBirdId || String(finalBirdId).endsWith('_bird'))) {
+              const { data: birds } = await supabase
+                .from('birds')
+                .select('id')
+                .ilike('common_name', _birdName)
+                .limit(1);
+
+              if (birds && birds.length > 0) {
+                finalBirdId = birds[0].id;
               }
-            } catch {
-              pathsArray = [_localImagePaths || _localImagePath]; // fallback
             }
 
-            for (let i = 0; i < pathsArray.length; i++) {
-              const path = pathsArray[i];
-              const ext = path.split('.').pop() || 'jpg';
-              const fileName = `${sightingData.user_id}/${Date.now()}_${i}.${ext}`;
-              const base64 = await fetch(path)
-                .then(r => r.blob())
-                .then(blob => new Promise<string>((resolve, reject) => {
-                  const reader = new FileReader();
-                  reader.onload = () => resolve((reader.result as string).split(',')[1]);
-                  reader.onerror = reject;
-                  reader.readAsDataURL(blob);
-                }));
+            if (!finalBirdId || String(finalBirdId).endsWith('_bird')) {
+              throw new Error(`La especie "${_birdName || 'desconocida'}" no existe en el catálogo oficial.`);
+            }
 
-              const arrayBuffer = decodeBase64ToArrayBuffer(base64);
-              let bucketName = 'Sightings';
-              let { error: uploadError } = await supabase.storage
-                .from(bucketName)
-                .upload(fileName, arrayBuffer, {
-                  contentType: `image/${ext === 'png' ? 'png' : 'jpeg'}`,
-                  upsert: true,
-                });
+            // 2. Subir imágenes locales a Supabase Storage mediante ArrayBuffer directo (AUD-022)
+            const photoUrls: string[] = [];
+            if (_localImagePaths || _localImagePath) {
+              let pathsArray: string[] = [];
 
-              if (uploadError && (uploadError as any).code === 'NoSuchBucket') {
-                bucketName = 'sightings';
-                const retry = await supabase.storage
+              try {
+                if (_localImagePaths) {
+                  pathsArray = typeof _localImagePaths === 'string' && _localImagePaths.startsWith('[')
+                    ? JSON.parse(_localImagePaths)
+                    : [_localImagePaths];
+                } else if (_localImagePath) {
+                  pathsArray = [_localImagePath];
+                }
+              } catch {
+                pathsArray = [_localImagePaths || _localImagePath];
+              }
+
+              for (let i = 0; i < pathsArray.length; i++) {
+                const path = pathsArray[i];
+                if (!path) continue;
+
+                if (path.startsWith('http://') || path.startsWith('https://')) {
+                  photoUrls.push(path);
+                  continue;
+                }
+
+                const rawExt = (path.split('?')[0].split('.').pop() || 'jpg').toLowerCase();
+                const ext = rawExt === 'png' || rawExt === 'webp' ? rawExt : 'jpg';
+                const contentType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+                const fileName = `${sightingData.user_id}/${Date.now()}_${i}.${ext}`;
+
+                const response = await fetch(path);
+                const arrayBuffer = await response.arrayBuffer();
+
+                let bucketName = 'Sightings';
+                let { error: uploadError } = await supabase.storage
                   .from(bucketName)
                   .upload(fileName, arrayBuffer, {
-                    contentType: `image/${ext === 'png' ? 'png' : 'jpeg'}`,
+                    contentType,
                     upsert: true,
                   });
-                uploadError = retry.error;
+
+                if (uploadError && (uploadError as any).code === 'NoSuchBucket') {
+                  bucketName = 'sightings';
+                  const retry = await supabase.storage
+                    .from(bucketName)
+                    .upload(fileName, arrayBuffer, {
+                      contentType,
+                      upsert: true,
+                    });
+                  uploadError = retry.error;
+                }
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabase.storage.from(bucketName).getPublicUrl(fileName);
+                photoUrls.push(publicUrl);
+              }
+            }
+
+            const finalPhotoUrl =
+              photoUrls.length === 1
+                ? photoUrls[0]
+                : photoUrls.length > 1
+                  ? JSON.stringify(photoUrls)
+                  : null;
+
+            // 3. Insertar avistamiento en Supabase respetando privacidad de ubicación (AUD-001)
+            const isPrivateLoc = Boolean(sightingData.is_location_private);
+            ({ error } = await supabase.from('sightings').upsert(
+              {
+                ...sightingData,
+                bird_id: finalBirdId,
+                latitude: isPrivateLoc ? null : sightingData.latitude,
+                longitude: isPrivateLoc ? null : sightingData.longitude,
+                photo_url: finalPhotoUrl,
+              },
+              { onConflict: 'id' }
+            ));
+
+            if (!error) {
+              if (sightingData.bird_id !== finalBirdId) {
+                const existingLocalBird = await db.getFirstAsync<{ id: string }>(
+                  `SELECT id FROM birds WHERE id = ? LIMIT 1`,
+                  [finalBirdId]
+                );
+
+                if (existingLocalBird) {
+                  await db.runAsync(`DELETE FROM birds WHERE id = ?`, [sightingData.bird_id]);
+                } else {
+                  await db.runAsync(`UPDATE birds SET id = ? WHERE id = ?`, [
+                    finalBirdId,
+                    sightingData.bird_id,
+                  ]);
+                }
               }
 
-              if (uploadError) throw uploadError;
-
-              const { data: { publicUrl } } = supabase.storage.from(bucketName).getPublicUrl(fileName);
-              photoUrls.push(publicUrl);
+              await db.runAsync(
+                `UPDATE sightings
+                 SET photo_url = ?, sync_status = 'synced', bird_id = ?
+                 WHERE id = ?`,
+                [finalPhotoUrl, finalBirdId, sightingData.id]
+              );
             }
+          } else if (row.operation === 'UPDATE') {
+            ({ error } = await supabase.from('sightings').update(sightingData).eq('id', sightingData.id));
+            if (!error) {
+              await db.runAsync(`UPDATE sightings SET sync_status = 'synced' WHERE id = ?`, [sightingData.id]);
+            }
+          } else if (row.operation === 'DELETE') {
+            ({ error } = await supabase.from('sightings').delete().eq('id', sightingData.id));
           }
-
-          const finalPhotoUrl = photoUrls.length === 1 ? photoUrls[0] : (photoUrls.length > 1 ? JSON.stringify(photoUrls) : null);
-
-        // 3. Insertar sighting en Supabase
-        ({ error } = await supabase.from('sightings').upsert({
-          ...sightingData,
-          bird_id: finalBirdId,
-          photo_url: finalPhotoUrl,
-        }, { onConflict: 'id' }));
+        } else {
+          if (row.operation === 'INSERT') {
+            ({ error } = await supabase.from(row.table_name).insert(payload));
+          } else if (row.operation === 'UPDATE') {
+            ({ error } = await supabase.from(row.table_name).update(payload).eq('id', payload.id));
+          } else if (row.operation === 'DELETE') {
+            ({ error } = await supabase.from(row.table_name).delete().eq('id', payload.id));
+          } else if (row.operation === 'DELETE_REACTION') {
+            ({ error } = await supabase
+              .from('reactions')
+              .delete()
+              .match({ sighting_id: payload.sighting_id, user_id: payload.user_id }));
+          }
+        }
 
         if (!error) {
-          // 4. Actualizar bird local con ID real de Supabase para que el JOIN siga funcionando
-          if (sightingData.bird_id !== finalBirdId) {
-            const existingLocalBird = await db.getFirstAsync<{ id: string }>(
-              `SELECT id FROM birds WHERE id = ? LIMIT 1`,
-              [finalBirdId]
-            );
-
-            if (existingLocalBird) {
-              // Ya existe el ave real localmente.
-              // Borramos el ave temporal para evitar duplicados y conflictos de PK.
-              await db.runAsync(
-                `DELETE FROM birds WHERE id = ?`,
-                [sightingData.bird_id]
-              );
-            } else {
-              // No existe el ave real, podemos renombrar el ID temporal al real.
-              await db.runAsync(
-                `UPDATE birds SET id = ? WHERE id = ?`,
-                [finalBirdId, sightingData.bird_id]
-              );
-            }
-          }
-
-          // 5. Actualizar sighting ÔÇö photo_url = URL Supabase, local_photo_path intacto
-          await db.runAsync(
-            `UPDATE sightings
-             SET photo_url = ?, sync_status = 'synced', bird_id = ?
-             WHERE id = ?`,
-            [finalPhotoUrl, finalBirdId, sightingData.id]
-          );
+          await db.runAsync(`DELETE FROM sync_queue WHERE id = ?`, [row.id]);
+          console.log(`Sincronizado: ${row.operation} en ${row.table_name}`);
+          syncedAnything = true;
+        } else {
+          throw error;
         }
-        } else if (row.operation === 'UPDATE') {
-          ({ error } = await supabase.from('sightings').update(sightingData).eq('id', sightingData.id));
-        } else if (row.operation === 'DELETE') {
-          ({ error } = await supabase.from('sightings').delete().eq('id', sightingData.id));
-        }
-      } else {
-        if (row.operation === 'INSERT') {
-          ({ error } = await supabase.from(row.table_name).insert(payload));
-        } else if (row.operation === 'UPDATE') {
-          ({ error } = await supabase.from(row.table_name).update(payload).eq('id', payload.id));
-        } else if (row.operation === 'DELETE') {
-          ({ error } = await supabase.from(row.table_name).delete().eq('id', payload.id));
-        } else if (row.operation === 'DELETE_REACTION') {
-          ({ error } = await supabase.from('reactions').delete().match({ sighting_id: payload.sighting_id, user_id: payload.user_id }));
-        }
+      } catch (err) {
+        console.warn(`Fallo sync (intento ${(row.attempts || 0) + 1}):`, err);
+        await db.runAsync(
+          `UPDATE sync_queue SET attempts = COALESCE(attempts, 0) + 1 WHERE id = ?`,
+          [row.id]
+        );
       }
-
-      if (!error) {
-        await db.runAsync(`DELETE FROM sync_queue WHERE id = ?`, [row.id]);
-        console.log(`Sincronizado: ${row.operation} en ${row.table_name}`);
-        syncedAnything = true;
-      } else {
-        throw error;
-      }
-
-    } catch (err) {
-      console.warn(`Fallo sync (intento ${row.attempts + 1}):`, err);
-      await db.runAsync(
-        `UPDATE sync_queue SET attempts = attempts + 1 WHERE id = ?`,
-        [row.id]
-      );
     }
-  }
 
     if (syncedAnything) {
       DeviceEventEmitter.emit('sync_completed');
@@ -253,21 +236,24 @@ export async function flushSyncQueue() {
   }
 }
 
+/**
+ * Elimina un avistamiento local preservando cualquier operación DELETE encolada
+ * para registros que ya habían sido sincronizados en el servidor (AUD-019).
+ */
 export async function deletePendingSighting(sightingId: string): Promise<void> {
-  // 1. Borrar de sync_queue 
   await db.runAsync(
     `DELETE FROM sync_queue
      WHERE table_name = 'sightings'
+       AND operation != 'DELETE'
        AND JSON_EXTRACT(payload, '$.id') = ?`,
     [sightingId]
   );
-  // 2. Borrar de la tabla local
   await db.runAsync(`DELETE FROM sightings WHERE id = ?`, [sightingId]);
 }
 
 /**
- * Limpia la cach├® local y la cola de sincronizaci├│n al cerrar sesi├│n
- * para evitar fugas de informaci├│n entre cuentas (V-03).
+ * Limpia la caché local y la cola de sincronización al cerrar sesión
+ * para evitar fugas de información entre cuentas (AUD-008).
  */
 export async function clearLocalData(): Promise<void> {
   try {

@@ -1,14 +1,13 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigation, useRoute, useIsFocused } from '@react-navigation/native';
+import { useState, useEffect, useCallback, useMemo, useRef, useContext } from 'react';
+import { useNavigation, useRoute, useIsFocused, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
 import MapView from 'react-native-maps';
+import * as Location from 'expo-location';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { SightingRepository } from '../repositories/sighting.repository';
-import * as Location from 'expo-location';
+import { OfflineContext } from '../context/OfflineContext';
+import { useAuth } from '../context/AuthContext';
 import { handleError } from '../utils/errorHandler';
-import { useContext } from 'react';
-import { OfflineContext } from '../navigation/AppNavigator';
 
 type ExploreNavProp = NativeStackNavigationProp<RootStackParamList, 'Explore'>;
 type ExploreRouteProp = RouteProp<RootStackParamList, 'Explore'>;
@@ -35,6 +34,8 @@ export function useExplore() {
   const isFocused = useIsFocused();
   const mapRef = useRef<MapView>(null);
   const isOffline = useContext(OfflineContext);
+  const { user } = useAuth();
+
   const [loading, setLoading] = useState(true);
   const [selectedMarker, setSelectedMarker] = useState<string | null>(null);
   const [sightings, setSightings] = useState<MapSighting[]>([]);
@@ -77,20 +78,19 @@ export function useExplore() {
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return (R * c).toFixed(1);
   };
 
   const loadSightings = useCallback(async () => {
-        if (isOffline) {           // guard offline
-      setLoading(false);
-      return;
-    }
     try {
       setLoading(true);
-      const data = await SightingRepository.getFeed();
+      // AUD-020: Consulta específica de marcadores públicos (hasta 200 puntos) filtrando bloqueados y ubicaciones privadas
+      const data = await SightingRepository.getForMap(user?.id, 200);
       const validSightings = data.filter(
         (item) =>
           item.latitude != null &&
@@ -99,11 +99,13 @@ export function useExplore() {
       );
       setSightings(validSightings);
     } catch (error) {
-      handleError(error, setToast, 'Error loading sightings');
+      if (!isOffline) {
+        handleError(error, setToast, 'Error loading sightings');
+      }
     } finally {
       setLoading(false);
     }
-  }, [isOffline]);    
+  }, [isOffline, user?.id]);
 
   const loadUserLocation = async (isMounted: boolean) => {
     try {
@@ -113,7 +115,7 @@ export function useExplore() {
       }
 
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+        accuracy: Location.Accuracy.Balanced,
       });
 
       if (!isMounted) return;
@@ -133,12 +135,10 @@ export function useExplore() {
 
     const initializeScreen = async () => {
       if (!isFocused) return;
-      if (isOffline) {         // ÔåÉ agrega este guard
-        setLoading(false);
-        return;
-      }
       await loadSightings();
-      await loadUserLocation(isMounted);
+      if (!isOffline) {
+        await loadUserLocation(isMounted);
+      }
     };
 
     initializeScreen();
@@ -146,11 +146,15 @@ export function useExplore() {
     return () => {
       isMounted = false;
     };
-  }, [loadSightings, isFocused, isOffline]); 
+  }, [loadSightings, isFocused, isOffline]);
 
-  // Navigate to target sighting if provided
   useEffect(() => {
-    if (targetSighting && sightings.length > 0) {
+    if (
+      targetSighting &&
+      targetSighting.latitude != null &&
+      targetSighting.longitude != null &&
+      sightings.length > 0
+    ) {
       setSelectedMarker(targetSighting.id);
       mapRef.current?.animateToRegion({
         latitude: targetSighting.latitude,
@@ -205,12 +209,11 @@ export function useExplore() {
     setSelectedMarker(sightingId);
   };
 
-  const navigateToSighting = (sightingId: string) => {
-    // Navigate to sighting detail if needed
+  const navigateToSighting = (_sightingId: string) => {
+    // Reservado para navegación futura a detalle de marcador
   };
 
   return {
-    // State
     loading,
     selectedMarker,
     sightings,
@@ -221,13 +224,10 @@ export function useExplore() {
     DEFAULT_REGION,
     mapRef,
     toast,
-    
-    // Setters
+    navigation,
     setSearchQuery,
     setSelectedMarker,
     setToast,
-    
-    // Actions
     loadSightings,
     loadUserLocation,
     closeSelection,

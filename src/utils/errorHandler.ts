@@ -17,13 +17,15 @@ export function handleError(
   showToast?: ToastSetter,
   customMessage?: string
 ): string {
-  const errorMessage = customMessage || 
-    (error?.message) || 
-    (typeof error === 'string' ? error : 
+  const errorMessage = customMessage ||
+    (error?.message) ||
+    (typeof error === 'string' ? error :
     'Ocurrió un error inesperado');
-  
-  console.error('Error:', error);
-  
+
+  if (__DEV__) {
+    console.error('Error:', error);
+  }
+
   if (showToast) {
     showToast({
       visible: true,
@@ -31,7 +33,7 @@ export function handleError(
       type: 'error',
     });
   }
-  
+
   return errorMessage;
 }
 

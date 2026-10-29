@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   ScrollView,
   StatusBar,
   Switch,
-  Alert,
   Modal,
   TextInput,
   ActivityIndicator,
@@ -23,6 +22,29 @@ import { ProfileRepository } from '../../repositories/profile.repository';
 import { handleError } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
 
+const USER_STORAGE_BUCKETS = ['avatars', 'Sightings', 'sightings', 'sighting-images', 'group-avatars'] as const;
+
+async function purgeUserStorageObjects(userId: string): Promise<void> {
+  await Promise.all(
+    USER_STORAGE_BUCKETS.map(async (bucket) => {
+      try {
+        const { data: items, error } = await supabase.storage.from(bucket).list(userId, { limit: 500 });
+        if (error || !items || items.length === 0) return;
+
+        const paths = items
+          .filter((item) => Boolean(item.name))
+          .map((item) => `${userId}/${item.name}`);
+
+        if (paths.length > 0) {
+          await supabase.storage.from(bucket).remove(paths);
+        }
+      } catch {
+        // Ignorar buckets no existentes o sin permisos para no bloquear la eliminación de cuenta
+      }
+    })
+  );
+}
+
 export default function PrivacySettingsScreen() {
   const navigation = useNavigation();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
@@ -33,7 +55,11 @@ export default function PrivacySettingsScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Toast state
-  const [toast, setToast] = useState<{ visible: boolean, message: string, type: 'success' | 'error' }>({ visible: false, message: '', type: 'success' });
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -42,7 +68,7 @@ export default function PrivacySettingsScreen() {
     }
     setToast({ visible: true, message, type });
     toastTimerRef.current = setTimeout(() => {
-      setToast(prev => ({ ...prev, visible: false }));
+      setToast((prev) => ({ ...prev, visible: false }));
     }, 3500);
   };
 
@@ -174,13 +200,14 @@ export default function PrivacySettingsScreen() {
 
     setIsDeleting(true);
     try {
-      // 1. Intentar eliminar el usuario de auth.users mediante un RPC (elimina de auth y por cascada de public)
+      // 1. Purgar objetos de Storage asociados al usuario antes de revocar su sesión/registro (AUD-009)
+      await purgeUserStorageObjects(user.id);
+
+      // 2. Eliminar el usuario de auth.users mediante RPC (elimina de auth y por cascada de public)
       const { error: rpcError } = await supabase.rpc('delete_user');
 
       if (rpcError) {
-        console.warn('RPC delete_user no disponible o falló, aplicando fallback a public.users:', rpcError);
-        
-        // 2. Fallback: eliminar al menos el registro público
+        // 3. Fallback: eliminar al menos el registro público
         const { error: dbError } = await supabase
           .from('users')
           .delete()
@@ -199,83 +226,87 @@ export default function PrivacySettingsScreen() {
     }
   };
 
-  const localStyles = StyleSheet.create({
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.6)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 20,
-    },
-    modalContainer: {
-      backgroundColor: colors.surface,
-      borderRadius: 18,
-      width: '100%',
-      maxWidth: 360,
-      padding: 24,
-      borderWidth: 1,
-      borderColor: colors.border + '30',
-      elevation: 5,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.25,
-      shadowRadius: 10,
-    },
-    modalTitle: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: colors.primary,
-      fontFamily: 'PlusJakartaSans-Bold',
-      marginBottom: 16,
-      textAlign: 'center',
-    },
-    inputGroup: {
-      marginBottom: 14,
-    },
-    inputLabel: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: colors.textPrimary,
-      marginBottom: 6,
-    },
-    input: {
-      backgroundColor: colors.componentBase,
-      borderWidth: 1,
-      borderColor: colors.border + '20',
-      borderRadius: 10,
-      padding: 12,
-      fontSize: 15,
-      color: colors.textPrimary,
-    },
-    btnContainer: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      gap: 10,
-      marginTop: 10,
-    },
-    btn: {
-      flex: 1,
-      padding: 12,
-      borderRadius: 10,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    btnCancel: {
-      borderWidth: 1.5,
-      borderColor: colors.border + '60',
-    },
-    btnSave: {
-      backgroundColor: colors.primary,
-    },
-    btnTextCancel: {
-      color: colors.textSecondary,
-      fontWeight: '600',
-    },
-    btnTextSave: {
-      color: colors.canvasPure,
-      fontWeight: '600',
-    },
-  });
+  const localStyles = useMemo(
+    () =>
+      StyleSheet.create({
+        modalOverlay: {
+          flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 20,
+        },
+        modalContainer: {
+          backgroundColor: colors.surface,
+          borderRadius: 18,
+          width: '100%',
+          maxWidth: 360,
+          padding: 24,
+          borderWidth: 1,
+          borderColor: colors.border + '30',
+          elevation: 5,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.25,
+          shadowRadius: 10,
+        },
+        modalTitle: {
+          fontSize: 18,
+          fontWeight: 'bold',
+          color: colors.primary,
+          fontFamily: 'PlusJakartaSans-Bold',
+          marginBottom: 16,
+          textAlign: 'center',
+        },
+        inputGroup: {
+          marginBottom: 14,
+        },
+        inputLabel: {
+          fontSize: 13,
+          fontWeight: '600',
+          color: colors.textPrimary,
+          marginBottom: 6,
+        },
+        input: {
+          backgroundColor: colors.componentBase,
+          borderWidth: 1,
+          borderColor: colors.border + '20',
+          borderRadius: 10,
+          padding: 12,
+          fontSize: 15,
+          color: colors.textPrimary,
+        },
+        btnContainer: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          gap: 10,
+          marginTop: 10,
+        },
+        btn: {
+          flex: 1,
+          padding: 12,
+          borderRadius: 10,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        btnCancel: {
+          borderWidth: 1.5,
+          borderColor: colors.border + '60',
+        },
+        btnSave: {
+          backgroundColor: colors.primary,
+        },
+        btnTextCancel: {
+          color: colors.textSecondary,
+          fontWeight: '600',
+        },
+        btnTextSave: {
+          color: colors.canvasPure,
+          fontWeight: '600',
+        },
+      }),
+    [colors]
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -283,10 +314,10 @@ export default function PrivacySettingsScreen() {
         visible={toast.visible && !passwordModalVisible}
         message={toast.message}
         type={toast.type}
-        onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+        onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
@@ -296,7 +327,6 @@ export default function PrivacySettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
         {/* Privacy Settings Section */}
         <View style={styles.sectionHeader}>
           <Ionicons name="shield-outline" size={22} color={colors.primary} />
@@ -323,8 +353,8 @@ export default function PrivacySettingsScreen() {
             activeOpacity={0.7}
             onPress={() => navigation.navigate('BlockedUsers' as never)}
           >
-            <Ionicons name="remove-circle-outline" size={22} color={colors.textPrimary} style={{marginRight: 12}} />
-            <Text style={[styles.settingLabel, {flex: 1}]}>Blocked Users</Text>
+            <Ionicons name="remove-circle-outline" size={22} color={colors.textPrimary} style={{ marginRight: 12 }} />
+            <Text style={[styles.settingLabel, { flex: 1 }]}>Blocked Users</Text>
             <Ionicons name="chevron-forward" size={20} color={colors.placeholder} />
           </TouchableOpacity>
         </View>
@@ -355,20 +385,20 @@ export default function PrivacySettingsScreen() {
             />
           </View>
           <View style={styles.settingDivider} />
-          <TouchableOpacity 
-            style={styles.settingRow} 
+          <TouchableOpacity
+            style={styles.settingRow}
             activeOpacity={0.7}
             onPress={() => setPasswordModalVisible(true)}
           >
-            <MaterialCommunityIcons name="dots-horizontal" size={22} color={colors.textPrimary} style={{marginRight: 12}} />
-            <Text style={[styles.settingLabel, {flex: 1}]}>Change Password</Text>
+            <MaterialCommunityIcons name="dots-horizontal" size={22} color={colors.textPrimary} style={{ marginRight: 12 }} />
+            <Text style={[styles.settingLabel, { flex: 1 }]}>Change Password</Text>
             <Ionicons name="chevron-forward" size={20} color={colors.placeholder} />
           </TouchableOpacity>
         </View>
 
         {/* Delete Account */}
-        <TouchableOpacity 
-          style={[styles.deleteBtn, isDeleting && { opacity: 0.6 }]} 
+        <TouchableOpacity
+          style={[styles.deleteBtn, isDeleting && { opacity: 0.6 }]}
           activeOpacity={0.8}
           onPress={handleDeleteAccount}
           disabled={isDeleting || isChangingPassword}
@@ -377,14 +407,16 @@ export default function PrivacySettingsScreen() {
             <ActivityIndicator size="small" color={colors.errorRed} />
           ) : (
             <>
-              <View style={{
-                backgroundColor: 'transparent',
-                borderWidth: 1,
-                borderColor: colors.errorRed,
-                borderRadius: 4,
-                padding: 2,
-                marginRight: 8
-              }}>
+              <View
+                style={{
+                  backgroundColor: 'transparent',
+                  borderWidth: 1,
+                  borderColor: colors.errorRed,
+                  borderRadius: 4,
+                  padding: 2,
+                  marginRight: 8,
+                }}
+              >
                 <Ionicons name="trash-outline" size={16} color={colors.errorRed} />
               </View>
               <Text style={styles.deleteBtnText}>Delete Account</Text>
@@ -394,7 +426,6 @@ export default function PrivacySettingsScreen() {
         <Text style={styles.deleteWarning}>
           Deleting your account will permanently remove all your sightings, journals, and data. This action cannot be undone.
         </Text>
-
       </ScrollView>
 
       {/* Change Password Modal */}
@@ -414,7 +445,7 @@ export default function PrivacySettingsScreen() {
               visible={toast.visible}
               message={toast.message}
               type={toast.type}
-              onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+              onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
               floating={false}
               containerStyle={{ marginBottom: 14, padding: 12, borderRadius: 10 }}
             />
@@ -500,15 +531,17 @@ export default function PrivacySettingsScreen() {
         <View style={localStyles.modalOverlay}>
           <View style={localStyles.modalContainer}>
             <View style={{ alignItems: 'center', marginBottom: 12 }}>
-              <View style={{
-                width: 56,
-                height: 56,
-                borderRadius: 28,
-                backgroundColor: colors.errorRed + '20',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginBottom: 10,
-              }}>
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  backgroundColor: colors.errorRed + '20',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 10,
+                }}
+              >
                 <Ionicons name="warning-outline" size={30} color={colors.errorRed} />
               </View>
               <Text style={[localStyles.modalTitle, { color: colors.errorRed, marginBottom: 4 }]}>⚠️ ¿Eliminar Cuenta?</Text>
@@ -533,9 +566,14 @@ export default function PrivacySettingsScreen() {
             </View>
 
             <View style={localStyles.inputGroup}>
-              <Text style={[localStyles.inputLabel, { color: colors.textSecondary }]}>Escribe <Text style={{ fontWeight: 'bold', color: colors.errorRed }}>ELIMINAR</Text> para confirmar:</Text>
+              <Text style={[localStyles.inputLabel, { color: colors.textSecondary }]}>
+                Escribe <Text style={{ fontWeight: 'bold', color: colors.errorRed }}>ELIMINAR</Text> para confirmar:
+              </Text>
               <TextInput
-                style={[localStyles.input, { borderColor: deleteConfirmationText.trim().toUpperCase() === 'ELIMINAR' ? colors.errorRed : colors.border + '20' }]}
+                style={[
+                  localStyles.input,
+                  { borderColor: deleteConfirmationText.trim().toUpperCase() === 'ELIMINAR' ? colors.errorRed : colors.border + '20' },
+                ]}
                 value={deleteConfirmationText}
                 onChangeText={setDeleteConfirmationText}
                 placeholder="ELIMINAR"
@@ -558,7 +596,10 @@ export default function PrivacySettingsScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[localStyles.btn, { backgroundColor: deleteConfirmationText.trim().toUpperCase() === 'ELIMINAR' ? colors.errorRed : colors.border + '60' }]}
+                style={[
+                  localStyles.btn,
+                  { backgroundColor: deleteConfirmationText.trim().toUpperCase() === 'ELIMINAR' ? colors.errorRed : colors.border + '60' },
+                ]}
                 onPress={confirmDeleteAccount}
                 disabled={isDeleting || deleteConfirmationText.trim().toUpperCase() !== 'ELIMINAR'}
               >
@@ -575,5 +616,3 @@ export default function PrivacySettingsScreen() {
     </SafeAreaView>
   );
 }
-
-

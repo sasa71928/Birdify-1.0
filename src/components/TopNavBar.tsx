@@ -1,15 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Colors, Typography, Spacing } from '../theme';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Spacing } from '../theme';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
 import { useDynamicStyles } from '../hooks/useDynamicStyles';
 import { useAuth } from '../context/AuthContext';
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export const createStyles = (colors: any) => StyleSheet.create({
   container: {
@@ -80,24 +79,33 @@ export default function TopNavBar() {
   return (
     <View style={styles.container}>
       <View style={styles.left}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.logoContainer}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Ir al inicio"
           onPress={() => navigation.navigate('MainTabs', { screen: 'Feed' })}
         >
-          <Image 
-            source={require('../../assets/icon.png')} 
-            style={styles.appLogo as any} 
+          <Image
+            source={require('../../assets/icon.png')}
+            style={styles.appLogo as any}
           />
           <Text style={styles.logoText}>Birdify</Text>
         </TouchableOpacity>
       </View>
       <View style={styles.right}>
-        <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('Search')}>
+        <TouchableOpacity
+          style={styles.iconButton}
+          accessibilityRole="button"
+          accessibilityLabel="Buscar aves y usuarios"
+          onPress={() => navigation.navigate('Search')}
+        >
           <Ionicons name="search-outline" size={24} color={colors.primary} />
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.profileButton}
+          accessibilityRole="button"
+          accessibilityLabel={isMyProfile ? 'Abrir configuración' : 'Abrir mi perfil'}
           onPress={() => {
             if (isMyProfile) {
               navigation.navigate('Settings');
@@ -109,9 +117,9 @@ export default function TopNavBar() {
           {isMyProfile ? (
             <Ionicons name="settings-outline" size={26} color={colors.primary} />
           ) : (
-            <Image 
-              source={{ uri: avatarUrl }} 
-              style={styles.profileImage} 
+            <Image
+              source={{ uri: avatarUrl }}
+              style={styles.profileImage}
             />
           )}
         </TouchableOpacity>
@@ -119,4 +127,3 @@ export default function TopNavBar() {
     </View>
   );
 }
-

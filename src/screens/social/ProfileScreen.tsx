@@ -31,12 +31,13 @@ import { ConversationRepository } from '../../repositories/conversation.reposito
 import { User } from '../../types/models';
 import { handleError } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
+import ReportModal from '../../components/ReportModal';
 import { supabase } from '../../lib/supabase';
 import { FollowRepository } from '../../repositories/follow.repository';
 
 type ProfileRouteProp = RouteProp<RootStackParamList, 'Profile'>;
 
-// ÔöÇÔöÇ Tabs ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── Tabs ──────────────────────────────────────────────────────────────────────
 type Tab = 'Sightings' | 'Logbook' | 'Likes';
 
 export default function ProfileScreen() {
@@ -69,6 +70,7 @@ export default function ProfileScreen() {
   // States for sighting modal
   const [selectedSighting, setSelectedSighting] = useState<any>(null);
   const [showSightingModal, setShowSightingModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
     message: '',
@@ -376,7 +378,7 @@ const userData = profile ? {
   name: profile.fullname || 'Usuario',
   username: profile.username || 'user',
   avatar: profile.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
-  bio: profile.bio || 'Sin biograf├¡a.',
+  bio: profile.bio || 'Sin biografía.',
   isPrivate: profile.is_private,
   is_verified: profile.is_verified ?? false,
   followers: followersCount.toString(),
@@ -414,19 +416,16 @@ const userData = profile ? {
         list = await FollowRepository.getFollowing(displayUserId);
       }
       
-      const mappedList = await Promise.all(list.map(async (u) => {
-        let isFollowing = false;
-        if (authUser && u.id !== authUser.id) {
-          isFollowing = await FollowRepository.isFollowing(authUser.id, u.id);
-        }
-        
-        return {
-          id: u.id,
-          name: u.fullname || u.username || 'Usuario',
-          username: u.username || 'user',
-          avatar: u.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
-          isFollowing
-        };
+      const myFollowingIds = authUser
+        ? await FollowRepository.getFollowingIds(authUser.id)
+        : new Set<string>();
+
+      const mappedList = list.map((u) => ({
+        id: u.id,
+        name: u.fullname || u.username || 'Usuario',
+        username: u.username || 'user',
+        avatar: u.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
+        isFollowing: Boolean(authUser && u.id !== authUser.id && myFollowingIds.has(u.id)),
       }));
       setModalUsersList(mappedList);
     } catch (err) {
@@ -452,7 +451,7 @@ const userData = profile ? {
       <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
       <TopNavBar />
 
-      {/* ÔöÇÔöÇ Profile Header (fijo, no scroll) ÔöÇÔöÇ */}
+      {/* ── Profile Header (fijo, no scroll) ── */}
       <View style={styles.profileHeader}>
         <View style={styles.avatarWrapper}>
           <Image
@@ -530,10 +529,13 @@ const userData = profile ? {
                 const conversationId = await ConversationRepository.createDirectConversation(authUser!.id, displayUserId!);
                 navigation.navigate('Chat', { conversationId });
               } catch (error) {
-                handleError(error, setToast, 'No se pudo crear la conversaci├│n');
+                handleError(error, setToast, 'No se pudo crear la conversación');
               }
             }}>
               <Ionicons name="chatbubble-outline" size={20} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.messageMainBtn} onPress={() => setShowReportModal(true)}>
+              <Ionicons name="flag-outline" size={20} color={colors.errorRed || '#FF5252'} />
             </TouchableOpacity>
           </View>
         )}
@@ -552,7 +554,7 @@ const userData = profile ? {
         </View>
       ) : (
         <View style={{ flex: 1 }}>
-          {/* ÔöÇÔöÇ Tab bar horizontal ÔöÇÔöÇ */}
+          {/* ── Tab bar horizontal ── */}
           <View style={styles.tabsContainer}>
             {(['Sightings', 'Logbook', 'Likes'] as Tab[]).map((tab) => (
               <TouchableOpacity
@@ -565,7 +567,7 @@ const userData = profile ? {
             ))}
           </View>
 
-          {/* ÔöÇÔöÇ Contenido scrollable del tab activo ÔöÇÔöÇ */}
+          {/* ── Contenido scrollable del tab activo ── */}
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
@@ -578,7 +580,18 @@ const userData = profile ? {
         </View>
       )}
 
-      {/* ÔöÇÔöÇ Follow Modal ÔöÇÔöÇ */}
+      {/* ── Follow Modal ── */}
+      {authUser?.id && !isMe && displayUserId && (
+        <ReportModal
+          visible={showReportModal}
+          reporterId={authUser.id}
+          reportedUserId={displayUserId}
+          targetLabel={`@${userData.username}`}
+          onClose={() => setShowReportModal(false)}
+          onSuccess={() => setToast({ visible: true, message: 'Reporte enviado correctamente.', type: 'success' })}
+          onError={(msg) => setToast({ visible: true, message: msg, type: 'error' })}
+        />
+      )}
       <Modal
         animationType="slide"
         transparent={true}
@@ -628,7 +641,7 @@ const userData = profile ? {
                       <TouchableOpacity 
                         style={[styles.followBtn, item.isFollowing && styles.followingBtn]}
                         onPress={(e) => {
-                          e.stopPropagation(); // Evitar navegaci├│n de perfil
+                          e.stopPropagation(); // Evitar navegación de perfil
                           handleModalFollowToggle(item);
                         }}
                         disabled={togglingModalUserId === item.id}
@@ -650,7 +663,7 @@ const userData = profile ? {
         </View>
       </Modal>
 
-      {/* ÔöÇÔöÇ Sighting Modal ÔöÇÔöÇ */}
+      {/* ── Sighting Modal ── */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -685,13 +698,13 @@ const userData = profile ? {
   );
 }
 
-// ÔöÇÔöÇ mapSightingToPost ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── mapSightingToPost ─────────────────────────────────────────────────────────
 function mapSightingToPost(sighting: any, currentUserId?: string): Post {
   const timeDiff = Date.now() - new Date(sighting.created_at || sighting.sighting_date).getTime();
   const hoursAgo = Math.floor(timeDiff / (1000 * 60 * 60));
   const timeAgoStr = hoursAgo < 24
     ? (hoursAgo === 0 ? 'Hace un momento' : `Hace ${hoursAgo} hora${hoursAgo === 1 ? '' : 's'}`)
-    : `Hace ${Math.floor(hoursAgo/24)} d├¡a${Math.floor(hoursAgo/24) === 1 ? '' : 's'}`;
+    : `Hace ${Math.floor(hoursAgo/24)} día${Math.floor(hoursAgo/24) === 1 ? '' : 's'}`;
 
   const reactionsList = sighting.reactions || [];
   const likesCount = reactionsList.length;
@@ -714,7 +727,7 @@ function mapSightingToPost(sighting: any, currentUserId?: string): Post {
     }
   }
 
-  let locationText = 'Ubicaci├│n Privada';
+  let locationText = 'Ubicación Privada';
   if (!sighting.is_location_private && sighting.latitude && sighting.longitude) {
     locationText = `${sighting.latitude.toFixed(4)}, ${sighting.longitude.toFixed(4)}`;
   }
@@ -735,12 +748,12 @@ function mapSightingToPost(sighting: any, currentUserId?: string): Post {
     commentsList: [],
     hasLiked,
     createdAt: sighting.created_at || sighting.sighting_date,
-    latitude: sighting.latitude,
-    longitude: sighting.longitude,
+    latitude: sighting.is_location_private ? undefined : sighting.latitude,
+    longitude: sighting.is_location_private ? undefined : sighting.longitude,
   };
 }
 
-// ÔöÇÔöÇ Sightings grid ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── Sightings grid ────────────────────────────────────────────────────────────
 function SightingsGrid({ sightings, onItemPress }: { sightings: any[], onItemPress?: (sighting: any) => void }) {
   const { screen: styles, colors } = useDynamicStyles(createStyles);
 
@@ -770,7 +783,7 @@ function SightingsGrid({ sightings, onItemPress }: { sightings: any[], onItemPre
       <View style={{ padding: 40, alignItems: 'center' }}>
         <Ionicons name="camera-outline" size={48} color={colors.textSecondary} style={{ marginBottom: 12 }} />
         <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', fontFamily: 'PlusJakartaSans-Medium' }}>
-          No has publicado ning├║n avistamiento a├║n.
+          No has publicado ningún avistamiento aún.
         </Text>
       </View>
     );
@@ -790,7 +803,7 @@ function SightingsGrid({ sightings, onItemPress }: { sightings: any[], onItemPre
   );
 }
 
-// ÔöÇÔöÇ Logbook ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── Logbook ───────────────────────────────────────────────────────────────────
 function LogbookView({ species }: { species: any[] }) {
   const { screen: styles, colors } = useDynamicStyles(createStyles);
   const [selectedSpecies, setSelectedSpecies] = useState<any>(null);
@@ -837,7 +850,7 @@ function LogbookView({ species }: { species: any[] }) {
       <View style={{ padding: 40, alignItems: 'center' }}>
         <MaterialCommunityIcons name="bird" size={48} color={colors.textSecondary} style={{ marginBottom: 12 }} />
         <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', fontFamily: 'PlusJakartaSans-Medium' }}>
-          No has catalogado ninguna especie a├║n.
+          No has catalogado ninguna especie aún.
         </Text>
       </View>
     );
@@ -898,7 +911,7 @@ function LogbookView({ species }: { species: any[] }) {
             {/* Count badge */}
             <View style={styles.stampCountRow}>
               <Ionicons name="eye-outline" size={11} color={colors.textSecondary} />
-              <Text style={styles.stampCount}>├ù{entry.count}</Text>
+              <Text style={styles.stampCount}>×{entry.count}</Text>
             </View>
           </TouchableOpacity>
         ))}
@@ -922,7 +935,7 @@ function LogbookView({ species }: { species: any[] }) {
             <ScrollView style={styles.logbookModalImagesContainer} contentContainerStyle={{ paddingBottom: Spacing.md }}>
               {!selectedSpecies?.images || selectedSpecies.images.length === 0 ? (
                 <View style={{ padding: 20, alignItems: 'center', justifyContent: 'center', minHeight: 100 }}>
-                  <Text style={{ color: colors.textSecondary }}>No hay im├ígenes disponibles</Text>
+                  <Text style={{ color: colors.textSecondary }}>No hay imágenes disponibles</Text>
                 </View>
               ) : (
                 (() => {
@@ -989,7 +1002,7 @@ function LogbookView({ species }: { species: any[] }) {
   );
 }
 
-// ÔöÇÔöÇ Likes ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── Likes ─────────────────────────────────────────────────────────────────────
 function LikesView({ likes, onItemPress }: { likes: any[], onItemPress?: (post: any) => void }) {
   const { screen: styles, colors } = useDynamicStyles(createStyles);
 
@@ -1019,7 +1032,7 @@ function LikesView({ likes, onItemPress }: { likes: any[], onItemPress?: (post: 
       <View style={{ padding: 40, alignItems: 'center' }}>
         <Ionicons name="heart-outline" size={48} color={colors.textSecondary} style={{ marginBottom: 12 }} />
         <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', fontFamily: 'PlusJakartaSans-Medium' }}>
-          No has reaccionado a ning├║n avistamiento a├║n.
+          No has reaccionado a ningún avistamiento aún.
         </Text>
       </View>
     );

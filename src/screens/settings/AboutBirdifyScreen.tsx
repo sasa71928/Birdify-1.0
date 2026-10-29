@@ -1,26 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
   StatusBar,
-  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import LegalModal, { LegalDocumentType } from '../../components/LegalModal';
 
 export default function AboutBirdifyScreen() {
   const navigation = useNavigation();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const [legalDoc, setLegalDoc] = useState<LegalDocumentType>(null);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      
+      <LegalModal documentType={legalDoc} onClose={() => setLegalDoc(null)} />
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
@@ -30,13 +32,12 @@ export default function AboutBirdifyScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
         <View style={styles.aboutHeader}>
           <View style={styles.appLogo}>
             <Ionicons name="leaf" size={40} color={colors.canvasPure} />
           </View>
           <Text style={styles.appName}>Birdify</Text>
-          <Text style={styles.appVersion}>Version 0.1 (Build 42)</Text>
+          <Text style={styles.appVersion}>Version 1.0.4</Text>
         </View>
 
         <Text style={styles.aboutDescription}>
@@ -44,22 +45,38 @@ export default function AboutBirdifyScreen() {
         </Text>
 
         <View style={styles.aboutCard}>
-          <TouchableOpacity style={styles.linkRow} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.linkRow}
+            activeOpacity={0.7}
+            onPress={() => setLegalDoc('terms')}
+          >
             <Text style={styles.linkText}>Terms of Service</Text>
             <Ionicons name="open-outline" size={18} color={colors.placeholder} />
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.linkRow} activeOpacity={0.7}>
+
+          <TouchableOpacity
+            style={styles.linkRow}
+            activeOpacity={0.7}
+            onPress={() => setLegalDoc('privacy')}
+          >
             <Text style={styles.linkText}>Privacy Policy</Text>
             <Ionicons name="open-outline" size={18} color={colors.placeholder} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.linkRow} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.linkRow}
+            activeOpacity={0.7}
+            onPress={() => setLegalDoc('licenses')}
+          >
             <Text style={styles.linkText}>Open Source Licenses</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.placeholder} />
           </TouchableOpacity>
-          
-          <TouchableOpacity style={[styles.linkRow, { borderBottomWidth: 0, opacity: 0.5 }]} disabled={true} activeOpacity={1}>
+
+          <TouchableOpacity
+            style={[styles.linkRow, { borderBottomWidth: 0, opacity: 0.5 }]}
+            disabled={true}
+            activeOpacity={1}
+          >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={styles.linkText}>Visit Website</Text>
               <View style={{ backgroundColor: '#EEE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 }}>
@@ -71,12 +88,10 @@ export default function AboutBirdifyScreen() {
         </View>
 
         <View style={{ alignItems: 'center', marginTop: 40, marginBottom: 20 }}>
-          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Made with ÔØñ´©Å by the Birdify Team</Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 4 }}>┬® 2026 Birdify Inc. All rights reserved.</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Made with ❤️ by the Birdify Team</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 4 }}>© 2026 Birdify Inc. All rights reserved.</Text>
         </View>
-
       </ScrollView>
     </SafeAreaView>
   );
 }
-

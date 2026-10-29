@@ -17,6 +17,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AppButton from '../../components/AppButton';
 import InputField from '../../components/InputField';
 import SocialButton from '../../components/SocialButton';
+import LegalModal, { LegalDocumentType } from '../../components/LegalModal';
 
 // ── Estilos dinámicos ────────────────────────────────────────────────────────
 import { createSharedStyles } from '../../styles/shared/shared.styles';
@@ -56,6 +57,7 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<LegalDocumentType>(null);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
     message: '',
@@ -148,6 +150,7 @@ export default function RegisterScreen() {
         type={toast.type}
         onClose={() => setToast(prev => ({ ...prev, visible: false }))}
       />
+      <LegalModal documentType={legalDoc} onClose={() => setLegalDoc(null)} />
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={colors.background}
@@ -329,6 +332,35 @@ export default function RegisterScreen() {
               {' '}→
             </Text>
           </TouchableOpacity>
+
+          {/* ── Pie legal ── */}
+          <Text
+            style={{
+              textAlign: 'center',
+              fontSize: 12,
+              color: colors.textSecondary,
+              marginTop: 14,
+              marginBottom: 12,
+              paddingHorizontal: 16,
+              lineHeight: 18,
+            }}
+          >
+            Al crear una cuenta, aceptas nuestros{' '}
+            <Text
+              style={{ color: colors.primary, fontWeight: '600', textDecorationLine: 'underline' }}
+              onPress={() => setLegalDoc('terms')}
+            >
+              Términos de Servicio
+            </Text>{' '}
+            y{' '}
+            <Text
+              style={{ color: colors.primary, fontWeight: '600', textDecorationLine: 'underline' }}
+              onPress={() => setLegalDoc('privacy')}
+            >
+              Política de Privacidad
+            </Text>
+            .
+          </Text>
 
         </ScrollView>
       </KeyboardAvoidingView>
