@@ -1,13 +1,12 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { DeviceEventEmitter, Modal, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { DeviceEventEmitter, Modal, View, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import AppToast from '../components/AppToast';
 import FeedItem, { Post } from '../components/FeedItem';
 import { mapSightingToPost } from '../hooks/useFeed';
-import { Colors, Radius, Spacing, Typography } from '../theme';
+import { Colors } from '../theme';
 
 interface InteractionsContextType {}
 
@@ -15,47 +14,54 @@ const InteractionsContext = createContext<InteractionsContextType>({});
 
 export function InteractionsProvider({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
-  const [toast, setToast] = useState<{ visible: boolean; message: string; sightingId?: string }>({ 
-    visible: false, 
-    message: '' 
+  const [toast, setToast] = useState<{ visible: boolean; message: string; sightingId?: string }>({
+    visible: false,
+    message: '',
   });
-  
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isLoadingPost, setIsLoadingPost] = useState(false);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!session?.user?.id) return;
+    if (!session?.user?.id) {
+      setToast({ visible: false, message: '' });
+      setSelectedPost(null);
+      setIsLoadingPost(false);
+      return;
+    }
 
-    // Cache local de IDs propios para filtrar en O(1) sin consultar la BD en cada interacci├│n global
+    const currentUserId = session.user.id;
     const mySightingIds = new Set<string>();
     supabase
       .from('sightings')
       .select('id')
-      .eq('user_id', session.user.id)
+      .eq('user_id', currentUserId)
       .then(({ data }) => {
-        data?.forEach((s: any) => mySightingIds.add(s.id));
+        data?.forEach((s: { id: string }) => mySightingIds.add(s.id));
       });
 
     const handleInteraction = (payload: any, type: 'comment' | 'reaction') => {
       const newRecord = payload.new;
       if (!newRecord || !newRecord.sighting_id) return;
-      if (newRecord.user_id === session.user.id) return;
+      if (newRecord.user_id === currentUserId) return;
 
       if (mySightingIds.has(newRecord.sighting_id)) {
-        const msg = type === 'comment' 
-          ? 'Alguien ha comentado tu avistamiento.' 
-          : 'A alguien le ha gustado tu avistamiento.';
-          
+        const msg =
+          type === 'comment'
+            ? 'Alguien ha comentado tu avistamiento.'
+            : 'A alguien le ha gustado tu avistamiento.';
+
         setToast({ visible: true, message: msg, sightingId: newRecord.sighting_id });
-        
-        setTimeout(() => {
-          setToast(prev => ({ ...prev, visible: false }));
+
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => {
+          setToast((prev) => ({ ...prev, visible: false }));
         }, 5000);
       }
     };
 
     const channel = supabase
-      .channel('interactions-global')
+      .channel(`interactions-global-${currentUserId}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'comments' },
@@ -69,9 +75,10 @@ export function InteractionsProvider({ children }: { children: React.ReactNode }
       .subscribe();
 
     return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       supabase.removeChannel(channel);
     };
-  }, [session]);
+  }, [session?.user?.id]);
 
   const fetchSingleSighting = async (sightingId: string) => {
     setIsLoadingPost(true);
@@ -104,13 +111,11 @@ export function InteractionsProvider({ children }: { children: React.ReactNode }
   const handleToastPress = () => {
     const sightingId = toast.sightingId;
     setToast({ visible: false, message: '' });
-    // Emit refresh_feed in background so the list updates anyway
     DeviceEventEmitter.emit('refresh_feed');
-    
+
     if (sightingId) {
-      // Show an empty modal first with loading state
       setSelectedPost(null);
-      setIsLoadingPost(true); // Open the modal with spinner
+      setIsLoadingPost(true);
       fetchSingleSighting(sightingId);
     }
   };
@@ -118,9 +123,9 @@ export function InteractionsProvider({ children }: { children: React.ReactNode }
   return (
     <InteractionsContext.Provider value={{}}>
       {children}
-      <AppToast 
-        visible={toast.visible} 
-        message={toast.message} 
+      <AppToast
+        visible={toast.visible}
+        message={toast.message}
         type="success"
         onPress={handleToastPress}
         onClose={() => setToast({ visible: false, message: '' })}
@@ -149,18 +154,18 @@ export function InteractionsProvider({ children }: { children: React.ReactNode }
             ) : selectedPost ? (
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center' }}>
                 <View onStartShouldSetResponder={() => true}>
-                  <FeedItem 
-                    post={selectedPost} 
+                  <FeedItem
+                    post={selectedPost}
                     onNavigateAway={() => {
                       setSelectedPost(null);
                       setIsLoadingPost(false);
-                    }} 
+                    }}
                   />
                 </View>
               </ScrollView>
             ) : null}
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={{ position: 'absolute', top: 50, right: 20, zIndex: 10 }}
             onPress={() => {
@@ -177,8 +182,6 @@ export function InteractionsProvider({ children }: { children: React.ReactNode }
 }
 
 const styles = StyleSheet.create({});
-
-
 
 export function useInteractions() {
   return useContext(InteractionsContext);

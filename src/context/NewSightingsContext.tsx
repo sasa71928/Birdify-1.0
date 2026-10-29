@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthContext';
 
 interface NewSightingsContextType {
   hasNewPosts: boolean;
@@ -14,13 +15,20 @@ const NewSightingsContext = createContext<NewSightingsContextType>({
 });
 
 export function NewSightingsProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [newPostIds, setNewPostIds] = useState<Set<string>>(new Set());
   const [hasNewPosts, setHasNewPosts] = useState(false);
   const subscriptionRef = useRef<any>(null);
 
   useEffect(() => {
+    if (!user?.id) {
+      setNewPostIds(new Set());
+      setHasNewPosts(false);
+      return;
+    }
+
     const channel = supabase
-      .channel('sightings-global')
+      .channel(`sightings-global-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -28,15 +36,10 @@ export function NewSightingsProvider({ children }: { children: React.ReactNode }
           schema: 'public',
           table: 'sightings',
         },
-        async (payload) => {
-          console.log('REALTIME SIGHTINGS EVENT RECEIVED:', payload);
-          const newId = payload.new?.id;
-          const authorId = payload.new?.user_id;
-          if (!newId) return;
-
-          // Sesi├│n local en cach├®, sin llamada al servidor
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user?.id === authorId) return;
+        (payload) => {
+          const newId = (payload.new as any)?.id;
+          const authorId = (payload.new as any)?.user_id;
+          if (!newId || authorId === user.id) return;
 
           setNewPostIds((prevIds) => {
             if (prevIds.has(newId)) return prevIds;
@@ -47,18 +50,17 @@ export function NewSightingsProvider({ children }: { children: React.ReactNode }
           setHasNewPosts(true);
         }
       )
-      .subscribe((status) => {
-        console.log('REALTIME SUBSCRIPTION STATUS (sightings-global):', status);
-      });
+      .subscribe();
 
     subscriptionRef.current = channel;
 
     return () => {
       if (subscriptionRef.current) {
         supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
       }
     };
-  }, []);
+  }, [user?.id]);
 
   const clearNewPosts = useCallback(() => {
     setNewPostIds(new Set());
