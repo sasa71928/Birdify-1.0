@@ -72,13 +72,12 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
+      showToast(`Conectando a: ${process.env.EXPO_PUBLIC_SUPABASE_URL ? 'URL OK' : 'URL VACIA'}`, 'success');
       await AuthService.signIn(email, password, remember);
     } catch (error: any) {
-      let msg = error.message || 'Error al iniciar sesión.';
-      if (msg.includes('Email not confirmed')) {
-        msg = 'Debes confirmar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada.';
-      }
-      showToast(msg, 'error');
+      const details = error?.message || String(error);
+      const cause = error?.cause ? ` (Causa: ${error.cause.message || error.cause})` : '';
+      showToast(`${details}${cause}`, 'error');
     } finally {
       setIsLoading(false);
     }

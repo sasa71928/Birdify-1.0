@@ -151,10 +151,7 @@ export default function RegisterScreen() {
         onClose={() => setToast(prev => ({ ...prev, visible: false }))}
       />
       <LegalModal documentType={legalDoc} onClose={() => setLegalDoc(null)} />
-      <StatusBar
-        barStyle={isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={colors.background}
-      />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

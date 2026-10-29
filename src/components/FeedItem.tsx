@@ -1091,7 +1091,7 @@ const handleDeleteSighting = async () => {
         animationType="fade"
         transparent={true}
         statusBarTranslucent={true}
-        onRequestClose={() => !isDeleting && setShowDeleteModal(false)}
+        onRequestClose={() => { if (!isDeleting) setShowDeleteModal(false); }}
       >
         <View style={[styles.optionsOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
           <Animated.View
@@ -1215,7 +1215,7 @@ const handleDeleteSighting = async () => {
         animationType="fade"
         transparent={true}
         statusBarTranslucent={true}
-        onRequestClose={() => !isBlocking && setShowBlockModal(false)}
+        onRequestClose={() => { if (!isBlocking) setShowBlockModal(false); }}
       >
         <View style={[styles.optionsOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
           <Animated.View

@@ -30,7 +30,7 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export default function SearchScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<any>(null);
 
   const { screen: styles, colors, isDark } =
     useDynamicStyles(createStyles);

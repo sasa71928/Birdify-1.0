@@ -179,7 +179,7 @@ export default function ReportModal({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={() => !submitting && onClose()}
+      onRequestClose={() => { if (!submitting) onClose(); }}
     >
       <View style={styles.overlay}>
         <View style={styles.card}>

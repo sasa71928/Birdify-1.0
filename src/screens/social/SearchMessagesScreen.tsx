@@ -28,7 +28,7 @@ export default function SearchMessagesScreen() {
   const navigation = useNavigation<NavProp>();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const { user } = useAuth();
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<any>(null);
   const [query, setQuery] = useState('');
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
