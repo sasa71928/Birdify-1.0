@@ -52,7 +52,6 @@ END $$;
 
 -- Eliminar sobrecargas inseguras u obsoletas
 DROP FUNCTION IF EXISTS public.get_my_conversation_ids(uuid);
-DROP FUNCTION IF EXISTS public.handle_new_user();
 
 -- ----------------------------------------------------------------------------
 -- 2. FUNCIONES SECURITY DEFINER BLINDADAS (AUD-003, AUD-005, AUD-006)
