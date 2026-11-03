@@ -23,6 +23,21 @@ export const Colors = {
   errorRed: '#8A1A1A',        // Error Red      — errores, destructivo
   outlineGrey: '#77796E',     // Outline Grey   — bordes inactivos, iconos
 
+  // Chat Semantics (Light Mode - Contrast AA compliant >= 4.5:1)
+  chatBackground: '#F1F4EF',
+  bubbleMine: '#154212',
+  bubbleMineText: '#FEFEFE',
+  bubbleMineMeta: 'rgba(254, 254, 254, 0.75)',
+  bubbleTheirs: '#FEFEFE',
+  bubbleTheirsText: '#1F3131',
+  bubbleTheirsMeta: '#5F6B5F',
+  bubbleBorder: '#E2E8E0',
+  quoteMineBg: 'rgba(254, 254, 254, 0.16)',
+  quoteTheirsBg: '#EEF3EC',
+  danger: '#C62828',
+  warning: '#B26A00',
+  readTick: '#7FD1FF',
+
   // Aliases semánticos (retrocompatibilidad)
   background: '#F8F8F8',
   inputBackground: '#F7F8F7',
@@ -64,6 +79,21 @@ export const DarkColors = {
   errorRed: '#FF5252',
   outlineGrey: '#555555',
 
+  // Chat Semantics (Dark Mode - Contrast AA compliant >= 4.5:1)
+  chatBackground: '#0F1410',
+  bubbleMine: '#1B6310',
+  bubbleMineText: '#FEFEFE',
+  bubbleMineMeta: 'rgba(254, 254, 254, 0.78)',
+  bubbleTheirs: '#222822',
+  bubbleTheirsText: '#FEFEFE',
+  bubbleTheirsMeta: '#8C9A8C',
+  bubbleBorder: '#2E382E',
+  quoteMineBg: 'rgba(254, 254, 254, 0.16)',
+  quoteTheirsBg: '#182018',
+  danger: '#FF5252',
+  warning: '#FFB74D',
+  readTick: '#5CC3FF',
+
   // Aliases semánticos
   background: '#121212',
   inputBackground: '#1E1E1E',
@@ -88,6 +118,41 @@ export const DarkColors = {
   primaryLight: '#C2E8B8',
   primaryDark: '#154212',
 };
+
+// Paleta de colores para remitentes en grupos (determinista por id)
+const SENDER_COLORS_LIGHT = [
+  '#00796B', // Teal
+  '#1976D2', // Blue
+  '#C2185B', // Pink
+  '#7B1FA2', // Purple
+  '#E65100', // Orange
+  '#388E3C', // Green
+  '#5D4037', // Brown
+  '#0097A7', // Cyan
+];
+
+const SENDER_COLORS_DARK = [
+  '#4DB6AC', // Light Teal
+  '#64B5F6', // Light Blue
+  '#F06292', // Light Pink
+  '#BA68C8', // Light Purple
+  '#FFB74D', // Light Orange
+  '#81C784', // Light Green
+  '#BCAAA4', // Light Brown
+  '#4DD0E1', // Light Cyan
+];
+
+export function getSenderColor(userId: string | undefined, isDark = false): string {
+  if (!userId) return isDark ? SENDER_COLORS_DARK[0] : SENDER_COLORS_LIGHT[0];
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = (hash << 5) - hash + userId.charCodeAt(i);
+    hash |= 0;
+  }
+  const colors = isDark ? SENDER_COLORS_DARK : SENDER_COLORS_LIGHT;
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
+}
 
 // ─── TIPOGRAFÍA ──────────────────────────────────────────────────────────────
 export const Typography = {
@@ -146,15 +211,8 @@ export const Radius = {
 };
 
 // ─── ELEVACIÓN / SOMBRAS ──────────────────────────────────────────────────────
-// Level 0: Base — no shadow
-// Level 1: Cards — 4px blur
-// Level 2: Modals — 12px blur
-// Level 3: Active — Primary Glow
 export const Shadows = {
-  // Level 0
   none: {},
-
-  // Level 1 — Cards
   card: {
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
@@ -162,8 +220,6 @@ export const Shadows = {
     shadowRadius: 4,
     elevation: 2,
   },
-
-  // Level 2 — Modals
   modal: {
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
@@ -171,8 +227,6 @@ export const Shadows = {
     shadowRadius: 12,
     elevation: 8,
   },
-
-  // Level 3 — Active / Primary Glow
   active: {
     shadowColor: '#154212',
     shadowOffset: { width: 0, height: 4 },
@@ -180,8 +234,6 @@ export const Shadows = {
     shadowRadius: 16,
     elevation: 12,
   },
-
-  // Alias retrocompatible
   button: {
     shadowColor: '#154212',
     shadowOffset: { width: 0, height: 4 },

@@ -24,6 +24,7 @@ import { ProfileRepository } from '../../repositories/profile.repository';
 import { supabase } from '../../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { handleError, showSuccess } from '../../utils/errorHandler';
+import { compressImage } from '../../utils/imageCompressor';
 import AppToast from '../../components/AppToast';
 
 export default function EditProfileScreen() {
@@ -145,8 +146,9 @@ export default function EditProfileScreen() {
       const contentType = fileExt === 'png' ? 'image/png' : fileExt === 'webp' ? 'image/webp' : 'image/jpeg';
       const fileName = `${user!.id}/${Date.now()}.${fileExt}`;
 
-      // Lectura binaria directa desde URI sin retener cadenas Base64 en el heap JS (AUD-022)
-      const response = await fetch(imageUri);
+      // Comprimir avatar a 512x512 JPEG liviano para carga ultra rápida
+      const compressed = await compressImage(imageUri, 'avatar');
+      const response = await fetch(compressed.uri);
       const arrayBuffer = await response.arrayBuffer();
 
       const { error: uploadError } = await supabase.storage

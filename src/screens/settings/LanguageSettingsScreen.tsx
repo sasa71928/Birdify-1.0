@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { useLanguage, SupportedLanguage } from '../../i18n';
 
-const LANGUAGES = [
+const LANGUAGES: Array<{ id: SupportedLanguage; name: string; code: string }> = [
   { id: 'en', name: 'English', code: 'EN' },
   { id: 'es', name: 'Español', code: 'ES' },
   { id: 'fr', name: 'Français', code: 'FR' },
@@ -22,7 +23,7 @@ const LANGUAGES = [
 export default function LanguageSettingsScreen() {
   const navigation = useNavigation();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const { language, setLanguage } = useLanguage();
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -44,13 +45,13 @@ export default function LanguageSettingsScreen() {
 
         <View style={styles.languageList}>
           {LANGUAGES.map((lang) => {
-            const isActive = selectedLanguage === lang.id;
+            const isActive = language === lang.id;
             return (
               <TouchableOpacity
                 key={lang.id}
                 style={[styles.languageItem, isActive && styles.languageItemActive]}
                 activeOpacity={0.7}
-                onPress={() => setSelectedLanguage(lang.id)}
+                onPress={() => setLanguage(lang.id)}
               >
                 <View style={styles.langIcon}>
                   <Text style={styles.langIconText}>{lang.code}</Text>
@@ -67,12 +68,10 @@ export default function LanguageSettingsScreen() {
         <View style={styles.infoBox}>
           <Ionicons name="information-circle-outline" size={20} color={colors.secondaryBlue} />
           <Text style={styles.infoText}>
-            Changing the language will reload the application. This does not affect the species data
-            already saved in your Journal, which remains in the language it was recorded.
+            Changing the language takes effect immediately across chat, messages, search and settings.
           </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
-

@@ -75,38 +75,29 @@ export const MessageRepository = {
       .from(CHAT_IMAGES_BUCKET)
       .upload(storagePath, arrayBuffer, {
         contentType: mimeType,
-        upsert: false,
+        upsert: true,
       });
 
     if (error) {
       throw new Error(`No se pudo subir la imagen del chat: ${error.message}`);
     }
 
-    return `${CHAT_IMAGE_PREFIX}${storagePath}`;
+    const { data: { publicUrl } } = supabase.storage
+      .from(CHAT_IMAGES_BUCKET)
+      .getPublicUrl(storagePath);
+
+    return publicUrl || `${CHAT_IMAGE_PREFIX}${storagePath}`;
   },
 
   async resolveChatImageUrls(
     rawUrls: Array<string | null | undefined>
   ): Promise<Map<string, string>> {
-    const paths = Array.from(
-      new Set(
-        rawUrls
-          .map((u) => extractStoragePath(u))
-          .filter((p): p is string => Boolean(p))
-      )
-    );
     const resolved = new Map<string, string>();
-    if (paths.length === 0) return resolved;
-
-    const { data, error } = await supabase.storage
-      .from(CHAT_IMAGES_BUCKET)
-      .createSignedUrls(paths, SIGNED_URL_TTL_SECONDS);
-
-    if (error || !data) return resolved;
-
-    for (const entry of data) {
-      if (entry.path && entry.signedUrl) {
-        resolved.set(`${CHAT_IMAGE_PREFIX}${entry.path}`, entry.signedUrl);
+    for (const raw of rawUrls) {
+      if (!raw) continue;
+      const url = await this.resolveChatImageUrl(raw);
+      if (url) {
+        resolved.set(raw, url);
       }
     }
     return resolved;
@@ -117,12 +108,11 @@ export const MessageRepository = {
     const path = extractStoragePath(rawUrl);
     if (!path) return rawUrl;
 
-    const { data, error } = await supabase.storage
+    const { data } = supabase.storage
       .from(CHAT_IMAGES_BUCKET)
-      .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+      .getPublicUrl(path);
 
-    if (error || !data?.signedUrl) return null;
-    return data.signedUrl;
+    return data?.publicUrl || rawUrl;
   },
 
   async list(conversationId: string): Promise<MessageRow[]> {

@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase';
 import { BirdRepository } from '../repositories/bird.repository';
 import { SightingRepository } from '../repositories/sighting.repository';
 import { handleError } from '../utils/errorHandler';
+import { compressImage } from '../utils/imageCompressor';
 
 type RecordSightingNavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -476,7 +477,9 @@ export function useRecordSighting(editingSightingId?: string) {
               : 'image/jpeg';
         const fileName = `${user.id}/${Date.now()}_${i}.${fileExt}`;
 
-        const response = await fetch(uri);
+        // Comprimir con el algoritmo universal optimizado para feed (alta calidad y carga veloz)
+        const compressed = await compressImage(uri, 'feed');
+        const response = await fetch(compressed.uri);
         const arrayBuffer = await response.arrayBuffer();
 
         let bucketName = 'Sightings';

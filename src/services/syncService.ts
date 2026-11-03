@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import { DeviceEventEmitter } from 'react-native';
+import { compressImage } from '../utils/imageCompressor';
 
 export let isOnline = false;
 
@@ -116,7 +117,8 @@ export async function flushSyncQueue() {
                 const contentType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
                 const fileName = `${sightingData.user_id}/${Date.now()}_${i}.${ext}`;
 
-                const response = await fetch(path);
+                const compressed = await compressImage(path, 'feed');
+                const response = await fetch(compressed.uri);
                 const arrayBuffer = await response.arrayBuffer();
 
                 let bucketName = 'Sightings';

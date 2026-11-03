@@ -1,405 +1,582 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  Image,
-  StatusBar,
-  FlatList,
-  ActivityIndicator,
   ScrollView,
+  StatusBar,
+  ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { createStyles } from '../../styles/screens/social/createGroupScreen.styles';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
-import { useEditGroup } from '../../hooks/useEditGroup';
-import { ConversationRepository } from '../../repositories/conversation.repository';
-import { useRoute, RouteProp } from '@react-navigation/native';
-import { RootStackParamList } from '../../navigation/AppNavigator';
+import { useEditGroup, GroupMemberItem } from '../../hooks/useEditGroup';
 import AppToast from '../../components/AppToast';
-
-type EditGroupRouteProp = RouteProp<RootStackParamList, 'EditGroup'>;
-
-interface MemberProfile {
-  id: string;
-  username: string;
-  fullname: string | null;
-  profile_pic_url: string | null;
-}
+import { Avatar } from '../../components/ui/Avatar';
+import { BottomSheet } from '../../components/ui/BottomSheet';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { MemberPicker, PickerUser } from '../../features/chat/components/MemberPicker';
+import { Radius, Spacing, Typography } from '../../theme';
+import { useT } from '../../i18n';
 
 export default function EditGroupScreen() {
-  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
-  const route = useRoute<EditGroupRouteProp>();
-  const { conversationId } = route.params;
+  const { colors, isDark } = useDynamicStyles();
+  const { t } = useT();
 
   const {
     groupName,
+    setGroupName,
     description,
+    setDescription,
     image,
-    selected,
-    users,
-    searchQuery,
+    members,
+    isAdmin,
+    followingContacts,
     loading,
     saving,
     toast,
-    filteredUsers,
-    canSave,
-    navigation,
-    setGroupName,
-    setDescription,
-    setSearchQuery,
     setToast,
     pickImage,
     handleSave,
-    toggleUser,
+    removeMember,
+    leaveGroup,
+    navigation,
   } = useEditGroup();
 
-  // ── Miembros actuales enriquecidos con perfil ─────────────────────────────
-  const [memberProfiles, setMemberProfiles] = useState<MemberProfile[]>([]);
-  const [loadingMembers, setLoadingMembers] = useState(true);
+  const [showAddMembersSheet, setShowAddMembersSheet] = useState(false);
+  const [selectedToAdd, setSelectedToAdd] = useState<Set<string>>(new Set());
+  const [memberToRemove, setMemberToRemove] = useState<GroupMemberItem | null>(null);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
 
-  useEffect(() => {
-    const fetchMembers = async () => {
-      try {
-        setLoadingMembers(true);
-        const members = await ConversationRepository.getConversationMembers(conversationId);
-        const profiles: MemberProfile[] = members.map((m: any) => {
-          const u = Array.isArray(m.users) ? m.users[0] : m.users;
-          return {
-            id: m.user_id,
-            username: u?.username || 'usuario',
-            fullname: u?.fullname || null,
-            profile_pic_url: u?.profile_pic_url || null,
-          };
-        });
-        setMemberProfiles(profiles);
-      } catch {
-        // silencioso; el hook ya maneja errores generales
-      } finally {
-        setLoadingMembers(false);
-      }
-    };
-    fetchMembers();
-  }, [conversationId]);
+  const contactsToPick: PickerUser[] = followingContacts.map((c: any) => ({
+    id: c.id,
+    name: c.fullname || c.username || 'Usuario',
+    username: c.username || 'user',
+    avatar: c.profile_pic_url || null,
+  }));
 
-  // Sincronizar cuando `selected` cambia (alguien fue agregado/quitado)
-  // Los perfiles que ya tenemos se mantienen; los nuevos se añaden desde `users`
-  const currentMemberProfiles: MemberProfile[] = Array.from(selected).map((id) => {
-    // Buscar primero en los perfiles cargados del grupo
-    const fromGroup = memberProfiles.find((p) => p.id === id);
-    if (fromGroup) return fromGroup;
-    // Luego en la lista de usuarios disponibles (seguidos)
-    const fromUsers = users.find((u: any) => u.id === id);
-    if (fromUsers) {
-      return {
-        id: fromUsers.id,
-        username: fromUsers.username || 'usuario',
-        fullname: fromUsers.fullname || null,
-        profile_pic_url: fromUsers.profile_pic_url || null,
-      };
-    }
-    return { id, username: 'usuario', fullname: null, profile_pic_url: null };
-  });
-
-  // ── Render de usuario disponible para agregar ─────────────────────────────
-  const renderAvailableUser = ({ item }: { item: any }) => {
-    const isSelected = selected.has(item.id);
-    return (
-      <TouchableOpacity
-        style={[styles.userItem, isSelected ? styles.userItemSelected : null]}
-        onPress={() => toggleUser(item.id)}
-        activeOpacity={0.75}
-      >
-        <Image
-          source={{ uri: item.profile_pic_url || 'https://gravatar.com/avatar/?d=mp' }}
-          style={styles.userAvatar}
-        />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.userName}>{item.fullname || item.username}</Text>
-          {item.fullname ? (
-            <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1 }}>
-              @{item.username}
-            </Text>
-          ) : null}
-        </View>
-        <View
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: 13,
-            borderWidth: 2,
-            borderColor: isSelected ? colors.primary : colors.border,
-            backgroundColor: isSelected ? colors.primary : 'transparent',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          {isSelected && <Ionicons name="checkmark" size={14} color={colors.canvasPure} />}
-        </View>
-      </TouchableOpacity>
-    );
+  const handleToggleAddUser = (id: string) => {
+    setSelectedToAdd((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const handleConfirmAddMembers = async () => {
+    setShowAddMembersSheet(false);
+    if (selectedToAdd.size > 0) {
+      const allSelected = new Set([...members.map((m) => m.id), ...Array.from(selectedToAdd)]);
+      await handleSave(allSelected);
+      setSelectedToAdd(new Set());
+    }
+  };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.surface }]} edges={['top']}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <AppToast
         visible={toast.visible}
         message={toast.message}
         type={toast.type}
         onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Editar Grupo</Text>
-        <TouchableOpacity
-          style={[styles.saveBtn, canSave ? styles.saveBtnActive : styles.saveBtnDisabled]}
-          onPress={handleSave}
-          disabled={!canSave || saving}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color={colors.canvasPure} />
-          ) : (
-            <Text style={styles.saveBtnText}>Guardar</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: 40 }}
+      {/* Header */}
+      <View
+        style={[
+          styles.header,
+          { borderBottomColor: colors.border + '20', backgroundColor: colors.surface },
+        ]}
       >
-        {/* ── Group Avatar ── */}
-        <View style={styles.avatarSection}>
-          <TouchableOpacity onPress={pickImage}>
-            {image ? (
-              <Image source={{ uri: image }} style={styles.groupAvatar} />
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
+
+        <Text
+          style={[
+            styles.headerTitle,
+            { color: colors.textPrimary, fontFamily: Typography.fontFamilyDisplay },
+          ]}
+        >
+          {isAdmin ? t('chat.menu.editGroup') : t('groups.groupInfoTitle')}
+        </Text>
+
+        {isAdmin && (
+          <TouchableOpacity
+            style={[
+              styles.saveBtn,
+              {
+                backgroundColor:
+                  groupName.trim().length > 0 && !saving ? colors.primary : colors.componentBase,
+              },
+            ]}
+            disabled={groupName.trim().length === 0 || saving}
+            onPress={() => handleSave()}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <View style={[styles.groupAvatar, styles.groupAvatarPlaceholder]}>
-                <Ionicons name="camera" size={32} color={colors.textSecondary} />
-              </View>
+              <Text
+                style={[
+                  styles.saveBtnText,
+                  { color: groupName.trim().length > 0 ? '#FFFFFF' : colors.textSecondary },
+                ]}
+              >
+                {t('common.save')}
+              </Text>
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.changeAvatarBtn} onPress={pickImage}>
-            <Text style={styles.changeAvatarText}>Cambiar foto</Text>
-          </TouchableOpacity>
-        </View>
+        )}
+      </View>
 
-        {/* ── Group Name ── */}
-        <View style={styles.inputSection}>
-          <Text style={styles.label}>Nombre del grupo</Text>
-          <TextInput
-            style={styles.input}
-            value={groupName}
-            onChangeText={setGroupName}
-            placeholder="Nombre del grupo"
-            placeholderTextColor={colors.placeholder}
-          />
+      {loading ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
-
-        {/* ── Description ── */}
-        <View style={styles.inputSection}>
-          <Text style={styles.label}>Descripción (opcional)</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Descripción del grupo"
-            placeholderTextColor={colors.placeholder}
-            multiline
-            numberOfLines={3}
-          />
-        </View>
-
-        {/* ── Miembros actuales ── */}
-        <View style={[styles.membersSection, { paddingBottom: 0 }]}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginBottom: 12,
-            }}
-          >
-            <Ionicons name="people" size={18} color={colors.primary} style={{ marginRight: 6 }} />
-            <Text style={styles.sectionTitle}>
-              Miembros actuales{' '}
-              <Text style={{ color: colors.primary }}>({selected.size})</Text>
-            </Text>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {/* Avatar del grupo */}
+          <View style={styles.avatarSection}>
+            <TouchableOpacity
+              style={[
+                styles.avatarTouch,
+                { backgroundColor: colors.componentBase, borderColor: colors.border + '30' },
+              ]}
+              disabled={!isAdmin}
+              activeOpacity={0.8}
+              onPress={pickImage}
+            >
+              {image ? (
+                <Image source={{ uri: image }} style={styles.avatarImg} contentFit="cover" />
+              ) : (
+                <Ionicons name="people" size={44} color={colors.primary} />
+              )}
+            </TouchableOpacity>
+            {isAdmin && (
+              <Text style={[styles.avatarHint, { color: colors.textSecondary }]}>
+                {image ? t('groups.tapToChangePhoto') : t('groups.tapToAddPhoto')}
+              </Text>
+            )}
           </View>
 
-          {loadingMembers ? (
-            <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
-          ) : currentMemberProfiles.length === 0 ? (
-            <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 12 }}>
-              Sin miembros.
-            </Text>
-          ) : (
-            currentMemberProfiles.map((member) => (
-              <View
-                key={member.id}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: 10,
-                  paddingHorizontal: 4,
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.border + '20',
-                }}
-              >
-                <Image
-                  source={{
-                    uri: member.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
-                  }}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
-                    marginRight: 12,
-                    backgroundColor: colors.componentBase,
-                  }}
+          {/* Formulario / Info */}
+          <View
+            style={[
+              styles.formCard,
+              { backgroundColor: colors.componentBase, borderColor: colors.border + '20' },
+            ]}
+          >
+            <View style={styles.inputRow}>
+              <MaterialCommunityIcons
+                name="account-group-outline"
+                size={22}
+                color={colors.primary}
+              />
+              {isAdmin ? (
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    { color: colors.textPrimary, fontFamily: Typography.fontFamilyBody },
+                  ]}
+                  value={groupName}
+                  onChangeText={setGroupName}
+                  placeholder={t('groups.groupNamePlaceholder')}
+                  placeholderTextColor={colors.placeholder}
+                  maxLength={50}
                 />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: 15,
-                      fontWeight: '600',
-                      color: colors.textPrimary,
-                    }}
-                  >
-                    {member.fullname || member.username}
-                  </Text>
-                  {member.fullname ? (
-                    <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1 }}>
-                      @{member.username}
-                    </Text>
-                  ) : null}
-                </View>
-                {/* Botón quitar (solo si hay más de 1 miembro) */}
-                {selected.size > 1 && (
-                  <TouchableOpacity
-                    onPress={() => toggleUser(member.id)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 14,
-                      backgroundColor: colors.border + '30',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Ionicons name="remove" size={16} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))
-          )}
-        </View>
+              ) : (
+                <Text
+                  style={[
+                    styles.staticText,
+                    { color: colors.textPrimary, fontFamily: Typography.fontFamilyDisplay },
+                  ]}
+                >
+                  {groupName}
+                </Text>
+              )}
+            </View>
 
-        {/* ── Agregar personas ── */}
-        <View style={[styles.membersSection, { marginTop: 20 }]}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginBottom: 12,
-            }}
-          >
-            <Ionicons
-              name="person-add-outline"
-              size={18}
-              color={colors.primary}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={styles.sectionTitle}>Agregar personas</Text>
+            <View style={[styles.fieldDivider, { backgroundColor: colors.border + '15' }]} />
+
+            <View style={styles.inputRow}>
+              <Ionicons name="information-circle-outline" size={22} color={colors.primary} />
+              {isAdmin ? (
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    { color: colors.textPrimary, fontFamily: Typography.fontFamilyBody },
+                  ]}
+                  value={description}
+                  onChangeText={setDescription}
+                  placeholder={t('groups.descriptionPlaceholder')}
+                  placeholderTextColor={colors.placeholder}
+                  maxLength={120}
+                />
+              ) : (
+                <Text style={[styles.staticDesc, { color: colors.textSecondary }]}>
+                  {description || 'Sin descripción'}
+                </Text>
+              )}
+            </View>
           </View>
 
-          <TextInput
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Buscar usuarios que sigues..."
-            placeholderTextColor={colors.placeholder}
-          />
+          {/* Sección de Miembros */}
+          <View style={styles.membersHeaderRow}>
+            <Text
+              style={[
+                styles.membersSectionTitle,
+                { color: colors.textSecondary, fontFamily: Typography.fontFamilyDisplay },
+              ]}
+            >
+              {t('groups.membersSection', { count: members.length })}
+            </Text>
 
-          {users.length === 0 ? (
-            <Text
-              style={{ color: colors.textSecondary, fontSize: 13, marginTop: 8 }}
-            >
-              No sigues a nadie más para agregar.
-            </Text>
-          ) : filteredUsers.length === 0 ? (
-            <Text
-              style={{ color: colors.textSecondary, fontSize: 13, marginTop: 8 }}
-            >
-              Sin resultados para "{searchQuery}".
-            </Text>
-          ) : (
-            filteredUsers.map((item: any) => {
-              const isSelected = selected.has(item.id);
+            {isAdmin && (
+              <TouchableOpacity
+                style={[styles.addMemberBtn, { backgroundColor: colors.primary + '18' }]}
+                onPress={() => setShowAddMembersSheet(true)}
+              >
+                <Ionicons name="person-add-outline" size={16} color={colors.primary} />
+                <Text style={[styles.addMemberBtnText, { color: colors.primary }]}>
+                  {t('groups.addMembers')}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View
+            style={[
+              styles.membersListCard,
+              { backgroundColor: colors.componentBase, borderColor: colors.border + '20' },
+            ]}
+          >
+            {members.map((m) => {
+              const isMemberAdmin = m.role === 'admin';
               return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[styles.userItem, isSelected ? styles.userItemSelected : null]}
-                  onPress={() => toggleUser(item.id)}
-                  activeOpacity={0.75}
+                <View
+                  key={m.id}
+                  style={[styles.memberRow, { borderBottomColor: colors.border + '15' }]}
                 >
-                  <Image
-                    source={{
-                      uri: item.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
-                    }}
-                    style={styles.userAvatar}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.userName}>{item.fullname || item.username}</Text>
-                    {item.fullname ? (
-                      <Text
-                        style={{ fontSize: 12, color: colors.textSecondary, marginTop: 1 }}
-                      >
-                        @{item.username}
+                  <Avatar uri={m.profile_pic_url} name={m.fullname || m.username} size={40} />
+
+                  <View style={styles.memberInfo}>
+                    <Text
+                      style={[
+                        styles.memberName,
+                        { color: colors.textPrimary, fontFamily: Typography.fontFamilyDisplay },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {m.fullname || m.username}
+                    </Text>
+                    <Text style={[styles.memberHandle, { color: colors.textSecondary }]}>
+                      @{m.username}
+                    </Text>
+                  </View>
+
+                  {isMemberAdmin && (
+                    <View style={[styles.adminBadge, { backgroundColor: colors.primary + '20' }]}>
+                      <Text style={[styles.adminBadgeText, { color: colors.primary }]}>
+                        {t('groups.adminBadge')}
                       </Text>
-                    ) : null}
-                  </View>
-                  <View
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: 13,
-                      borderWidth: 2,
-                      borderColor: isSelected ? colors.primary : colors.border,
-                      backgroundColor: isSelected ? colors.primary : 'transparent',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  >
-                    {isSelected && (
-                      <Ionicons name="checkmark" size={14} color={colors.canvasPure} />
-                    )}
-                  </View>
-                </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {isAdmin && !isMemberAdmin && (
+                    <TouchableOpacity
+                      style={styles.removeMemberBtn}
+                      onPress={() => setMemberToRemove(m)}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                    </TouchableOpacity>
+                  )}
+                </View>
               );
-            })
-          )}
+            })}
+          </View>
+
+          {/* Botón Salir del grupo */}
+          <TouchableOpacity
+            style={[styles.leaveGroupRow, { borderColor: colors.danger + '30' }]}
+            activeOpacity={0.75}
+            onPress={() => setShowLeaveDialog(true)}
+          >
+            <Ionicons name="exit-outline" size={20} color={colors.danger} />
+            <Text style={[styles.leaveGroupText, { color: colors.danger }]}>
+              {t('chat.menu.leaveGroup')}
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+
+      {/* Sheet para agregar miembros */}
+      <BottomSheet
+        visible={showAddMembersSheet}
+        onClose={() => setShowAddMembersSheet(false)}
+      >
+        <View style={styles.addSheetContainer}>
+          <View style={styles.addSheetHeader}>
+            <Text
+              style={[
+                styles.addSheetTitle,
+                { color: colors.textPrimary, fontFamily: Typography.fontFamilyDisplay },
+              ]}
+            >
+              {t('groups.addMembers')}
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.confirmAddBtn,
+                { backgroundColor: selectedToAdd.size > 0 ? colors.primary : colors.componentBase },
+              ]}
+              disabled={selectedToAdd.size === 0}
+              onPress={handleConfirmAddMembers}
+            >
+              <Text
+                style={[
+                  styles.confirmAddBtnText,
+                  { color: selectedToAdd.size > 0 ? '#FFFFFF' : colors.textSecondary },
+                ]}
+              >
+                {t('common.save')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <MemberPicker
+            contacts={contactsToPick.filter((c) => !members.some((m) => m.id === c.id))}
+            selectedIds={selectedToAdd}
+            onToggleUser={handleToggleAddUser}
+          />
         </View>
-      </ScrollView>
+      </BottomSheet>
+
+      {/* Diálogo confirmación remover miembro */}
+      <ConfirmDialog
+        visible={memberToRemove !== null}
+        title={t('groups.removeMember')}
+        message={t('groups.removeMemberConfirm', {
+          name: memberToRemove?.fullname || memberToRemove?.username || '',
+        })}
+        isDestructive={true}
+        onConfirm={() => {
+          if (memberToRemove) {
+            removeMember(memberToRemove.id);
+            setMemberToRemove(null);
+          }
+        }}
+        onCancel={() => setMemberToRemove(null)}
+      />
+
+      {/* Diálogo salir del grupo */}
+      <ConfirmDialog
+        visible={showLeaveDialog}
+        title={t('messages.leaveGroupTitle')}
+        message={t('messages.leaveGroupDesc')}
+        isDestructive={true}
+        onConfirm={() => {
+          setShowLeaveDialog(false);
+          leaveGroup();
+        }}
+        onCancel={() => setShowLeaveDialog(false)}
+      />
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  backBtn: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    flex: 1,
+  },
+  saveBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: Radius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  saveBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollContent: {
+    padding: Spacing.md,
+  },
+  avatarSection: {
+    alignItems: 'center',
+    marginVertical: 16,
+    gap: 8,
+  },
+  avatarTouch: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarHint: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  formCard: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
+  },
+  staticText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  staticDesc: {
+    flex: 1,
+    fontSize: 14,
+  },
+  fieldDivider: {
+    height: 1,
+    marginLeft: 48,
+  },
+  membersHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  membersSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  addMemberBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Radius.full,
+    gap: 4,
+  },
+  addMemberBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  membersListCard: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: 24,
+  },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  memberInfo: {
+    flex: 1,
+  },
+  memberName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  memberHandle: {
+    fontSize: 12.5,
+    marginTop: 1,
+  },
+  adminBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
+  },
+  adminBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  removeMemberBtn: {
+    padding: 6,
+  },
+  leaveGroupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    gap: 8,
+    marginBottom: 32,
+  },
+  leaveGroupText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  addSheetContainer: {
+    paddingVertical: 8,
+    maxHeight: 520,
+  },
+  addSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    marginBottom: 8,
+  },
+  addSheetTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  confirmAddBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: Radius.full,
+  },
+  confirmAddBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+});

@@ -1,190 +1,320 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  Image,
   StatusBar,
+  StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { RootStackParamList } from '../../navigation/AppNavigator';
-import { ConversationRepository } from '../../repositories/conversation.repository';
-import { useAuth } from '../../context/AuthContext';
-import { createStyles } from '../../styles/screens/social/searchMessagesScreen.styles';
+import { FlashList } from '@shopify/flash-list';
+import { RootStackParamList, ChatThread } from '../../navigation/AppNavigator';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
-import { handleError } from '../../utils/errorHandler';
-import AppToast from '../../components/AppToast';
+import { useUnreadMessages } from '../../context/UnreadMessagesContext';
+import { Avatar } from '../../components/ui/Avatar';
+import { Radius, Typography, Spacing } from '../../theme';
+import { useT } from '../../i18n';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'SearchMessages'>;
 
-
+function normalizeText(text?: string | null): string {
+  if (!text) return '';
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
 
 export default function SearchMessagesScreen() {
   const navigation = useNavigation<NavProp>();
-  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
-  const { user } = useAuth();
+  const { colors, isDark } = useDynamicStyles();
+  const { conversations, conversationsLoading } = useUnreadMessages();
+  const { t } = useT();
   const inputRef = useRef<any>(null);
   const [query, setQuery] = useState('');
-  const [conversations, setConversations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
-    visible: false,
-    message: '',
-    type: 'success',
-  });
 
-  useEffect(() => {
-    loadConversations();
-  }, []);
+  const normalizedQuery = normalizeText(query.trim());
 
-  const loadConversations = async () => {
-    if (!user) return;
-    try {
-      setLoading(true);
-      const items = await ConversationRepository.listForUser(user.id);
-      setConversations(items);
-    } catch (error) {
-      handleError(error, setToast, 'Error loading conversations');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const results = useMemo(() => {
+    if (!normalizedQuery) return [];
+    return conversations.filter((thread) => {
+      const nameNorm = normalizeText(thread.name);
+      const msgNorm = normalizeText(thread.lastMessage);
+      return nameNorm.includes(normalizedQuery) || msgNorm.includes(normalizedQuery);
+    });
+  }, [conversations, normalizedQuery]);
 
-  const results = query.trim()
-    ? conversations.filter((item) => {
-        const c = item.conversation;
-        const members = c.members || [];
-        const other = members.find((m: any) => m.user_id !== user?.id)?.users;
-        const name = c.is_group ? (c.name || 'Group') : (other?.fullname || other?.username || 'Usuario');
-        const lastMessage = item.lastMessage?.content || (item.lastMessage?.image_url ? '📷 Foto' : '');
-        return (
-          name.toLowerCase().includes(query.toLowerCase()) ||
-          lastMessage.toLowerCase().includes(query.toLowerCase())
-        );
-      })
-    : [];
+  const highlightMatch = (text: string, q: string) => {
+    if (!q.trim() || !text) return text;
+    const normText = normalizeText(text);
+    const normQ = normalizeText(q);
+    const idx = normText.indexOf(normQ);
+    if (idx === -1) return text;
 
-  const highlightMatch = (text: string, query: string) => {
-    if (!query.trim()) return <Text>{text}</Text>;
-    const idx = text.toLowerCase().indexOf(query.toLowerCase());
-    if (idx === -1) return <Text>{text}</Text>;
+    const before = text.slice(0, idx);
+    const matched = text.slice(idx, idx + q.length);
+    const after = text.slice(idx + q.length);
+
     return (
       <Text>
-        {text.slice(0, idx)}
-        <Text style={styles.highlight}>{text.slice(idx, idx + query.length)}</Text>
-        {text.slice(idx + query.length)}
+        {before}
+        <Text style={{ backgroundColor: colors.primary + '30', fontWeight: '700' }}>
+          {matched}
+        </Text>
+        {after}
       </Text>
     );
   };
 
-  const renderItem = ({ item }: { item: any }) => {
-    const c = item.conversation;
-    const members = c.members || [];
-    const other = members.find((m: any) => m.user_id !== user?.id)?.users;
-    const name = c.is_group ? (c.name || 'Group') : (other?.fullname || other?.username || 'Usuario');
-    const avatar = c.is_group
-      ? (c.avatar_url || 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=100')
-      : (other?.profile_pic_url || 'https://gravatar.com/avatar/?d=mp');
-    const lastMessage = item.lastMessage?.content || (item.lastMessage?.image_url ? '📷 Foto' : '');
-
+  const renderItem = ({ item }: { item: ChatThread }) => {
     return (
       <TouchableOpacity
-        style={styles.resultRow}
+        style={[
+          styles.resultRow,
+          {
+            backgroundColor: colors.surface,
+            borderBottomColor: colors.border + '15',
+          },
+        ]}
         activeOpacity={0.75}
-        onPress={() => navigation.navigate('Chat', { conversationId: c.id })}
+        onPress={() => navigation.navigate('Chat', { conversationId: item.id })}
       >
-        <View style={styles.avatarWrap}>
-          {c.is_group ? (
-            <View style={styles.groupAvatar}>
-              <Ionicons name="people" size={22} color={colors.secondaryBlue} />
-            </View>
-          ) : (
-            <Image source={{ uri: avatar }} style={styles.avatar} />
-          )}
-        </View>
+        <Avatar
+          uri={item.avatar}
+          name={item.name}
+          size={46}
+          isGroup={item.isGroup}
+        />
 
         <View style={styles.info}>
-          <View style={styles.infoRow}>
-            <Text style={styles.name}>{highlightMatch(name, query)}</Text>
-          </View>
-          <Text style={styles.lastMessage} numberOfLines={1}>
-            {highlightMatch(lastMessage, query)}
+          <Text
+            style={[
+              styles.name,
+              { color: colors.textPrimary, fontFamily: Typography.fontFamilyDisplay },
+            ]}
+            numberOfLines={1}
+          >
+            {highlightMatch(item.name, query)}
+          </Text>
+
+          <Text
+            style={[
+              styles.lastMessage,
+              { color: colors.textSecondary, fontFamily: Typography.fontFamilyBody },
+            ]}
+            numberOfLines={1}
+          >
+            {highlightMatch(item.lastMessage, query)}
           </Text>
         </View>
+
+        <Ionicons name="chevron-forward" size={18} color={colors.textSecondary + '80'} />
       </TouchableOpacity>
     );
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.surface }]} edges={['top']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
 
-      {/* ── Search bar ── */}
-      <View style={styles.searchBar}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+      {/* Barra de búsqueda */}
+      <View
+        style={[
+          styles.searchBar,
+          {
+            backgroundColor: colors.surface,
+            borderBottomColor: colors.border + '20',
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
           <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
 
-        <View style={styles.inputWrapper}>
+        <View
+          style={[
+            styles.inputWrapper,
+            {
+              backgroundColor: colors.componentBase,
+              borderColor: colors.border + '30',
+            },
+          ]}
+        >
           <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
           <TextInput
             ref={inputRef}
             autoFocus
             value={query}
             onChangeText={setQuery}
-            placeholder="Search conversations..."
+            placeholder={t('search.placeholder')}
             placeholderTextColor={colors.placeholder}
-            style={styles.input}
+            style={[styles.input, { color: colors.textPrimary }]}
           />
           {query.length > 0 && (
             <TouchableOpacity onPress={() => setQuery('')}>
-              <Ionicons name="close-circle" size={18} color={colors.outlineGrey} />
+              <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {/* ── Resultados ── */}
-      {loading ? (
+      {/* Resultados */}
+      {conversationsLoading ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Loading...</Text>
+          <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+            {t('common.loading')}
+          </Text>
         </View>
       ) : query.trim().length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="chatbubbles-outline" size={52} color={colors.outlineGrey} />
-          <Text style={styles.emptyTitle}>Search conversations</Text>
-          <Text style={styles.emptySubtitle}>Find messages by contact name or keywords</Text>
+          <Ionicons name="chatbubbles-outline" size={56} color={colors.textSecondary + '80'} />
+          <Text
+            style={[
+              styles.emptyTitle,
+              { color: colors.textPrimary, fontFamily: Typography.fontFamilyDisplay },
+            ]}
+          >
+            {t('search.title')}
+          </Text>
+          <Text
+            style={[
+              styles.emptySubtitle,
+              { color: colors.textSecondary, fontFamily: Typography.fontFamilyBody },
+            ]}
+          >
+            {t('search.subtitle')}
+          </Text>
         </View>
       ) : results.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="search-outline" size={48} color={colors.outlineGrey} />
-          <Text style={styles.emptyTitle}>No results</Text>
-          <Text style={styles.emptySubtitle}>No conversations match "{query}"</Text>
+          <Ionicons name="search-outline" size={48} color={colors.textSecondary + '80'} />
+          <Text
+            style={[
+              styles.emptyTitle,
+              { color: colors.textPrimary, fontFamily: Typography.fontFamilyDisplay },
+            ]}
+          >
+            {t('search.noResultsTitle')}
+          </Text>
+          <Text
+            style={[
+              styles.emptySubtitle,
+              { color: colors.textSecondary, fontFamily: Typography.fontFamilyBody },
+            ]}
+          >
+            {t('search.noResultsDesc', { query })}
+          </Text>
         </View>
       ) : (
-        <>
-          <Text style={styles.resultsCount}>
-            {results.length} result{results.length !== 1 ? 's' : ''} for "{query}"
+        <View style={{ flex: 1 }}>
+          <Text
+            style={[
+              styles.resultsCount,
+              { color: colors.textSecondary, fontFamily: Typography.fontFamilyBody },
+            ]}
+          >
+            {results.length === 1
+              ? t('search.resultsCount', { count: 1, query })
+              : t('search.resultsCountPlural', { count: results.length, query })}
           </Text>
-          <FlatList
+
+          <FlashList
             data={results}
             renderItem={renderItem}
-            keyExtractor={(item) => item.conversation.id}
+            keyExtractor={(item) => item.id}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           />
-        </>
+        </View>
       )}
     </SafeAreaView>
   );
 }
 
-// ── Estilos ───────────────────────────────────────────────────────────────────
-
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    gap: 8,
+  },
+  backBtn: {
+    padding: 6,
+  },
+  inputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    gap: 8,
+  },
+  input: {
+    flex: 1,
+    fontSize: 14.5,
+    padding: 0,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 36,
+    gap: 10,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  resultsCount: {
+    fontSize: 12.5,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xs,
+    fontWeight: '600',
+  },
+  list: {
+    paddingBottom: 24,
+  },
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  info: {
+    flex: 1,
+    gap: 3,
+  },
+  name: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  lastMessage: {
+    fontSize: 13,
+  },
+});

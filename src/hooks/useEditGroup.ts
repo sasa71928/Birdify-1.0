@@ -1,22 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as ImagePicker from 'expo-image-picker';
+import { compressImage } from '../utils/imageCompressor';
 import { supabase } from '../lib/supabase';
 import { ConversationRepository } from '../repositories/conversation.repository';
 import { FollowRepository } from '../repositories/follow.repository';
 import { useAuth } from '../context/AuthContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import * as ImagePicker from 'expo-image-picker';
 import { handleError } from '../utils/errorHandler';
 
 type EditGroupNavProp = NativeStackNavigationProp<RootStackParamList, 'EditGroup'>;
 type EditGroupRouteProp = RouteProp<RootStackParamList, 'EditGroup'>;
 
-interface EditableGroupUser {
+export interface GroupMemberItem {
   id: string;
   username: string;
   fullname: string | null;
   profile_pic_url: string | null;
+  role: 'admin' | 'member';
 }
 
 export function useEditGroup() {
@@ -28,69 +30,59 @@ export function useEditGroup() {
   const [groupName, setGroupName] = useState('');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [users, setUsers] = useState<EditableGroupUser[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [members, setMembers] = useState<GroupMemberItem[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [followingContacts, setFollowingContacts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
 
-  useEffect(() => {
-    loadGroupAndUsers();
-  }, [conversationId, user?.id]);
-
-  const loadGroupAndUsers = async () => {
+  const loadGroupData = useCallback(async () => {
     try {
       setLoading(true);
-      const [conversation, following] = await Promise.all([
+      const [conv, following] = await Promise.all([
         ConversationRepository.getById(conversationId),
         user?.id ? FollowRepository.getFollowing(user.id) : Promise.resolve([]),
       ]);
 
-      const mergedById = new Map<string, EditableGroupUser>();
+      if (conv) {
+        setGroupName(conv.name || '');
+        setDescription(conv.description || '');
+        setImage(conv.avatar_url || null);
 
-      // FollowRepository.getFollowing ya retorna objetos { id, username, fullname, profile_pic_url } (AUD-015)
-      for (const followedUser of following as EditableGroupUser[]) {
-        if (followedUser?.id && followedUser.id !== user?.id) {
-          mergedById.set(followedUser.id, followedUser);
-        }
+        const convMembers: GroupMemberItem[] = (conv.members || []).map((m: any) => {
+          const u = Array.isArray(m.users) ? m.users[0] : m.users;
+          return {
+            id: m.user_id,
+            username: u?.username || 'usuario',
+            fullname: u?.fullname || null,
+            profile_pic_url: u?.profile_pic_url || null,
+            role: m.role || 'member',
+          };
+        });
+
+        setMembers(convMembers);
+        const myMember = convMembers.find((m) => m.id === user?.id);
+        setIsAdmin(myMember?.role === 'admin');
       }
 
-      if (conversation) {
-        setGroupName(conversation.name || '');
-        setDescription(conversation.description || '');
-        setImage(conversation.avatar_url || null);
-
-        const members = conversation.members || [];
-        const memberIds = members.map((m) => m.user_id);
-        setSelected(new Set(memberIds));
-
-        // Conservar también en la lista los miembros actuales aunque el admin no los siga
-        for (const member of members) {
-          const memberProfile = member.users;
-          if (memberProfile?.id && memberProfile.id !== user?.id && !mergedById.has(memberProfile.id)) {
-            mergedById.set(memberProfile.id, {
-              id: memberProfile.id,
-              username: memberProfile.username,
-              fullname: memberProfile.fullname,
-              profile_pic_url: memberProfile.profile_pic_url,
-            });
-          }
-        }
-      }
-
-      setUsers(Array.from(mergedById.values()));
-    } catch (error) {
-      handleError(error, setToast, 'Error loading group data');
+      setFollowingContacts(following || []);
+    } catch (e) {
+      handleError(e, setToast, 'Error al cargar información del grupo');
     } finally {
       setLoading(false);
     }
-  };
+  }, [conversationId, user?.id]);
+
+  useEffect(() => {
+    loadGroupData();
+  }, [loadGroupData]);
 
   const pickImage = async () => {
+    if (!isAdmin) return;
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      handleError('Permiso denegado', setToast, 'Se necesita permiso para acceder a la galería.');
+      setToast({ visible: true, message: 'Permiso denegado para fotos', type: 'error' });
       return;
     }
 
@@ -98,31 +90,24 @@ export function useEditGroup() {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
-      exif: false,
+      quality: 0.85,
     });
 
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
+    if (!result.canceled && result.assets[0]?.uri) {
+      const compressed = await compressImage(result.assets[0].uri, 'avatar');
+      setImage(compressed.uri);
     }
   };
 
-  const handleSave = async () => {
-    if (!canSave || !user || saving) return;
+  const handleSave = async (selectedMemberIds?: Set<string>) => {
+    if (!isAdmin || !user || saving) return;
     try {
       setSaving(true);
 
       let finalAvatarUrl = image;
       if (image && !image.startsWith('http://') && !image.startsWith('https://')) {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (!authUser?.id) {
-          handleError('User not authenticated', setToast, 'User not authenticated');
-          throw new Error('User not authenticated');
-        }
-        const rawExt = (image.split('.').pop() || 'jpg').toLowerCase().split('?')[0];
-        const ext = rawExt === 'png' || rawExt === 'webp' ? rawExt : 'jpg';
-        const contentType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-        const fileName = `${authUser.id}/${Date.now()}.${ext}`;
+        const ext = 'jpg';
+        const fileName = `${user.id}/${Date.now()}.${ext}`;
 
         const response = await fetch(image);
         const arrayBuffer = await response.arrayBuffer();
@@ -130,13 +115,11 @@ export function useEditGroup() {
         const { error: uploadError } = await supabase.storage
           .from('group-avatars')
           .upload(fileName, arrayBuffer, {
-            contentType,
+            contentType: 'image/jpeg',
             upsert: true,
           });
 
-        if (uploadError) {
-          handleError(uploadError, setToast, 'Error uploading group avatar');
-        } else {
+        if (!uploadError) {
           const { data: { publicUrl } } = supabase.storage
             .from('group-avatars')
             .getPublicUrl(fileName);
@@ -144,79 +127,94 @@ export function useEditGroup() {
         }
       }
 
-      await ConversationRepository.updateConversation(conversationId, {
-        name: groupName.trim(),
-        description: description.trim() || undefined,
-        avatar_url: finalAvatarUrl,
-      });
+      // Si se pasaron miembros seleccionados, calcular altas y bajas
+      if (selectedMemberIds) {
+        const currentIds = new Set(members.map((m) => m.id));
+        const toAdd = Array.from(selectedMemberIds).filter((id) => !currentIds.has(id));
+        const toRemove = Array.from(currentIds).filter(
+          (id) => !selectedMemberIds.has(id) && id !== user.id
+        );
 
-      const currentMembers = await ConversationRepository.getConversationMembers(conversationId);
-      const currentMemberIds = new Set(currentMembers.map((m) => m.user_id));
+        const { error: rpcError } = await supabase.rpc('update_group', {
+          p_conversation_id: conversationId,
+          p_name: groupName.trim(),
+          p_description: description.trim() || null,
+          p_avatar_url: finalAvatarUrl,
+          p_add_member_ids: toAdd,
+          p_remove_member_ids: toRemove,
+        });
 
-      const newMembers = Array.from(selected).filter((id) => !currentMemberIds.has(id));
-      if (newMembers.length > 0) {
-        await ConversationRepository.addConversationMembers(conversationId, newMembers);
+        if (rpcError) {
+          // Fallback tradicional
+          await ConversationRepository.updateConversation(conversationId, {
+            name: groupName.trim(),
+            description: description.trim() || undefined,
+            avatar_url: finalAvatarUrl,
+          });
+          if (toAdd.length > 0) {
+            await ConversationRepository.addConversationMembers(conversationId, toAdd);
+          }
+          if (toRemove.length > 0) {
+            await ConversationRepository.removeConversationMembers(conversationId, toRemove);
+          }
+        }
+      } else {
+        await ConversationRepository.updateConversation(conversationId, {
+          name: groupName.trim(),
+          description: description.trim() || undefined,
+          avatar_url: finalAvatarUrl,
+        });
       }
 
-      const removedMembers = Array.from(currentMemberIds).filter((id) => !selected.has(id) && id !== user.id);
-      if (removedMembers.length > 0) {
-        await ConversationRepository.removeConversationMembers(conversationId, removedMembers);
-      }
-
-      showToast('Grupo actualizado.', 'success');
-      setTimeout(() => {
-        navigation.goBack();
-      }, 500);
+      setToast({ visible: true, message: 'Grupo actualizado correctamente', type: 'success' });
+      await loadGroupData();
     } catch (e) {
-      handleError(e, setToast, 'No se pudo actualizar el grupo.');
+      handleError(e, setToast, 'No se pudo actualizar el grupo');
     } finally {
       setSaving(false);
     }
   };
 
-  const canSave = groupName.trim().length > 0 && selected.size >= 1;
-
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ visible: true, message, type });
+  const removeMember = async (memberId: string) => {
+    if (!isAdmin || memberId === user?.id) return;
+    try {
+      await ConversationRepository.removeConversationMembers(conversationId, [memberId]);
+      setToast({ visible: true, message: 'Miembro eliminado', type: 'success' });
+      await loadGroupData();
+    } catch (e) {
+      handleError(e, setToast, 'No se pudo eliminar al miembro');
+    }
   };
 
-  const toggleUser = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  const leaveGroup = async () => {
+    if (!user) return;
+    try {
+      await ConversationRepository.leaveConversation(conversationId, user.id);
+      setToast({ visible: true, message: 'Has salido del grupo', type: 'success' });
+      setTimeout(() => navigation.navigate('MainTabs', { screen: 'Messages' }), 500);
+    } catch (e) {
+      handleError(e, setToast, 'No se pudo salir del grupo');
+    }
   };
-
-  const filteredUsers = users.filter((u) => {
-    const query = searchQuery.toLowerCase();
-    return (
-      u.fullname?.toLowerCase().includes(query) ||
-      u.username?.toLowerCase().includes(query)
-    );
-  });
 
   return {
+    conversationId,
     groupName,
+    setGroupName,
     description,
+    setDescription,
     image,
-    selected,
-    users,
-    searchQuery,
+    members,
+    isAdmin,
+    followingContacts,
     loading,
     saving,
     toast,
-    filteredUsers,
-    canSave,
-    navigation,
-    setGroupName,
-    setDescription,
-    setImage,
-    setSearchQuery,
     setToast,
     pickImage,
     handleSave,
-    showToast,
-    toggleUser,
+    removeMember,
+    leaveGroup,
+    navigation,
   };
 }

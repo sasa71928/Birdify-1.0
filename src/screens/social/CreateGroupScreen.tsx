@@ -1,82 +1,75 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  Image,
-  StatusBar,
   ScrollView,
+  StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Typography, Spacing, Radius, Shadows } from '../../theme';
+import { compressImage } from '../../utils/imageCompressor';
+import { Image } from 'expo-image';
+import { Typography, Spacing, Radius } from '../../theme';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import { createStyles } from '../../styles/screens/social/createGroupScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useAuth } from '../../context/AuthContext';
 import { FollowRepository } from '../../repositories/follow.repository';
 import { ConversationRepository } from '../../repositories/conversation.repository';
 import { handleError } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
+import { MemberPicker, PickerUser } from '../../features/chat/components/MemberPicker';
+import { useT } from '../../i18n';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'CreateGroup'>;
 
 export default function CreateGroupScreen() {
   const navigation = useNavigation<NavProp>();
-  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const { colors, isDark } = useDynamicStyles();
   const { user } = useAuth();
+  const { t } = useT();
+
+  const [step, setStep] = useState<1 | 2>(1); // 1 = miembros, 2 = detalles de grupo
   const [groupName, setGroupName] = useState('');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [contacts, setContacts] = useState<{ id: string; name: string; avatar: string }[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [contacts, setContacts] = useState<PickerUser[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(true);
   const [creating, setCreating] = useState(false);
+
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
     message: '',
     type: 'success',
   });
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showToast = (message: string, type: 'success' | 'error') => {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ visible: true, message, type });
-    toastTimerRef.current = setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3600);
   };
 
   useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
-      }
-    };
-  }, []);
-
-  React.useEffect(() => {
     let mounted = true;
     const loadContacts = async () => {
       if (!user) return;
       try {
         setLoadingContacts(true);
         const following = await FollowRepository.getFollowing(user.id);
-        const mapped = (following || []).map((u: any) => ({
+        const mapped: PickerUser[] = (following || []).map((u: any) => ({
           id: u.id,
           name: u.fullname || u.username || 'Usuario',
-          avatar: u.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
+          username: u.username || 'user',
+          avatar: u.profile_pic_url || null,
         }));
         if (mounted) setContacts(mapped);
       } catch (e) {
-        handleError(e, setToast, 'No se pudo cargar tu lista de contactos');
+        handleError(e, setToast, 'No se pudo cargar la lista de contactos');
       } finally {
         if (mounted) setLoadingContacts(false);
       }
@@ -87,40 +80,37 @@ export default function CreateGroupScreen() {
     };
   }, [user?.id]);
 
-  const toggle = (id: string) =>
+  const toggleUser = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
-
-  const filteredContacts = contacts.filter((contact) => {
-    const query = searchQuery.toLowerCase();
-    return contact.name.toLowerCase().includes(query);
-  });
+  };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      handleError('Permiso denegado', setToast, 'Se necesita permiso para acceder a la galería.');
+      showToast(t('chat.imagePermissionDenied'), 'error');
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
-      exif: false,
+      quality: 0.85,
     });
 
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
+    if (!result.canceled && result.assets[0]?.uri) {
+      const compressed = await compressImage(result.assets[0].uri, 'avatar');
+      setImage(compressed.uri);
     }
   };
 
-  const handleCreate = async () => {
-    if (!canCreate || !user || creating) return;
+  const handleCreateGroup = async () => {
+    if (!user || groupName.trim().length === 0 || creating) return;
     try {
       setCreating(true);
       const conversationId = await ConversationRepository.createGroupConversation({
@@ -131,144 +121,281 @@ export default function CreateGroupScreen() {
         memberIds: Array.from(selected),
       });
 
-      showToast('Grupo creado.', 'success');
+      showToast(t('groups.groupCreated'), 'success');
+      // Navegación directa al nuevo chat
       setTimeout(() => {
-        navigation.navigate('MainTabs', { screen: 'Messages' });
-      }, 500);
+        navigation.replace('Chat', { conversationId });
+      }, 400);
     } catch (e) {
       handleError(e, setToast, 'No se pudo crear el grupo');
-    } finally {
       setCreating(false);
     }
   };
 
-  const canCreate = groupName.trim().length > 0 && selected.size >= 1;
-
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.surface }]} edges={['top']}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <AppToast
         visible={toast.visible}
         message={toast.message}
         type={toast.type}
-        onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+        onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>New Group</Text>
+      {/* Header */}
+      <View
+        style={[
+          styles.header,
+          { borderBottomColor: colors.border + '20', backgroundColor: colors.surface },
+        ]}
+      >
         <TouchableOpacity
-          style={[styles.createBtn, !canCreate && styles.createBtnDisabled]}
-          disabled={!canCreate || creating}
-          onPress={handleCreate}
+          style={styles.backBtn}
+          onPress={() => {
+            if (step === 2) setStep(1);
+            else navigation.goBack();
+          }}
         >
-          <Text style={[styles.createBtnText, !canCreate && styles.createBtnTextDisabled]}>
-            {creating ? 'Creating…' : 'Create'}
-          </Text>
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-      </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={styles.headerTitleWrap}>
+          <Text
+            style={[
+              styles.headerTitle,
+              { color: colors.textPrimary, fontFamily: Typography.fontFamilyDisplay },
+            ]}
+          >
+            {t('groups.newGroupTitle')}
+          </Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+            {step === 1 ? t('groups.stepMembers') : t('groups.stepInfo')}
+          </Text>
+        </View>
 
-        {/* ── Group icon placeholder ── */}
-        <View style={styles.iconSection}>
-          <TouchableOpacity style={styles.groupIconCircle} activeOpacity={0.75} onPress={pickImage}>
-            {image ? (
-              <Image source={{ uri: image }} style={styles.groupIconImage} />
+        {step === 1 ? (
+          <TouchableOpacity
+            style={[
+              styles.nextBtn,
+              {
+                backgroundColor: selected.size > 0 ? colors.primary : colors.componentBase,
+              },
+            ]}
+            disabled={selected.size === 0}
+            onPress={() => setStep(2)}
+          >
+            <Text
+              style={[
+                styles.nextBtnText,
+                { color: selected.size > 0 ? '#FFFFFF' : colors.textSecondary },
+              ]}
+            >
+              {t('common.next')}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[
+              styles.nextBtn,
+              {
+                backgroundColor:
+                  groupName.trim().length > 0 && !creating ? colors.primary : colors.componentBase,
+              },
+            ]}
+            disabled={groupName.trim().length === 0 || creating}
+            onPress={handleCreateGroup}
+          >
+            {creating ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <MaterialCommunityIcons name="camera-plus-outline" size={28} color={colors.textSecondary} />
+              <Text
+                style={[
+                  styles.nextBtnText,
+                  { color: groupName.trim().length > 0 ? '#FFFFFF' : colors.textSecondary },
+                ]}
+              >
+                {t('common.create')}
+              </Text>
             )}
           </TouchableOpacity>
-          <Text style={styles.iconHint}>{image ? 'Tap to change photo' : 'Tap to add a group photo'}</Text>
-        </View>
-
-        {/* ── Campos del grupo ── */}
-        <View style={styles.formCard}>
-          <View style={styles.fieldRow}>
-            <MaterialCommunityIcons name="account-group-outline" size={20} color={colors.primary} />
-            <TextInput
-              style={styles.fieldInput}
-              placeholder="Group name"
-              placeholderTextColor={colors.placeholder}
-              value={groupName}
-              onChangeText={setGroupName}
-              maxLength={50}
-            />
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.fieldRow}>
-            <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
-            <TextInput
-              style={styles.fieldInput}
-              placeholder="Description (optional)"
-              placeholderTextColor={colors.placeholder}
-              value={description}
-              onChangeText={setDescription}
-              maxLength={120}
-            />
-          </View>
-        </View>
-
-        {/* ── Miembros seleccionados (chips) ── */}
-        {selected.size > 0 && (
-          <View style={styles.selectedSection}>
-            <Text style={styles.sectionLabel}>Selected ({selected.size})</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-              {contacts.filter((c) => selected.has(c.id)).map((c) => (
-                <TouchableOpacity key={c.id} style={styles.chip} onPress={() => toggle(c.id)}>
-                  <Image source={{ uri: c.avatar }} style={styles.chipAvatar} />
-                  <Text style={styles.chipName}>{c.name.split(' ')[0]}</Text>
-                  <Ionicons name="close-circle" size={15} color={colors.primary} style={{ marginLeft: 2 }} />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
         )}
+      </View>
 
-        {/* ── Lista de contactos ── */}
-        <View style={styles.contactsSection}>
-          <Text style={styles.sectionLabel}>Add People</Text>
-          <TextInput
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Buscar usuarios..."
-            placeholderTextColor={colors.placeholder}
+      {/* Paso 1: Selección de miembros */}
+      {step === 1 ? (
+        loadingContacts ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <MemberPicker
+            contacts={contacts}
+            selectedIds={selected}
+            onToggleUser={toggleUser}
           />
-          {loadingContacts ? (
-            <Text style={{ color: colors.textSecondary, paddingHorizontal: 16, paddingVertical: 10 }}>
-              Cargando...
+        )
+      ) : (
+        /* Paso 2: Detalles del grupo */
+        <ScrollView contentContainerStyle={styles.detailsScroll}>
+          <View style={styles.avatarPickerSection}>
+            <TouchableOpacity
+              style={[
+                styles.avatarTouch,
+                { backgroundColor: colors.componentBase, borderColor: colors.border + '30' },
+              ]}
+              activeOpacity={0.8}
+              onPress={pickImage}
+            >
+              {image ? (
+                <Image source={{ uri: image }} style={styles.avatarImg} contentFit="cover" />
+              ) : (
+                <MaterialCommunityIcons
+                  name="camera-plus-outline"
+                  size={36}
+                  color={colors.primary}
+                />
+              )}
+            </TouchableOpacity>
+            <Text style={[styles.avatarHint, { color: colors.textSecondary }]}>
+              {image ? t('groups.tapToChangePhoto') : t('groups.tapToAddPhoto')}
             </Text>
-          ) : contacts.length === 0 ? (
-            <Text style={{ color: colors.textSecondary, paddingHorizontal: 16, paddingVertical: 10 }}>
-              No tienes usuarios para agregar. Sigue a alguien para crear un grupo.
-            </Text>
-          ) : (
-          filteredContacts.map((contact) => {
-            const isSelected = selected.has(contact.id);
-            return (
-              <TouchableOpacity
-                key={contact.id}
-                style={styles.contactRow}
-                activeOpacity={0.7}
-                onPress={() => toggle(contact.id)}
-              >
-                <View style={styles.contactAvatarWrap}>
-                  <Image source={{ uri: contact.avatar }} style={styles.contactAvatar} />
-                </View>
-                <Text style={styles.contactName}>{contact.name}</Text>
-                <View style={[styles.checkbox, isSelected && styles.checkboxChecked]}>
-                  {isSelected && <Ionicons name="checkmark" size={14} color={colors.canvasPure} />}
-                </View>
-              </TouchableOpacity>
-            );
-          }))}
-        </View>
+          </View>
 
-      </ScrollView>
+          <View
+            style={[
+              styles.formCard,
+              { backgroundColor: colors.componentBase, borderColor: colors.border + '20' },
+            ]}
+          >
+            <View style={styles.inputFieldRow}>
+              <MaterialCommunityIcons
+                name="account-group-outline"
+                size={22}
+                color={colors.primary}
+              />
+              <TextInput
+                style={[
+                  styles.formInput,
+                  { color: colors.textPrimary, fontFamily: Typography.fontFamilyBody },
+                ]}
+                placeholder={t('groups.groupNamePlaceholder')}
+                placeholderTextColor={colors.placeholder}
+                value={groupName}
+                onChangeText={setGroupName}
+                maxLength={50}
+              />
+            </View>
+
+            <View style={[styles.fieldDivider, { backgroundColor: colors.border + '15' }]} />
+
+            <View style={styles.inputFieldRow}>
+              <Ionicons name="information-circle-outline" size={22} color={colors.primary} />
+              <TextInput
+                style={[
+                  styles.formInput,
+                  { color: colors.textPrimary, fontFamily: Typography.fontFamilyBody },
+                ]}
+                placeholder={t('groups.descriptionPlaceholder')}
+                placeholderTextColor={colors.placeholder}
+                value={description}
+                onChangeText={setDescription}
+                maxLength={120}
+              />
+            </View>
+          </View>
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  backBtn: {
+    padding: 4,
+  },
+  headerTitleWrap: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+  nextBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: Radius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  nextBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailsScroll: {
+    padding: Spacing.md,
+  },
+  avatarPickerSection: {
+    alignItems: 'center',
+    marginVertical: 20,
+    gap: 10,
+  },
+  avatarTouch: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarHint: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  formCard: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  inputFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  formInput: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
+  },
+  fieldDivider: {
+    height: 1,
+    marginLeft: 48,
+  },
+});

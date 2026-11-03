@@ -58,6 +58,7 @@ export default {
     },
     plugins: [
       'expo-font',
+      'expo-image',
       'expo-notifications',
       'expo-mail-composer',
       'expo-sqlite',

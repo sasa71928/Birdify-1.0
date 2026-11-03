@@ -21,24 +21,23 @@ export function useMessages() {
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<ChatThread | null>(null);
-  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
 
-  const load = useCallback(async (_silent = false) => {
+  const load = useCallback(async () => {
     await refreshConversations();
   }, [refreshConversations]);
 
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       if (user && !isOffline) {
         refreshConversations();
       }
     }, [user, refreshConversations, isOffline])
   );
 
-  const handleDeleteConversation = async (conversationId: string) => {
+  const handleDeleteConversation = (conversationId: string) => {
     setConversationToDelete(conversationId);
     setDeleteModalVisible(true);
   };
@@ -63,17 +62,14 @@ export function useMessages() {
     }
   };
 
-  const handleLongPress = (item: ChatThread, event: any) => {
+  const handleLongPress = (item: ChatThread) => {
     setSelectedConversation(item);
-    const { pageX, pageY } = event.nativeEvent;
-    setMenuPosition({ x: pageX, y: pageY });
     setOptionsVisible(true);
   };
 
   const handleOptionPress = (option: string) => {
     setOptionsVisible(false);
     if (option === 'leaveGroup' && selectedConversation) {
-      // Conservar selectedConversation hasta que el usuario confirme o cancele el modal (AUD-015)
       setShowLeaveModal(true);
       return;
     }
@@ -102,13 +98,6 @@ export function useMessages() {
     } finally {
       setLeaving(false);
       setShowLeaveModal(false);
-      setSelectedConversation(null);
-    }
-  };
-
-  const handleSetShowLeaveModal = (visible: boolean) => {
-    setShowLeaveModal(visible);
-    if (!visible) {
       setSelectedConversation(null);
     }
   };
@@ -143,7 +132,6 @@ export function useMessages() {
     conversationToDelete,
     optionsVisible,
     selectedConversation,
-    menuPosition,
     showLeaveModal,
     leaving,
     toast,
@@ -152,8 +140,7 @@ export function useMessages() {
     setConversationToDelete,
     setOptionsVisible,
     setSelectedConversation,
-    setMenuPosition,
-    setShowLeaveModal: handleSetShowLeaveModal,
+    setShowLeaveModal,
     setToast,
     load,
     confirmDelete,

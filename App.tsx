@@ -21,6 +21,8 @@ import {
   BeVietnamPro_600SemiBold,
   BeVietnamPro_700Bold,
 } from '@expo-google-fonts/be-vietnam-pro';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { LanguageProvider } from './src/i18n';
 import { Colors } from './src/theme';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
@@ -75,23 +77,27 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <OfflineProvider>
-        <AuthProvider>
-          <ThemeProvider>
-            <NewSightingsProvider>
-              <UnreadMessagesProvider>
-                <NavigationContainer linking={navigationLinking}>
-                  <InteractionsProvider>
-                    <AppNavigator />
-                    <PasswordRecoveryGate />
-                  </InteractionsProvider>
-                </NavigationContainer>
-              </UnreadMessagesProvider>
-            </NewSightingsProvider>
-          </ThemeProvider>
-        </AuthProvider>
-      </OfflineProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <LanguageProvider>
+          <OfflineProvider>
+            <AuthProvider>
+              <ThemeProvider>
+                <NewSightingsProvider>
+                  <UnreadMessagesProvider>
+                    <NavigationContainer linking={navigationLinking}>
+                      <InteractionsProvider>
+                        <AppNavigator />
+                        <PasswordRecoveryGate />
+                      </InteractionsProvider>
+                    </NavigationContainer>
+                  </UnreadMessagesProvider>
+                </NewSightingsProvider>
+              </ThemeProvider>
+            </AuthProvider>
+          </OfflineProvider>
+        </LanguageProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
