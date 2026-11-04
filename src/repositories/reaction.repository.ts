@@ -19,9 +19,24 @@ export const ReactionRepository = {
       .from('reactions')
       .insert({ sighting_id: sightingId, user_id: userId });
 
-    if (error) {
+    const isDuplicate =
+      error &&
+      (error.code === '23505' ||
+        error.message?.toLowerCase().includes('duplicate key') ||
+        error.message?.toLowerCase().includes('unique constraint'));
+
+    if (error && !isDuplicate) {
       console.error('Error reacting to sighting:', error);
       throw error;
+    }
+
+    try {
+      await db.runAsync(
+        `INSERT OR REPLACE INTO reactions (user_id, sighting_id, created_at) VALUES (?, ?, ?)`,
+        [userId, sightingId, new Date().toISOString()]
+      );
+    } catch {
+      // Non-blocking local SQLite cache update
     }
   },
 
@@ -44,6 +59,15 @@ export const ReactionRepository = {
     if (error) {
       console.error('Error unreacting to sighting:', error);
       throw error;
+    }
+
+    try {
+      await db.runAsync(
+        `DELETE FROM reactions WHERE user_id = ? AND sighting_id = ?`,
+        [userId, sightingId]
+      );
+    } catch {
+      // Non-blocking local SQLite cache update
     }
   },
 

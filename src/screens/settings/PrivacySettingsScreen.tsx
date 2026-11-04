@@ -1,26 +1,32 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
-  ScrollView,
-  StatusBar,
-  Switch,
-  Modal,
   TextInput,
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
+import { Ionicons } from '@expo/vector-icons';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { createStyles } from '../../styles/screens/settings/privacySettingsScreen.styles';
 import { useAuth } from '../../context/AuthContext';
+import { useT } from '../../i18n';
 import { supabase } from '../../lib/supabase';
 import { ProfileRepository } from '../../repositories/profile.repository';
-import { handleError } from '../../utils/errorHandler';
+import { handleError, showSuccess } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
+import {
+  SettingsScaffold,
+  SettingsSection,
+  SettingsRow,
+} from '../../components/settings';
+import {
+  AnimatedSwitch,
+  AnimatedDialog,
+  PressableScale,
+} from '../../components/animated';
+import { Radius, Typography, Shadows } from '../../theme';
 
 const USER_STORAGE_BUCKETS = ['avatars', 'Sightings', 'sightings', 'sighting-images', 'group-avatars'] as const;
 
@@ -39,7 +45,7 @@ async function purgeUserStorageObjects(userId: string): Promise<void> {
           await supabase.storage.from(bucket).remove(paths);
         }
       } catch {
-        // Ignorar buckets no existentes o sin permisos para no bloquear la eliminación de cuenta
+        // Ignorar buckets no existentes o sin permisos
       }
     })
   );
@@ -49,43 +55,35 @@ export default function PrivacySettingsScreen() {
   const navigation = useNavigation();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const { user, signOut } = useAuth();
+  const { t } = useT();
 
   const [isPrivateProfile, setIsPrivateProfile] = useState(false);
   const [isSavingPrivacy, setIsSavingPrivacy] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Toast state
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    message: string;
+    type: 'success' | 'error';
+  }>({
     visible: false,
     message: '',
     type: 'success',
   });
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showToast = (message: string, type: 'success' | 'error') => {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-    setToast({ visible: true, message, type });
-    toastTimerRef.current = setTimeout(() => {
-      setToast((prev) => ({ ...prev, visible: false }));
-    }, 3500);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
-      }
-    };
-  }, []);
-
-  // Password Modal states
+  // Password modal states
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  // Delete modal states
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+
+  const targetDeleteWord = t('settings.deleteWord');
 
   useEffect(() => {
     const loadPrivacy = async () => {
@@ -115,14 +113,14 @@ export default function PrivacySettingsScreen() {
 
     try {
       await ProfileRepository.update(user.id, { is_private: nextValue });
-      showToast(
+      showSuccess(
         nextValue
-          ? 'Tu perfil ahora es privado. Solo usuarios que se siguen mutuamente podrán ver Sightings, Logbook y Likes.'
-          : 'Tu perfil ahora es público.',
-        'success'
+          ? t('settings.privateProfileToastOn')
+          : t('settings.privateProfileToastOff'),
+        setToast
       );
     } catch (error) {
-      handleError(error, setToast, 'No se pudo actualizar la privacidad del perfil');
+      handleError(error, setToast, 'Failed to update privacy');
       setIsPrivateProfile(previous);
     } finally {
       setIsSavingPrivacy(false);
@@ -130,489 +128,392 @@ export default function PrivacySettingsScreen() {
   };
 
   const handleChangePassword = async () => {
-    if (!user || !user.email) {
-      showToast('No se detectó un usuario autenticado.', 'error');
-      return;
-    }
+    if (!user || !user.email) return;
+
     if (!currentPassword || !newPassword || !confirmPassword) {
-      showToast('Por favor completa todos los campos.', 'error');
+      handleError('Completa todos los campos', setToast);
       return;
     }
     if (newPassword !== confirmPassword) {
-      showToast('La nueva contraseña y su confirmación no coinciden.', 'error');
+      handleError(t('settings.passwordsDoNotMatch'), setToast);
       return;
     }
     if (newPassword.length < 6) {
-      showToast('La contraseña debe tener al menos 6 caracteres.', 'error');
+      handleError(t('settings.passwordMinLength'), setToast);
       return;
     }
 
     setIsChangingPassword(true);
     try {
-      // 1. Validar la contraseña actual intentando iniciar sesión
       const { error: authError } = await supabase.auth.signInWithPassword({
         email: user.email,
         password: currentPassword,
       });
 
       if (authError) {
-        showToast('La contraseña actual es incorrecta.', 'error');
+        handleError(t('settings.wrongCurrentPassword'), setToast);
         setIsChangingPassword(false);
         return;
       }
 
-      // 2. Actualizar la contraseña a la nueva
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
       });
 
-      if (updateError) {
-        throw updateError;
-      }
+      if (updateError) throw updateError;
 
-      showToast('Tu contraseña ha sido cambiada correctamente.', 'success');
+      showSuccess(t('settings.changePasswordSuccess'), setToast);
       setPasswordModalVisible(false);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
-      handleError(err, setToast, err.message || 'No se pudo cambiar la contraseña. Inténtalo de nuevo.');
+      handleError(err, setToast);
     } finally {
       setIsChangingPassword(false);
     }
   };
 
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
-
-  const handleDeleteAccount = () => {
-    if (!user) return;
-    setDeleteConfirmationText('');
-    setDeleteModalVisible(true);
-  };
-
   const confirmDeleteAccount = async () => {
-    if (deleteConfirmationText.trim().toUpperCase() !== 'ELIMINAR') {
-      showToast('Por favor escribe la palabra ELIMINAR.', 'error');
+    if (deleteConfirmationText.trim().toUpperCase() !== targetDeleteWord.toUpperCase()) {
+      handleError(`Escribe ${targetDeleteWord}`, setToast);
       return;
     }
     if (!user) return;
 
     setIsDeleting(true);
     try {
-      // 1. Purgar objetos de Storage asociados al usuario antes de revocar su sesión/registro (AUD-009)
       await purgeUserStorageObjects(user.id);
-
-      // 2. Eliminar el usuario de auth.users mediante RPC (elimina de auth y por cascada de public)
       const { error: rpcError } = await supabase.rpc('delete_user');
-
       if (rpcError) {
-        // 3. Fallback: eliminar al menos el registro público
-        const { error: dbError } = await supabase
-          .from('users')
-          .delete()
-          .eq('id', user.id);
-
+        const { error: dbError } = await supabase.from('users').delete().eq('id', user.id);
         if (dbError) throw dbError;
       }
-
       setDeleteModalVisible(false);
-      setDeleteConfirmationText('');
       await signOut();
     } catch (err: any) {
-      handleError(err, setToast, 'No se pudo eliminar tu cuenta. Por favor vuelve a intentarlo.');
+      handleError(err, setToast, t('settings.deleteFailed'));
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const localStyles = useMemo(
-    () =>
-      StyleSheet.create({
-        modalOverlay: {
-          flex: 1,
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: 20,
-        },
-        modalContainer: {
-          backgroundColor: colors.surface,
-          borderRadius: 18,
-          width: '100%',
-          maxWidth: 360,
-          padding: 24,
-          borderWidth: 1,
-          borderColor: colors.border + '30',
-          elevation: 5,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 10,
-        },
-        modalTitle: {
-          fontSize: 18,
-          fontWeight: 'bold',
-          color: colors.primary,
-          fontFamily: 'PlusJakartaSans-Bold',
-          marginBottom: 16,
-          textAlign: 'center',
-        },
-        inputGroup: {
-          marginBottom: 14,
-        },
-        inputLabel: {
-          fontSize: 13,
-          fontWeight: '600',
-          color: colors.textPrimary,
-          marginBottom: 6,
-        },
-        input: {
-          backgroundColor: colors.componentBase,
-          borderWidth: 1,
-          borderColor: colors.border + '20',
-          borderRadius: 10,
-          padding: 12,
-          fontSize: 15,
-          color: colors.textPrimary,
-        },
-        btnContainer: {
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          gap: 10,
-          marginTop: 10,
-        },
-        btn: {
-          flex: 1,
-          padding: 12,
-          borderRadius: 10,
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        btnCancel: {
-          borderWidth: 1.5,
-          borderColor: colors.border + '60',
-        },
-        btnSave: {
-          backgroundColor: colors.primary,
-        },
-        btnTextCancel: {
-          color: colors.textSecondary,
-          fontWeight: '600',
-        },
-        btnTextSave: {
-          color: colors.canvasPure,
-          fontWeight: '600',
-        },
-      }),
-    [colors]
-  );
+  const isDeleteWordMatch =
+    deleteConfirmationText.trim().toUpperCase() === targetDeleteWord.toUpperCase();
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SettingsScaffold
+      title={t('settings.privacyTitle')}
+      subtitle={t('settings.privacySubtitle')}
+      onBack={() => navigation.goBack()}
+    >
       <AppToast
-        visible={toast.visible && !passwordModalVisible}
+        visible={toast.visible}
         message={toast.message}
         type={toast.type}
         onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Privacy & Security</Text>
+      {/* Privacy Section */}
+      <SettingsSection title={t('settings.privacySection')}>
+        <SettingsRow
+          icon="eye-off-outline"
+          label={t('settings.privateProfile')}
+          sublabel={t('settings.privateProfileDesc')}
+          showChevron={false}
+          rightElement={
+            <AnimatedSwitch
+              value={isPrivateProfile}
+              disabled={isSavingPrivacy}
+              onValueChange={handleTogglePrivateProfile}
+              accessibilityLabel={t('settings.privateProfile')}
+            />
+          }
+        />
+        <SettingsRow
+          icon="ban-outline"
+          iconColor="#C62828"
+          label={t('settings.blockedUsers')}
+          isLast
+          onPress={() => navigation.navigate('BlockedUsers' as never)}
+        />
+      </SettingsSection>
+
+      {/* Security Section */}
+      <SettingsSection title={t('settings.securitySection')}>
+        <SettingsRow
+          icon="shield-outline"
+          label={t('settings.twoFactor')}
+          sublabel={t('settings.twoFactorDesc')}
+          badge={t('common.soon')}
+          showChevron={false}
+          disabled
+          rightElement={
+            <AnimatedSwitch
+              value={false}
+              disabled
+              onValueChange={() => {}}
+              accessibilityLabel={t('settings.twoFactor')}
+            />
+          }
+        />
+        <SettingsRow
+          icon="key-outline"
+          iconColor="#1565C0"
+          label={t('settings.changePassword')}
+          isLast
+          onPress={() => setPasswordModalVisible(true)}
+        />
+      </SettingsSection>
+
+      {/* Delete Account Button */}
+      <View style={{ marginTop: 8 }}>
+        <PressableScale
+          activeScale={0.97}
+          haptic="medium"
+          onPress={() => {
+            setDeleteConfirmationText('');
+            setDeleteModalVisible(true);
+          }}
+          style={[
+            styles.deleteBtn,
+            {
+              backgroundColor: colors.errorRed + '14',
+              borderColor: colors.errorRed + '35',
+            },
+          ]}
+        >
+          <Ionicons
+            name="trash-outline"
+            size={20}
+            color={colors.errorRed}
+            style={{ marginRight: 8 }}
+          />
+          <Text style={[styles.deleteBtnText, { color: colors.errorRed }]}>
+            {t('settings.deleteAccount')}
+          </Text>
+        </PressableScale>
+        <Text style={[styles.deleteWarning, { color: colors.textSecondary }]}>
+          {t('settings.deleteAccountWarning')}
+        </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Privacy Settings Section */}
-        <View style={styles.sectionHeader}>
-          <Ionicons name="shield-outline" size={22} color={colors.primary} />
-          <Text style={styles.sectionTitle}>Privacy Settings</Text>
-        </View>
-
-        <View style={styles.settingsCard}>
-          <View style={styles.settingRow}>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingLabel}>Private Profile</Text>
-              <Text style={styles.settingSublabel}>Only mutual followers can see your sightings, logbook and likes.</Text>
-            </View>
-            <Switch
-              value={isPrivateProfile}
-              onValueChange={handleTogglePrivateProfile}
-              disabled={isSavingPrivacy}
-              trackColor={{ false: isDark ? '#444' : '#D1D1D1', true: colors.primary }}
-              thumbColor={colors.canvasPure}
-            />
-          </View>
-          <View style={styles.settingDivider} />
-          <TouchableOpacity
-            style={styles.settingRow}
-            activeOpacity={0.7}
-            onPress={() => navigation.navigate('BlockedUsers' as never)}
-          >
-            <Ionicons name="remove-circle-outline" size={22} color={colors.textPrimary} style={{ marginRight: 12 }} />
-            <Text style={[styles.settingLabel, { flex: 1 }]}>Blocked Users</Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.placeholder} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Account Security Section */}
-        <View style={styles.sectionHeader}>
-          <Ionicons name="lock-closed-outline" size={22} color={colors.primary} />
-          <Text style={styles.sectionTitle}>Account Security</Text>
-        </View>
-
-        <View style={styles.settingsCard}>
-          <View style={styles.settingRow}>
-            <View style={[styles.settingContent, { opacity: 0.5 }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={styles.settingLabel}>Two-Factor Authentication</Text>
-                <View style={{ backgroundColor: '#EEE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 }}>
-                  <Text style={{ fontSize: 10, color: '#666', fontWeight: 'bold' }}>SOON</Text>
-                </View>
-              </View>
-              <Text style={styles.settingSublabel}>Secure your account with a code.</Text>
-            </View>
-            <Switch
-              value={false}
-              disabled={true}
-              trackColor={{ false: isDark ? '#444' : '#D1D1D1', true: colors.primary }}
-              thumbColor={colors.canvasPure}
-              style={{ opacity: 0.5 }}
-            />
-          </View>
-          <View style={styles.settingDivider} />
-          <TouchableOpacity
-            style={styles.settingRow}
-            activeOpacity={0.7}
-            onPress={() => setPasswordModalVisible(true)}
-          >
-            <MaterialCommunityIcons name="dots-horizontal" size={22} color={colors.textPrimary} style={{ marginRight: 12 }} />
-            <Text style={[styles.settingLabel, { flex: 1 }]}>Change Password</Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.placeholder} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Delete Account */}
-        <TouchableOpacity
-          style={[styles.deleteBtn, isDeleting && { opacity: 0.6 }]}
-          activeOpacity={0.8}
-          onPress={handleDeleteAccount}
-          disabled={isDeleting || isChangingPassword}
-        >
-          {isDeleting ? (
-            <ActivityIndicator size="small" color={colors.errorRed} />
-          ) : (
-            <>
-              <View
-                style={{
-                  backgroundColor: 'transparent',
-                  borderWidth: 1,
-                  borderColor: colors.errorRed,
-                  borderRadius: 4,
-                  padding: 2,
-                  marginRight: 8,
-                }}
-              >
-                <Ionicons name="trash-outline" size={16} color={colors.errorRed} />
-              </View>
-              <Text style={styles.deleteBtnText}>Delete Account</Text>
-            </>
-          )}
-        </TouchableOpacity>
-        <Text style={styles.deleteWarning}>
-          Deleting your account will permanently remove all your sightings, journals, and data. This action cannot be undone.
-        </Text>
-      </ScrollView>
-
-      {/* Change Password Modal */}
-      <Modal
+      {/* Change Password Dialog */}
+      <AnimatedDialog
         visible={passwordModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
+        onClose={() => {
           if (!isChangingPassword) setPasswordModalVisible(false);
         }}
       >
-        <View style={localStyles.modalOverlay}>
-          <View style={localStyles.modalContainer}>
-            <Text style={localStyles.modalTitle}>Cambiar Contraseña</Text>
+        <View style={styles.dialogBody}>
+          <Text style={[styles.dialogTitle, { color: colors.textPrimary }]}>
+            {t('settings.changePassword')}
+          </Text>
 
-            <AppToast
-              visible={toast.visible}
-              message={toast.message}
-              type={toast.type}
-              onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
-              floating={false}
-              containerStyle={{ marginBottom: 14, padding: 12, borderRadius: 10 }}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
+              {t('settings.currentPassword')}
+            </Text>
+            <TextInput
+              secureTextEntry
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              placeholder="••••••••"
+              placeholderTextColor={colors.outlineGrey + '80'}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.componentBase,
+                  color: colors.textPrimary,
+                  borderColor: colors.border + '30',
+                },
+              ]}
             />
+          </View>
 
-            <View style={localStyles.inputGroup}>
-              <Text style={localStyles.inputLabel}>Contraseña Actual</Text>
-              <TextInput
-                style={localStyles.input}
-                secureTextEntry
-                value={currentPassword}
-                onChangeText={setCurrentPassword}
-                placeholder="••••••••"
-                placeholderTextColor={colors.placeholder}
-                editable={!isChangingPassword}
-              />
-            </View>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
+              {t('settings.newPassword')}
+            </Text>
+            <TextInput
+              secureTextEntry
+              value={newPassword}
+              onChangeText={setNewPassword}
+              placeholder="••••••••"
+              placeholderTextColor={colors.outlineGrey + '80'}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.componentBase,
+                  color: colors.textPrimary,
+                  borderColor: colors.border + '30',
+                },
+              ]}
+            />
+          </View>
 
-            <View style={localStyles.inputGroup}>
-              <Text style={localStyles.inputLabel}>Nueva Contraseña</Text>
-              <TextInput
-                style={localStyles.input}
-                secureTextEntry
-                value={newPassword}
-                onChangeText={setNewPassword}
-                placeholder="••••••••"
-                placeholderTextColor={colors.placeholder}
-                editable={!isChangingPassword}
-              />
-            </View>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
+              {t('settings.confirmNewPassword')}
+            </Text>
+            <TextInput
+              secureTextEntry
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              placeholder="••••••••"
+              placeholderTextColor={colors.outlineGrey + '80'}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.componentBase,
+                  color: colors.textPrimary,
+                  borderColor: colors.border + '30',
+                },
+              ]}
+            />
+          </View>
 
-            <View style={localStyles.inputGroup}>
-              <Text style={localStyles.inputLabel}>Confirmar Nueva Contraseña</Text>
-              <TextInput
-                style={localStyles.input}
-                secureTextEntry
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                placeholder="••••••••"
-                placeholderTextColor={colors.placeholder}
-                editable={!isChangingPassword}
-              />
-            </View>
+          <View style={styles.dialogActions}>
+            <PressableScale
+              activeScale={0.96}
+              disabled={isChangingPassword}
+              style={[
+                styles.dialogBtn,
+                { borderColor: colors.border + '40', borderWidth: 1.5 },
+              ]}
+              onPress={() => setPasswordModalVisible(false)}
+            >
+              <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>
+                {t('common.cancel')}
+              </Text>
+            </PressableScale>
 
-            <View style={localStyles.btnContainer}>
-              <TouchableOpacity
-                style={[localStyles.btn, localStyles.btnCancel]}
-                onPress={() => {
-                  setPasswordModalVisible(false);
-                  setCurrentPassword('');
-                  setNewPassword('');
-                  setConfirmPassword('');
-                }}
-                disabled={isChangingPassword}
-              >
-                <Text style={localStyles.btnTextCancel}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[localStyles.btn, localStyles.btnSave]}
-                onPress={handleChangePassword}
-                disabled={isChangingPassword}
-              >
-                {isChangingPassword ? (
-                  <ActivityIndicator size="small" color={colors.canvasPure} />
-                ) : (
-                  <Text style={localStyles.btnTextSave}>Guardar</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+            <PressableScale
+              activeScale={0.96}
+              haptic="medium"
+              disabled={isChangingPassword}
+              style={[
+                styles.dialogBtn,
+                { backgroundColor: colors.primary, ...Shadows.button },
+              ]}
+              onPress={handleChangePassword}
+            >
+              {isChangingPassword ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <Text style={{ color: '#FFF', fontWeight: '700' }}>
+                  {t('common.save')}
+                </Text>
+              )}
+            </PressableScale>
           </View>
         </View>
-      </Modal>
+      </AnimatedDialog>
 
-      {/* Delete Account Modal */}
-      <Modal
+      {/* Delete Account Dialog */}
+      <AnimatedDialog
         visible={deleteModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
+        onClose={() => {
           if (!isDeleting) setDeleteModalVisible(false);
         }}
       >
-        <View style={localStyles.modalOverlay}>
-          <View style={localStyles.modalContainer}>
-            <View style={{ alignItems: 'center', marginBottom: 12 }}>
-              <View
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: 28,
-                  backgroundColor: colors.errorRed + '20',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginBottom: 10,
-                }}
-              >
-                <Ionicons name="warning-outline" size={30} color={colors.errorRed} />
-              </View>
-              <Text style={[localStyles.modalTitle, { color: colors.errorRed, marginBottom: 4 }]}>⚠️ ¿Eliminar Cuenta?</Text>
-              <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', lineHeight: 18, fontFamily: 'PlusJakartaSans-Medium' }}>
-                Esta acción es irreversible. Si decides eliminar tu cuenta de Birdify, se borrará de forma permanente:
+        <View style={styles.dialogBody}>
+          <View
+            style={[
+              styles.deleteIconBox,
+              { backgroundColor: colors.errorRed + '20' },
+            ]}
+          >
+            <Ionicons name="warning-outline" size={32} color={colors.errorRed} />
+          </View>
+
+          <Text style={[styles.dialogTitle, { color: colors.errorRed }]}>
+            {t('settings.deleteModalTitle')}
+          </Text>
+          <Text style={[styles.dialogDesc, { color: colors.textSecondary }]}>
+            {t('settings.deleteModalDesc')}
+          </Text>
+
+          <View
+            style={[
+              styles.deleteBulletsBox,
+              { backgroundColor: colors.componentBase },
+            ]}
+          >
+            <Text style={[styles.bulletItem, { color: colors.textPrimary }]}>
+              • {t('settings.deleteBullet1')}
+            </Text>
+            <Text style={[styles.bulletItem, { color: colors.textPrimary }]}>
+              • {t('settings.deleteBullet2')}
+            </Text>
+            <Text style={[styles.bulletItem, { color: colors.textPrimary }]}>
+              • {t('settings.deleteBullet3')}
+            </Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
+              {t('settings.deletePrompt', { word: targetDeleteWord })}
+            </Text>
+            <TextInput
+              value={deleteConfirmationText}
+              onChangeText={setDeleteConfirmationText}
+              placeholder={targetDeleteWord}
+              autoCapitalize="characters"
+              placeholderTextColor={colors.outlineGrey + '70'}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.componentBase,
+                  color: colors.textPrimary,
+                  borderColor: isDeleteWordMatch
+                    ? colors.errorRed
+                    : colors.border + '30',
+                },
+              ]}
+            />
+          </View>
+
+          <View style={styles.dialogActions}>
+            <PressableScale
+              activeScale={0.96}
+              disabled={isDeleting}
+              style={[
+                styles.dialogBtn,
+                { borderColor: colors.border + '40', borderWidth: 1.5 },
+              ]}
+              onPress={() => setDeleteModalVisible(false)}
+            >
+              <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>
+                {t('common.cancel')}
               </Text>
-            </View>
+            </PressableScale>
 
-            <View style={{ backgroundColor: colors.componentBase, borderRadius: 10, padding: 12, marginBottom: 16 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.errorRed, marginRight: 8 }} />
-                <Text style={{ fontSize: 13, color: colors.textPrimary, fontWeight: '500' }}>Perfil y nombre de usuario</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.errorRed, marginRight: 8 }} />
-                <Text style={{ fontSize: 13, color: colors.textPrimary, fontWeight: '500' }}>Avistamientos y fotos registradas</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.errorRed, marginRight: 8 }} />
-                <Text style={{ fontSize: 13, color: colors.textPrimary, fontWeight: '500' }}>Comentarios, reacciones y seguidores</Text>
-              </View>
-            </View>
-
-            <View style={localStyles.inputGroup}>
-              <Text style={[localStyles.inputLabel, { color: colors.textSecondary }]}>
-                Escribe <Text style={{ fontWeight: 'bold', color: colors.errorRed }}>ELIMINAR</Text> para confirmar:
-              </Text>
-              <TextInput
-                style={[
-                  localStyles.input,
-                  { borderColor: deleteConfirmationText.trim().toUpperCase() === 'ELIMINAR' ? colors.errorRed : colors.border + '20' },
-                ]}
-                value={deleteConfirmationText}
-                onChangeText={setDeleteConfirmationText}
-                placeholder="ELIMINAR"
-                placeholderTextColor={colors.placeholder}
-                autoCapitalize="characters"
-                editable={!isDeleting}
-              />
-            </View>
-
-            <View style={localStyles.btnContainer}>
-              <TouchableOpacity
-                style={[localStyles.btn, localStyles.btnCancel]}
-                onPress={() => {
-                  setDeleteModalVisible(false);
-                  setDeleteConfirmationText('');
-                }}
-                disabled={isDeleting}
-              >
-                <Text style={localStyles.btnTextCancel}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  localStyles.btn,
-                  { backgroundColor: deleteConfirmationText.trim().toUpperCase() === 'ELIMINAR' ? colors.errorRed : colors.border + '60' },
-                ]}
-                onPress={confirmDeleteAccount}
-                disabled={isDeleting || deleteConfirmationText.trim().toUpperCase() !== 'ELIMINAR'}
-              >
-                {isDeleting ? (
-                  <ActivityIndicator size="small" color={colors.canvasPure} />
-                ) : (
-                  <Text style={[localStyles.btnTextSave, { color: colors.canvasPure }]}>Eliminar</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+            <PressableScale
+              activeScale={0.96}
+              haptic="medium"
+              disabled={!isDeleteWordMatch || isDeleting}
+              style={[
+                styles.dialogBtn,
+                {
+                  backgroundColor: isDeleteWordMatch
+                    ? colors.errorRed
+                    : colors.outlineGrey + '40',
+                },
+              ]}
+              onPress={confirmDeleteAccount}
+            >
+              {isDeleting ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <Text style={{ color: '#FFF', fontWeight: '700' }}>
+                  {t('common.delete')}
+                </Text>
+              )}
+            </PressableScale>
           </View>
         </View>
-      </Modal>
-    </SafeAreaView>
+      </AnimatedDialog>
+    </SettingsScaffold>
   );
 }

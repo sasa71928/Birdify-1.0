@@ -1,6 +1,6 @@
-import { TranslationSchema } from './es';
+import type { core as esCore } from '../es/core';
 
-export const en: TranslationSchema = {
+export const core: typeof esCore = {
   common: {
     today: 'Today',
     yesterday: 'Yesterday',
@@ -21,6 +21,24 @@ export const en: TranslationSchema = {
     photo: 'Photo',
     camera: 'Camera',
     gallery: 'Gallery',
+    confirm: 'Confirm',
+    done: 'Done',
+    edit: 'Edit',
+    share: 'Share',
+    send: 'Send',
+    search: 'Search',
+    seeAll: 'See all',
+    soon: 'Soon',
+    ok: 'OK',
+    yes: 'Yes',
+    no: 'No',
+    on: 'On',
+    off: 'Off',
+    user: 'User',
+    noConnection: 'No connection',
+    unexpectedError: 'An unexpected error occurred',
+    version: 'Version {version}',
+    copied: 'Copied',
   },
   chat: {
     placeholder: 'Message…',
@@ -129,6 +147,23 @@ export const en: TranslationSchema = {
     addMembers: 'Add members',
     removeMember: 'Remove from group',
     removeMemberConfirm: 'Remove {name} from group?',
+  },
+  reports: {
+    reportPost: 'Report post',
+    reportUser: 'Report user',
+    targetPrompt: 'Select the reason why you want to report {target}. Our moderation team will review it within 24 hours.',
+    generalPrompt: 'Select the reason for the report. Our moderation team will review the content.',
+    additionalNotes: 'Additional details (optional)',
+    sendReport: 'Submit report',
+    sendingReport: 'Submitting…',
+    reportFailed: 'Could not submit report.',
+    reasons: {
+      inappropriate: 'Inappropriate or offensive content',
+      spam: 'Spam or misleading advertising',
+      misinformation: 'False identification or misinformation',
+      harassment: 'Harassment or abusive behavior',
+      protectedSpecies: 'Exposure of nest or protected species at risk',
+    },
   },
 };
 

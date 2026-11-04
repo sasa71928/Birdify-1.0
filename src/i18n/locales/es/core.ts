@@ -1,4 +1,4 @@
-export const es = {
+export const core = {
   common: {
     today: 'Hoy',
     yesterday: 'Ayer',
@@ -19,6 +19,24 @@ export const es = {
     photo: 'Foto',
     camera: 'Cámara',
     gallery: 'Galería',
+    confirm: 'Confirmar',
+    done: 'Listo',
+    edit: 'Editar',
+    share: 'Compartir',
+    send: 'Enviar',
+    search: 'Buscar',
+    seeAll: 'Ver todo',
+    soon: 'Pronto',
+    ok: 'Aceptar',
+    yes: 'Sí',
+    no: 'No',
+    on: 'Activado',
+    off: 'Desactivado',
+    user: 'Usuario',
+    noConnection: 'Sin conexión',
+    unexpectedError: 'Ocurrió un error inesperado',
+    version: 'Versión {version}',
+    copied: 'Copiado',
   },
   chat: {
     placeholder: 'Mensaje…',
@@ -128,7 +146,23 @@ export const es = {
     removeMember: 'Eliminar del grupo',
     removeMemberConfirm: '¿Eliminar a {name} del grupo?',
   },
+  reports: {
+    reportPost: 'Reportar publicación',
+    reportUser: 'Reportar usuario',
+    targetPrompt: 'Selecciona el motivo por el que deseas reportar a {target}. Nuestro equipo de moderación lo revisará en menos de 24 horas.',
+    generalPrompt: 'Selecciona el motivo del reporte. Nuestro equipo de moderación revisará el contenido.',
+    additionalNotes: 'Detalles adicionales (opcional)',
+    sendReport: 'Enviar reporte',
+    sendingReport: 'Enviando…',
+    reportFailed: 'No se pudo enviar el reporte.',
+    reasons: {
+      inappropriate: 'Contenido inapropiado u ofensivo',
+      spam: 'Spam o publicidad engañosa',
+      misinformation: 'Identificación falsa o desinformación',
+      harassment: 'Acoso o comportamiento abusivo',
+      protectedSpecies: 'Exposición de nido o especie protegida en riesgo',
+    },
+  },
 };
 
-export type TranslationSchema = typeof es;
 

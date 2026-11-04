@@ -12,12 +12,24 @@ import { handleError } from '../utils/errorHandler';
 type ExploreNavProp = NativeStackNavigationProp<RootStackParamList, 'Explore'>;
 type ExploreRouteProp = RouteProp<RootStackParamList, 'Explore'>;
 
-type MapSighting = {
+export type MapSighting = {
   id: string;
+  user_id?: string;
+  bird_id?: string;
   latitude: number | string;
   longitude: number | string;
   created_at: string;
+  description?: string;
+  photo_url?: string;
+  local_photo_path?: string;
   is_location_private?: boolean;
+  user?: {
+    id: string;
+    username: string;
+    fullname?: string;
+    profile_pic_url?: string;
+    is_verified?: boolean;
+  } | null;
   bird?: any;
 };
 
@@ -217,6 +229,7 @@ export function useExplore() {
     loading,
     selectedMarker,
     sightings,
+    setSightings,
     searchQuery,
     filteredSightings,
     userLocation,

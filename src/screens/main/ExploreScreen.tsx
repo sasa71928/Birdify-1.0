@@ -1,13 +1,17 @@
-import React, { useMemo, useCallback, useContext } from 'react';
+import React, { useMemo, useCallback, useContext, useState } from 'react';
 import { OfflineContext } from '../../navigation/AppNavigator';
 import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   StatusBar,
   ActivityIndicator,
   FlatList,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,9 +33,15 @@ import { createStyles } from '../../styles/screens/main/exploreScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 
 import { useExplore } from '../../hooks/useExplore';
+import { useAuth } from '../../context/AuthContext';
+import { useT } from '../../i18n';
 import { mapBird } from '../../utils/mapBird';
 import AppToast from '../../components/AppToast';
 import { ExploreSkeleton } from '../../components/skeleton';
+import { PressableScale } from '../../components/animated/PressableScale';
+import { SightingMapCard } from '../../components/explore/SightingMapCard';
+import FeedItem from '../../components/FeedItem';
+import { mapSightingToPost } from '../../features/profile/utils/mapSightingToPost';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, 'Explore'>;
 
@@ -94,6 +104,7 @@ const createMapStyle = (colors: any) => [
 
 export default function ExploreScreen() {
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const { t } = useT();
   const isOffline = useContext(OfflineContext);
   const navigation = useNavigation<NavProp>();
   const isFocused = useIsFocused();
@@ -104,6 +115,7 @@ export default function ExploreScreen() {
     loading,
     selectedMarker,
     sightings,
+    setSightings,
     searchQuery,
     filteredSightings,
     userLocation,
@@ -119,55 +131,166 @@ export default function ExploreScreen() {
     handleMarkerPress,
     getTimeAgo,
     calculateDistance,
+    loadSightings,
   } = useExplore();
+  const { user } = useAuth();
 
-  const markers = useMemo(() => filteredSightings.map((item) => {
-    const isSelected = selectedMarker === item.id;
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [selectedPostSighting, setSelectedPostSighting] = useState<any>(null);
 
-    return (
-      <Marker
-        key={item.id}
-        coordinate={{
-          latitude: Number(item.latitude),
-          longitude: Number(item.longitude),
-        }}
-        onPress={() => {
-          handleMarkerPress(item.id);
-          mapRef.current?.animateToRegion({
-            latitude: Number(item.latitude),
-            longitude: Number(item.longitude),
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }, 300);
-        }}
-      >
-        <Ionicons
-          name="location-sharp"
-          size={isSelected ? 36 : 28}
-          color={
-            isSelected
-              ? colors.secondaryBlue
-              : colors.primary
-          }
-        />
-      </Marker>
+  const selectedSightingDistance = useMemo(() => {
+    if (!selectedSighting || !userLocation) return null;
+    return calculateDistance(
+      userLocation.latitude,
+      userLocation.longitude,
+      Number(selectedSighting.latitude),
+      Number(selectedSighting.longitude)
     );
-  }), [filteredSightings, selectedMarker, colors.primary, colors.secondaryBlue, handleMarkerPress]);
+  }, [selectedSighting, userLocation, calculateDistance]);
+
+  const handleViewDetails = useCallback(() => {
+    if (!selectedSighting) return;
+    const birdData = selectedSighting.bird || {
+      id: selectedSighting.id,
+      common_name: 'Ave observada',
+      scientific_name: 'Especie silvestre',
+      image_url: selectedSighting.photo_url || selectedSighting.local_photo_path,
+    };
+    const mappedBird = mapBird(birdData, 0);
+    navigation.navigate('BirdDetail', { bird: mappedBird });
+  }, [selectedSighting, navigation]);
+
+  const handleViewPost = useCallback(() => {
+    if (!selectedSighting) return;
+    setSelectedPostSighting(selectedSighting);
+    setShowPostModal(true);
+  }, [selectedSighting]);
+
+  const handleLikeToggled = useCallback(
+    (postId: string, hasLiked: boolean) => {
+      if (!user?.id) return;
+      setSightings((prev) =>
+        prev.map((s) => {
+          if (s.id !== postId) return s;
+          const currentReactions = (s as any).reactions || [];
+          const updatedReactions = hasLiked
+            ? currentReactions.some((r: any) => r.user_id === user.id)
+              ? currentReactions
+              : [...currentReactions, { user_id: user.id }]
+            : currentReactions.filter((r: any) => r.user_id !== user.id);
+          return { ...s, reactions: updatedReactions };
+        })
+      );
+      setSelectedPostSighting((prev: any) => {
+        if (!prev || prev.id !== postId) return prev;
+        const currentReactions = prev.reactions || [];
+        const updatedReactions = hasLiked
+          ? currentReactions.some((r: any) => r.user_id === user.id)
+            ? currentReactions
+            : [...currentReactions, { user_id: user.id }]
+          : currentReactions.filter((r: any) => r.user_id !== user.id);
+        return { ...prev, reactions: updatedReactions };
+      });
+    },
+    [user?.id, setSightings]
+  );
+
+  const handleCommentAdded = useCallback(
+    (postId: string) => {
+      setSightings((prev) =>
+        prev.map((s) => {
+          if (s.id !== postId) return s;
+          const currentComments = (s as any).comments || [];
+          return { ...s, comments: [...currentComments, { id: Date.now().toString() }] };
+        })
+      );
+      setSelectedPostSighting((prev: any) => {
+        if (!prev || prev.id !== postId) return prev;
+        const currentComments = prev.comments || [];
+        return { ...prev, comments: [...currentComments, { id: Date.now().toString() }] };
+      });
+    },
+    [setSightings]
+  );
+
+  const markers = useMemo(
+    () =>
+      filteredSightings.map((item) => {
+        const isSelected = selectedMarker === item.id;
+        const lat = Number(item.latitude);
+        const lng = Number(item.longitude);
+        if (isNaN(lat) || isNaN(lng)) return null;
+
+        return (
+          <Marker
+            key={item.id}
+            coordinate={{
+              latitude: lat,
+              longitude: lng,
+            }}
+            zIndex={isSelected ? 999 : 1}
+            onPress={(e) => {
+              e?.stopPropagation?.();
+              handleMarkerPress(item.id);
+              mapRef.current?.animateToRegion(
+                {
+                  latitude: lat,
+                  longitude: lng,
+                  latitudeDelta: 0.015,
+                  longitudeDelta: 0.015,
+                },
+                300
+              );
+            }}
+          >
+            <Ionicons
+              name="location"
+              size={isSelected ? 40 : 28}
+              color={isSelected ? colors.secondaryBlue : colors.primary}
+            />
+          </Marker>
+        );
+      }),
+    [
+      filteredSightings,
+      selectedMarker,
+      colors.primary,
+      colors.secondaryBlue,
+      handleMarkerPress,
+    ]
+  );
 
   if (isOffline) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: colors.surface,
+          },
+        ]}
+      >
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-        <Ionicons name="cloud-offline-outline" size={48} color={colors.textSecondary} />
-        <Text style={{ color: colors.textSecondary, marginTop: 12, fontSize: 16 }}>
+        <Ionicons
+          name="cloud-offline-outline"
+          size={48}
+          color={colors.textSecondary}
+        />
+        <Text
+          style={{
+            color: colors.textSecondary,
+            marginTop: 12,
+            fontSize: 16,
+          }}
+        >
           No disponible sin conexión
         </Text>
       </View>
     );
   }
 
-  // Evitar que MapView se monte hasta que la pestaña este activa
-  // (previene crash por falta de Google Maps API key al iniciar la app)
   if (!isFocused) {
     return (
       <View style={[styles.container, { backgroundColor: colors.surface }]} />
@@ -176,14 +299,8 @@ export default function ExploreScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <StatusBar
-          barStyle={
-            isDark
-              ? 'light-content'
-              : 'dark-content'
-          }
-        />
+      <View style={[styles.container, { backgroundColor: colors.surface }]}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
         <ExploreSkeleton />
       </View>
     );
@@ -191,14 +308,13 @@ export default function ExploreScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar
-        barStyle={
-          isDark
-            ? 'light-content'
-            : 'dark-content'
-        }
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <AppToast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
-      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
 
       {isFocused && (
         <MapView
@@ -213,56 +329,75 @@ export default function ExploreScreen() {
           rotateEnabled={false}
           customMapStyle={isDark ? MAP_STYLE : []}
           initialRegion={DEFAULT_REGION}
-          onPress={closeSelection}
+          onPress={(e) => {
+            if (e?.nativeEvent?.action === 'marker-press') return;
+            closeSelection();
+          }}
         >
           {markers}
         </MapView>
       )}
 
       {selectedSighting && (
-        <TouchableOpacity
-          activeOpacity={0.9}
-          style={styles.calloutContainer}
-          onPress={() => {
-
-            if (!selectedSighting.bird) {
-              return;
-            }
-
-            const mappedBird = mapBird(
-              selectedSighting.bird,
-              0
-            );
-
-            navigation.navigate(
-              'BirdDetail',
-              {
-                bird: mappedBird,
-              }
-            );
-          }}
-        >
-          <Text style={styles.calloutTitle}>
-            {selectedSighting.bird
-              ?.common_name ?? 'Bird'}
-          </Text>
-
-          <Text style={styles.calloutSubtitle}>
-            {getTimeAgo(
-              selectedSighting.created_at
-            )}
-          </Text>
-
-          <Text style={styles.calloutHint}>
-            Tap here for details
-          </Text>
-        </TouchableOpacity>
+        <SightingMapCard
+          sighting={selectedSighting}
+          distance={selectedSightingDistance}
+          timeAgo={getTimeAgo(selectedSighting.created_at)}
+          onClose={closeSelection}
+          onViewDetails={handleViewDetails}
+          onViewPost={handleViewPost}
+          onUserPress={(userId) => navigation.navigate('Profile', { userId })}
+          colors={colors}
+        />
       )}
 
-      <SafeAreaView
-        style={styles.overlay}
-        pointerEvents="box-none"
+      {/* Sighting Post Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showPostModal}
+        onRequestClose={() => setShowPostModal(false)}
+        statusBarTranslucent
       >
+        <View style={styles.postModalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setShowPostModal(false)}
+          />
+
+          <ScrollView
+            contentContainerStyle={styles.postModalScroll}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.postCardWrap}>
+              {selectedPostSighting && (
+                <FeedItem
+                  post={mapSightingToPost(selectedPostSighting, user?.id)}
+                  onPostDeleted={() => {
+                    setShowPostModal(false);
+                    loadSightings();
+                  }}
+                  onNavigateAway={() => setShowPostModal(false)}
+                  onLikeToggled={handleLikeToggled}
+                  onCommentAdded={handleCommentAdded}
+                />
+              )}
+            </View>
+          </ScrollView>
+
+          <TouchableOpacity
+            style={styles.closePostModalBtn}
+            onPress={() => setShowPostModal(false)}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.close')}
+          >
+            <Ionicons name="close" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      <SafeAreaView style={styles.overlay} pointerEvents="box-none">
         <View style={styles.searchContainer}>
           <Ionicons
             name="search"
@@ -273,7 +408,7 @@ export default function ExploreScreen() {
 
           <TextInput
             style={styles.searchInput}
-            placeholder="Search bird..."
+            placeholder={t('explore.searchBird')}
             placeholderTextColor={colors.placeholder}
             value={searchQuery}
             onChangeText={handleSearch}
@@ -311,13 +446,12 @@ export default function ExploreScreen() {
                 : null;
 
               return (
-                <TouchableOpacity
-                  activeOpacity={0.8}
+                <PressableScale
+                  activeScale={0.98}
+                  haptic="light"
                   onPress={() => {
                     setSelectedMarker(item.id);
-
                     setSearchQuery('');
-
                     mapRef.current?.animateToRegion({
                       latitude: Number(item.latitude),
                       longitude: Number(item.longitude),
@@ -370,16 +504,17 @@ export default function ExploreScreen() {
                       {distance} km away
                     </Text>
                   )}
-                </TouchableOpacity>
+                </PressableScale>
               );
             }}
           />
         </View>
       )}
 
-      <TouchableOpacity
+      <PressableScale
+        activeScale={0.98}
+        haptic="light"
         style={styles.locationButton}
-        activeOpacity={0.8}
         onPress={() => {
           if (!userLocation) return;
 
@@ -397,7 +532,7 @@ export default function ExploreScreen() {
           size={24}
           color={colors.textPrimary}
         />
-      </TouchableOpacity>
-       </View>
+      </PressableScale>
+    </View>
   );
 }

@@ -37,9 +37,11 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { AuthService } from '../../services/auth.service';
 import AppToast from '../../components/AppToast';
 import { useSocialAuth } from '../../hooks/useSocialAuth';
+import { useT } from '../../i18n';
 
 export default function RegisterScreen() {
   const navigation = useNavigation<RegisterNavProp>();
+  const { t } = useT();
 
   const {
     colors,
@@ -96,28 +98,28 @@ export default function RegisterScreen() {
       !password ||
       !confirmPassword
     ) {
-      showToast('Por favor completa todos los campos.', 'error');
+      showToast(t('auth.fillAllFields'), 'error');
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      showToast('Por favor ingresa un correo electrónico válido.', 'error');
+      showToast(t('auth.validEmailError'), 'error');
       return;
     }
 
     if (username.trim().length < 3) {
-      showToast('El nombre de usuario debe tener al menos 3 caracteres.', 'error');
+      showToast(t('auth.usernameMinLength'), 'error');
       return;
     }
 
     if (password.length < 6) {
-      showToast('La contraseña debe tener al menos 6 caracteres.', 'error');
+      showToast(t('auth.passwordMinLength'), 'error');
       return;
     }
 
     if (password !== confirmPassword) {
-      showToast('La contraseña y su confirmación deben ser idénticas.', 'error');
+      showToast(t('auth.passwordsMustMatch'), 'error');
       return;
     }
 
@@ -131,12 +133,12 @@ export default function RegisterScreen() {
         fullName
       );
 
-      showToast('¡Cuenta creada! Revisa tu correo electrónico para confirmarla.', 'success');
+      showToast(t('auth.accountCreatedCheckEmail'), 'success');
       setTimeout(() => {
         navigation.navigate('Login');
       }, 3000);
     } catch (error: any) {
-      showToast(error.message || 'Error al registrarse.', 'error');
+      showToast(error.message || t('auth.registerFailed'), 'error');
     } finally {
       setIsLoading(false);
     }
@@ -168,11 +170,11 @@ export default function RegisterScreen() {
           {/* ── Hero ── */}
           <View style={shared.heroSection}>
             <Text style={local.heroTitle}>
-              Únete a la comunidad
+              {t('auth.registerHeroTitle')}
             </Text>
 
             <Text style={shared.heroSubtitle}>
-              Comienza tu viaje de observación hoy
+              {t('auth.registerHeroSubtitle')}
             </Text>
           </View>
 
@@ -180,8 +182,8 @@ export default function RegisterScreen() {
           <View style={shared.card}>
 
             <InputField
-              label="Nombre completo"
-              placeholder="Tu nombre"
+              label={t('auth.fullName')}
+              placeholder={t('auth.fullNamePlaceholder')}
               iconSymbol={
                 <Ionicons
                   name="person-outline"
@@ -194,8 +196,8 @@ export default function RegisterScreen() {
             />
 
             <InputField
-              label="Nombre de usuario"
-              placeholder="birdwatcher_99"
+              label={t('auth.username')}
+              placeholder={t('auth.usernamePlaceholder')}
               iconSymbol={
                 <Ionicons
                   name="at-outline"
@@ -208,8 +210,8 @@ export default function RegisterScreen() {
             />
 
             <InputField
-              label="Correo electrónico"
-              placeholder="ejemplo@birdify.com"
+              label={t('auth.email')}
+              placeholder={t('auth.emailPlaceholder')}
               iconSymbol={
                 <Ionicons
                   name="mail-outline"
@@ -223,8 +225,8 @@ export default function RegisterScreen() {
             />
 
             <InputField
-              label="Contraseña"
-              placeholder="••••••••"
+              label={t('auth.password')}
+              placeholder={t('auth.passwordPlaceholder')}
               iconSymbol={
                 <Ionicons
                   name="lock-closed-outline"
@@ -239,8 +241,8 @@ export default function RegisterScreen() {
             />
 
             <InputField
-              label="Confirmar Contraseña"
-              placeholder="••••••••"
+              label={t('auth.confirmPassword')}
+              placeholder={t('auth.passwordPlaceholder')}
               iconSymbol={
                 <Ionicons
                   name="lock-closed-outline"
@@ -257,8 +259,8 @@ export default function RegisterScreen() {
             <AppButton
               label={
                 isLoading
-                  ? 'Registrando...'
-                  : 'Crear Cuenta'
+                  ? t('auth.registering')
+                  : t('auth.createAccountBtn')
               }
               color={colors.primary}
               style={{
@@ -273,7 +275,7 @@ export default function RegisterScreen() {
               <View style={shared.dividerLine} />
 
               <Text style={shared.dividerText}>
-                O regístrate con
+                {t('auth.registerWith')}
               </Text>
 
               <View style={shared.dividerLine} />
@@ -318,11 +320,11 @@ export default function RegisterScreen() {
             onPress={() => navigation.navigate('Login')}
           >
             <Text style={shared.navText}>
-              ¿Ya tienes cuenta?
+              {t('auth.haveAccount')}
             </Text>
 
             <Text style={shared.navLink}>
-              {' '}Inicia Sesión
+              {' '}{t('auth.login')}
             </Text>
 
             <Text style={shared.navArrow}>
@@ -342,19 +344,19 @@ export default function RegisterScreen() {
               lineHeight: 18,
             }}
           >
-            Al crear una cuenta, aceptas nuestros{' '}
+            {t('auth.termsNoticeRegister')}{' '}
             <Text
               style={{ color: colors.primary, fontWeight: '600', textDecorationLine: 'underline' }}
               onPress={() => setLegalDoc('terms')}
             >
-              Términos de Servicio
+              {t('auth.termsLink')}
             </Text>{' '}
-            y{' '}
+            {t('auth.and')}{' '}
             <Text
               style={{ color: colors.primary, fontWeight: '600', textDecorationLine: 'underline' }}
               onPress={() => setLegalDoc('privacy')}
             >
-              Política de Privacidad
+              {t('auth.privacyLink')}
             </Text>
             .
           </Text>

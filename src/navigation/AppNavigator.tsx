@@ -27,6 +27,7 @@ import OfflineStorageScreen from '../screens/settings/OfflineStorageScreen';
 import LanguageSettingsScreen from '../screens/settings/LanguageSettingsScreen';
 import PrivacySettingsScreen from '../screens/settings/PrivacySettingsScreen';
 import NotificationSettingsScreen from '../screens/settings/NotificationSettingsScreen';
+import FeedPreferencesScreen from '../screens/settings/FeedPreferencesScreen';
 import EditProfileScreen from '../screens/settings/EditProfileScreen';
 import ThemeSettingsScreen from '../screens/settings/ThemeSettingsScreen';
 import HelpSupportScreen from '../screens/settings/HelpSupportScreen';
@@ -74,7 +75,7 @@ export type RootStackParamList = {
   Register: undefined;
   Login: undefined;
   Feed: undefined;
-  RecordSighting: { editingSighting?: any };
+  RecordSighting: { editingSighting?: any; preselectedBird?: BirdSpeciesData };
   Profile: { userId?: string };
   Dictionary: { searchQuery?: string };
   Messages: undefined;
@@ -91,6 +92,7 @@ export type RootStackParamList = {
   PrivacySettings: undefined;
   BlockedUsers: undefined;
   NotificationSettings: undefined;
+  FeedPreferences: undefined;
   EditProfile: undefined;
   ThemeSettings: undefined;
   HelpSupport: undefined;
@@ -158,7 +160,6 @@ export default function AppNavigator() {
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',
-        animationDuration: 280,
         gestureEnabled: true,
         fullScreenGestureEnabled: true,
       }}
@@ -168,17 +169,17 @@ export default function AppNavigator() {
           <Stack.Screen
             name="Welcome"
             component={WelcomeScreen}
-            options={{ animation: 'fade', animationDuration: 240 }}
+            options={{ animation: 'fade' }}
           />
           <Stack.Screen
             name="Register"
             component={RegisterScreen}
-            options={{ animation: 'slide_from_right', animationDuration: 280 }}
+            options={{ animation: 'slide_from_right' }}
           />
           <Stack.Screen
             name="Login"
             component={LoginScreen}
-            options={{ animation: 'slide_from_right', animationDuration: 280 }}
+            options={{ animation: 'slide_from_right' }}
           />
         </>
       ) : (
@@ -186,14 +187,13 @@ export default function AppNavigator() {
           <Stack.Screen
             name="MainTabs"
             component={MainTabs}
-            options={{ animation: 'fade', animationDuration: 200 }}
+            options={{ animation: 'fade' }}
           />
           <Stack.Screen
             name="RecordSighting"
             component={RecordSightingScreen}
             options={{
               animation: 'slide_from_bottom',
-              animationDuration: 300,
               gestureEnabled: true,
             }}
           />
@@ -202,7 +202,6 @@ export default function AppNavigator() {
             component={ProfileScreen}
             options={{
               animation: 'slide_from_right',
-              animationDuration: 280,
               gestureEnabled: true,
             }}
           />
@@ -211,7 +210,6 @@ export default function AppNavigator() {
             component={SearchScreen}
             options={{
               animation: 'fade_from_bottom',
-              animationDuration: 220,
               gestureEnabled: true,
             }}
           />
@@ -220,7 +218,6 @@ export default function AppNavigator() {
             component={BirdDetailScreen}
             options={{
               animation: 'slide_from_right',
-              animationDuration: 280,
               gestureEnabled: true,
             }}
           />
@@ -229,7 +226,6 @@ export default function AppNavigator() {
             component={ChatScreen}
             options={{
               animation: 'slide_from_right',
-              animationDuration: 280,
               gestureEnabled: true,
             }}
           />
@@ -238,7 +234,6 @@ export default function AppNavigator() {
             component={CreateGroupScreen}
             options={{
               animation: 'slide_from_bottom',
-              animationDuration: 300,
               gestureEnabled: true,
             }}
           />
@@ -247,7 +242,6 @@ export default function AppNavigator() {
             component={EditGroupScreen}
             options={{
               animation: 'slide_from_right',
-              animationDuration: 280,
               gestureEnabled: true,
             }}
           />
@@ -256,7 +250,6 @@ export default function AppNavigator() {
             component={SearchMessagesScreen}
             options={{
               animation: 'fade_from_bottom',
-              animationDuration: 220,
               gestureEnabled: true,
             }}
           />
@@ -265,7 +258,6 @@ export default function AppNavigator() {
             component={SettingsScreen}
             options={{
               animation: 'slide_from_right',
-              animationDuration: 260,
               gestureEnabled: true,
             }}
           />
@@ -274,7 +266,6 @@ export default function AppNavigator() {
             component={OfflineStorageScreen}
             options={{
               animation: 'slide_from_right',
-              animationDuration: 260,
               gestureEnabled: true,
             }}
           />
@@ -283,7 +274,6 @@ export default function AppNavigator() {
             component={LanguageSettingsScreen}
             options={{
               animation: 'slide_from_right',
-              animationDuration: 260,
               gestureEnabled: true,
             }}
           />
@@ -292,7 +282,6 @@ export default function AppNavigator() {
             component={PrivacySettingsScreen}
             options={{
               animation: 'slide_from_right',
-              animationDuration: 260,
               gestureEnabled: true,
             }}
           />
@@ -301,7 +290,6 @@ export default function AppNavigator() {
             component={BlockedUsersScreen}
             options={{
               animation: 'slide_from_right',
-              animationDuration: 260,
               gestureEnabled: true,
             }}
           />
@@ -310,7 +298,14 @@ export default function AppNavigator() {
             component={NotificationSettingsScreen}
             options={{
               animation: 'slide_from_right',
-              animationDuration: 260,
+              gestureEnabled: true,
+            }}
+          />
+          <Stack.Screen
+            name="FeedPreferences"
+            component={FeedPreferencesScreen}
+            options={{
+              animation: 'slide_from_right',
               gestureEnabled: true,
             }}
           />
@@ -319,7 +314,6 @@ export default function AppNavigator() {
             component={EditProfileScreen}
             options={{
               animation: 'slide_from_right',
-              animationDuration: 260,
               gestureEnabled: true,
             }}
           />
@@ -328,7 +322,6 @@ export default function AppNavigator() {
             component={ThemeSettingsScreen}
             options={{
               animation: 'slide_from_right',
-              animationDuration: 260,
               gestureEnabled: true,
             }}
           />
@@ -337,7 +330,6 @@ export default function AppNavigator() {
             component={HelpSupportScreen}
             options={{
               animation: 'slide_from_right',
-              animationDuration: 260,
               gestureEnabled: true,
             }}
           />
@@ -346,7 +338,6 @@ export default function AppNavigator() {
             component={AboutBirdifyScreen}
             options={{
               animation: 'slide_from_right',
-              animationDuration: 260,
               gestureEnabled: true,
             }}
           />

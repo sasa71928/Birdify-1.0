@@ -1,108 +1,159 @@
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StatusBar,
-  Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
-import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import { handleError, showSuccess } from '../../utils/errorHandler';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { useT } from '../../i18n';
+import { SettingsScaffold } from '../../components/settings';
+import { SelectableCard } from '../../components/animated';
+import { haptics } from '../../utils/haptics';
+import { showSuccess } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
-
-const THEMES = [
-  { id: 'light', name: 'Light Mode', icon: 'sunny-outline' },
-  { id: 'dark', name: 'Dark Mode', icon: 'moon-outline' },
-  { id: 'system', name: 'System Default', icon: 'settings-outline' },
-] as const;
-
+import { Radius, Typography } from '../../theme';
 
 export default function ThemeSettingsScreen() {
   const navigation = useNavigation();
   const { theme, setTheme } = useTheme();
-  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
-  const [selectedTheme, setSelectedTheme] = useState(theme);
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+  const { colors, isDark } = useDynamicStyles();
+  const { t } = useT();
+
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    message: string;
+    type: 'success' | 'error';
+  }>({
     visible: false,
     message: '',
     type: 'success',
   });
-  const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSave = () => {
-    setTheme(selectedTheme);
-    showSuccess(`Birdify is now set to ${THEMES.find(t => t.id === selectedTheme)?.name}`, setToast);
-    navTimerRef.current = setTimeout(() => navigation.goBack(), 1000);
+  const THEMES = [
+    {
+      id: 'system' as const,
+      name: t('settings.themeSystem'),
+      subtitle: 'Sincronizar automáticamente con el sistema operativo',
+      icon: 'settings-outline' as const,
+      previewColors: ['#F8F8F8', '#121212'],
+    },
+    {
+      id: 'light' as const,
+      name: t('settings.themeLight'),
+      subtitle: 'Fondo blanco y contrastes nítidos para luz diurna',
+      icon: 'sunny-outline' as const,
+      previewColors: ['#FFFFFF', '#F2F4F1'],
+    },
+    {
+      id: 'dark' as const,
+      name: t('settings.themeDark'),
+      subtitle: 'Fondo negro profundo optimizado para pantallas OLED',
+      icon: 'moon-outline' as const,
+      previewColors: ['#121212', '#1E1E1E'],
+    },
+  ];
+
+  const handleSelectTheme = (newTheme: 'light' | 'dark' | 'system') => {
+    if (newTheme === theme) return;
+    haptics.selection();
+    setTheme(newTheme);
+    showSuccess(t('settings.themeChangedToast'), setToast);
   };
 
-  useEffect(() => {
-    return () => {
-      if (navTimerRef.current) {
-        clearTimeout(navTimerRef.current);
-      }
-    };
-  }, []);
-
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Theme</Text>
+    <SettingsScaffold
+      title={t('settings.themeTitle')}
+      subtitle={t('settings.themeSubtitle')}
+      onBack={() => navigation.goBack()}
+    >
+      <AppToast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
+
+      <View style={styles.section}>
+        {THEMES.map((item) => {
+          const isSelected = theme === item.id;
+          return (
+            <SelectableCard
+              key={item.id}
+              selected={isSelected}
+              onPress={() => handleSelectTheme(item.id)}
+              title={item.name}
+              subtitle={item.subtitle}
+              leading={
+                <View
+                  style={[
+                    styles.iconCircle,
+                    {
+                      backgroundColor: isSelected
+                        ? colors.primary + '20'
+                        : isDark
+                        ? '#2A2A2A'
+                        : '#F0F2EE',
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={item.icon}
+                    size={22}
+                    color={isSelected ? colors.primary : colors.textPrimary}
+                  />
+                </View>
+              }
+            />
+          );
+        })}
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.mainTitle}>Choose Appearance</Text>
-        <Text style={styles.subtitle}>
-          Customize how Birdify looks on your device.
+      {/* Info Notice */}
+      <View
+        style={[
+          styles.infoBox,
+          {
+            backgroundColor: isDark ? colors.primary + '15' : colors.primary + '0C',
+            borderColor: colors.primary + '25',
+          },
+        ]}
+      >
+        <Ionicons
+          name="sparkles-outline"
+          size={20}
+          color={colors.primary}
+          style={{ marginTop: 1 }}
+        />
+        <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+          {t('settings.themeInfo')}
         </Text>
-
-        <View style={styles.languageList}>
-          {THEMES.map((theme) => {
-            const isActive = selectedTheme === theme.id;
-            return (
-              <TouchableOpacity
-                key={theme.id}
-                style={[styles.languageItem, isActive && styles.languageItemActive]}
-                activeOpacity={0.7}
-                onPress={() => setSelectedTheme(theme.id)}
-              >
-                <View style={styles.langIcon}>
-                  <Ionicons name={theme.icon as any} size={20} color={isActive ? colors.primary : colors.textPrimary} />
-                </View>
-                <Text style={styles.langName}>{theme.name}</Text>
-                <View style={{ flex: 1 }} />
-                <View style={[styles.radioOuter, isActive && styles.radioOuterActive]}>
-                  {isActive && <View style={styles.radioInner} />}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <View style={styles.infoBox}>
-          <Ionicons name="sparkles-outline" size={20} color={colors.primary} />
-          <Text style={styles.infoText}>
-            Dark mode is designed to reduce eye strain in low-light environments and save battery life on OLED screens.
-          </Text>
-        </View>
-
-        <TouchableOpacity style={[styles.saveBtn, { marginTop: 40 }]} onPress={handleSave}>
-          <Text style={styles.saveBtnText}>Save Appearance</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+    </SettingsScaffold>
   );
 }
 
+const styles = StyleSheet.create({
+  section: {
+    marginBottom: 20,
+  },
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoBox: {
+    flexDirection: 'row',
+    borderRadius: Radius.lg,
+    padding: 16,
+    borderWidth: 1,
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  infoText: {
+    flex: 1,
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamilyBody,
+    lineHeight: 18,
+  },
+});

@@ -31,10 +31,17 @@ import { UnreadMessagesProvider } from './src/context/UnreadMessagesContext';
 import { InteractionsProvider } from './src/context/InteractionsContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { OfflineProvider } from './src/context/OfflineContext';
+import { FeedPreferencesProvider } from './src/context/FeedPreferencesContext';
 import ResetPasswordModal from './src/components/ResetPasswordModal';
+import { LanguageTransitionOverlay } from './src/components/animated/LanguageTransitionOverlay';
 
 const navigationLinking = {
   prefixes: [Linking.createURL('/'), 'birdify://'],
+  config: {
+    screens: {
+      Profile: 'profile/:userId',
+    },
+  },
 };
 
 function PasswordRecoveryGate() {
@@ -85,12 +92,15 @@ export default function App() {
               <ThemeProvider>
                 <NewSightingsProvider>
                   <UnreadMessagesProvider>
-                    <NavigationContainer linking={navigationLinking}>
-                      <InteractionsProvider>
-                        <AppNavigator />
-                        <PasswordRecoveryGate />
-                      </InteractionsProvider>
-                    </NavigationContainer>
+                    <FeedPreferencesProvider>
+                      <NavigationContainer linking={navigationLinking}>
+                        <InteractionsProvider>
+                          <AppNavigator />
+                          <PasswordRecoveryGate />
+                          <LanguageTransitionOverlay />
+                        </InteractionsProvider>
+                      </NavigationContainer>
+                    </FeedPreferencesProvider>
                   </UnreadMessagesProvider>
                 </NewSightingsProvider>
               </ThemeProvider>

@@ -1,5 +1,6 @@
 import React from 'react';
-import { TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
+import { StyleSheet, ViewStyle } from 'react-native';
+import { PressableScale } from '../animated/PressableScale';
 
 interface IconButtonProps {
   onPress: () => void;
@@ -21,12 +22,13 @@ export const IconButton: React.FC<IconButtonProps> = ({
   style,
 }) => {
   return (
-    <TouchableOpacity
+    <PressableScale
+      activeScale={0.98}
+      haptic="light"
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
       accessible={true}
-      activeOpacity={0.7}
       disabled={disabled}
       onPress={onPress}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -42,7 +44,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
       ]}
     >
       {children}
-    </TouchableOpacity>
+    </PressableScale>
   );
 };
 
@@ -52,4 +54,3 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
-

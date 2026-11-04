@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StatusBar,
-  Switch,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Colors } from '../../theme';
-import styles from '../../styles/screens/settings/offlineStorageScreen.styles';
+import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { useT } from '../../i18n';
+import {
+  SettingsScaffold,
+  SettingsSection,
+  SettingsRow,
+} from '../../components/settings';
+import { AnimatedSwitch, PressableScale } from '../../components/animated';
+import { Radius, Typography, Shadows } from '../../theme';
 
 interface DownloadPackage {
   id: string;
@@ -21,118 +20,311 @@ interface DownloadPackage {
   progress?: number;
 }
 
-const MOCK_PACKAGES: DownloadPackage[] = [
-  { id: '1', name: 'Core Dictionary (Text & Basic Images)', size: '45 MB', status: 'downloaded' },
-  { id: '2', name: 'High-Resolution Bird Photos', size: '320 MB', status: 'not_downloaded' },
-  { id: '3', name: 'Offline Maps: Baja California', size: '120 MB', status: 'downloading', progress: 45 },
-  { id: '4', name: 'Offline Maps: Central Mexico', size: '150 MB', status: 'not_downloaded' },
+const INITIAL_PACKAGES: DownloadPackage[] = [
+  { id: '1', name: 'Diccionario Básico de Aves', size: '45 MB', status: 'downloaded' },
+  { id: '2', name: 'Fotografías en Alta Resolución', size: '320 MB', status: 'not_downloaded' },
+  { id: '3', name: 'Mapa Offline: Región Norte', size: '120 MB', status: 'downloading', progress: 45 },
+  { id: '4', name: 'Mapa Offline: Región Centro y Sur', size: '150 MB', status: 'not_downloaded' },
 ];
 
 export default function OfflineStorageScreen() {
   const navigation = useNavigation();
+  const { colors, isDark } = useDynamicStyles();
+  const { t } = useT();
+
   const [wifiOnly, setWifiOnly] = useState(true);
-  const [packages, setPackages] = useState<DownloadPackage[]>(MOCK_PACKAGES);
+  const [packages, setPackages] = useState<DownloadPackage[]>(INITIAL_PACKAGES);
 
   const toggleDownload = (id: string) => {
-    setPackages(prev => prev.map(pkg => {
-      if (pkg.id === id) {
-        if (pkg.status === 'not_downloaded') return { ...pkg, status: 'downloading', progress: 0 };
-        if (pkg.status === 'downloading') return { ...pkg, status: 'not_downloaded' };
-        if (pkg.status === 'downloaded') return { ...pkg, status: 'not_downloaded' };
-      }
-      return pkg;
-    }));
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'downloaded': return <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />;
-      case 'downloading': return <Ionicons name="stop-circle-outline" size={24} color={Colors.secondaryBlue} />;
-      default: return <Ionicons name="cloud-download-outline" size={24} color={Colors.primary} />;
-    }
+    setPackages((prev) =>
+      prev.map((pkg) => {
+        if (pkg.id === id) {
+          if (pkg.status === 'not_downloaded') {
+            return { ...pkg, status: 'downloading', progress: 0 };
+          }
+          if (pkg.status === 'downloading') {
+            return { ...pkg, status: 'not_downloaded' };
+          }
+          if (pkg.status === 'downloaded') {
+            return { ...pkg, status: 'not_downloaded' };
+          }
+        }
+        return pkg;
+      })
+    );
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar barStyle="dark-content" />
-
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Offline Storage</Text>
-        <View style={styles.placeholder} />
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={styles.card}>
-          <View style={styles.storageHeader}>
-            <MaterialCommunityIcons name="database" size={24} color={Colors.primary} />
-            <Text style={styles.storageTitle}>Storage Usage</Text>
-          </View>
-          <View style={styles.progressBarContainer}>
-            <View style={[styles.progressBar, { width: '35%' }]} />
-            <View style={[styles.progressBarApp, { width: '15%' }]} />
-          </View>
-          <View style={styles.storageLegends}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: Colors.primary }]} />
-              <Text style={styles.legendText}>Birdify (350 MB)</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#E0E7E4' }]} />
-              <Text style={styles.legendText}>Free (4.2 GB)</Text>
-            </View>
-          </View>
-          <Text style={styles.storageDesc}>
-            Download dictionaries and maps to identify birds and log sightings even without an internet connection.
+    <SettingsScaffold
+      title={t('settings.offlineStorage')}
+      subtitle={t('settings.offlineStorageSubtitle')}
+      onBack={() => navigation.goBack()}
+    >
+      {/* Storage Usage Card */}
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.canvasPure,
+            borderColor: isDark ? colors.border + '30' : colors.border + '20',
+          },
+        ]}
+      >
+        <View style={styles.storageHeader}>
+          <MaterialCommunityIcons name="database" size={24} color={colors.primary} />
+          <Text style={[styles.storageTitle, { color: colors.textPrimary }]}>
+            Uso de Almacenamiento
           </Text>
         </View>
 
-        <View style={styles.preferencesCard}>
-          <View style={styles.prefRow}>
-            <View>
-              <Text style={styles.prefTitle}>Download over Wi-Fi only</Text>
-              <Text style={styles.prefDesc}>Save cellular data</Text>
-            </View>
-            <Switch
-              value={wifiOnly}
-              onValueChange={setWifiOnly}
-              trackColor={{ false: '#E0E7E4', true: Colors.primary }}
-              thumbColor={Colors.canvasPure}
+        <View
+          style={[
+            styles.progressBarContainer,
+            { backgroundColor: isDark ? '#2E2E2E' : '#E8EBE6' },
+          ]}
+        >
+          <View
+            style={[styles.progressBarApp, { backgroundColor: colors.primary, width: '22%' }]}
+          />
+        </View>
+
+        <View style={styles.storageLegends}>
+          <View style={styles.legendItem}>
+            <View
+              style={[styles.legendDot, { backgroundColor: colors.primary }]}
             />
+            <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+              Birdify (350 MB)
+            </Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View
+              style={[
+                styles.legendDot,
+                { backgroundColor: isDark ? '#444' : '#CCC' },
+              ]}
+            />
+            <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+              Libre (4.2 GB)
+            </Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Available for Download</Text>
-        <View style={styles.packageList}>
-          {packages.map((pkg, index) => {
-            const isLast = index === packages.length - 1;
-            return (
-              <View key={pkg.id}>
-                <View style={styles.packageRow}>
-                  <View style={styles.packageInfo}>
-                    <Text style={styles.packageName}>{pkg.name}</Text>
-                    <Text style={styles.packageSize}>{pkg.size}</Text>
-                    {pkg.status === 'downloading' && (
-                      <View style={styles.downloadProgressWrap}>
-                        <View style={styles.downloadTrack}>
-                          <View style={[styles.downloadFill, { width: `${pkg.progress ?? 0}%` }]} />
-                        </View>
-                        <Text style={styles.downloadPercent}>{pkg.progress ?? 0}%</Text>
+        <Text style={[styles.storageDesc, { color: colors.textSecondary }]}>
+          Descarga paquetes de información y mapas para identificar especies y registrar avistamientos sin conexión a internet.
+        </Text>
+      </View>
+
+      {/* Preferences Section */}
+      <SettingsSection>
+        <SettingsRow
+          icon="wifi-outline"
+          label="Descargar solo con Wi-Fi"
+          sublabel="Ahorra datos de tu plan móvil"
+          showChevron={false}
+          isLast
+          rightElement={
+            <AnimatedSwitch
+              value={wifiOnly}
+              onValueChange={setWifiOnly}
+              accessibilityLabel="Descargar solo con Wi-Fi"
+            />
+          }
+        />
+      </SettingsSection>
+
+      {/* Packages Section */}
+      <SettingsSection title="Paquetes disponibles">
+        {packages.map((pkg, idx) => {
+          const isLast = idx === packages.length - 1;
+          const isDownloaded = pkg.status === 'downloaded';
+          const isDownloading = pkg.status === 'downloading';
+
+          return (
+            <View key={pkg.id}>
+              <View style={styles.packageRow}>
+                <View style={styles.packageInfo}>
+                  <Text
+                    style={[styles.packageName, { color: colors.textPrimary }]}
+                  >
+                    {pkg.name}
+                  </Text>
+                  <Text
+                    style={[styles.packageSize, { color: colors.textSecondary }]}
+                  >
+                    {pkg.size}
+                  </Text>
+                  {isDownloading && (
+                    <View style={styles.downloadProgressWrap}>
+                      <View
+                        style={[
+                          styles.downloadTrack,
+                          { backgroundColor: isDark ? '#333' : '#E0E7E4' },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.downloadFill,
+                            {
+                              backgroundColor: colors.primary,
+                              width: `${pkg.progress ?? 0}%`,
+                            },
+                          ]}
+                        />
                       </View>
-                    )}
-                  </View>
-                  <TouchableOpacity style={styles.downloadBtn} onPress={() => toggleDownload(pkg.id)}>
-                    {getStatusIcon(pkg.status)}
-                  </TouchableOpacity>
+                      <Text
+                        style={[
+                          styles.downloadPercent,
+                          { color: colors.primary },
+                        ]}
+                      >
+                        {pkg.progress ?? 0}%
+                      </Text>
+                    </View>
+                  )}
                 </View>
-                {!isLast && <View style={styles.divider} />}
+
+                <PressableScale
+                  activeScale={0.88}
+                  haptic="light"
+                  onPress={() => toggleDownload(pkg.id)}
+                  style={styles.downloadBtn}
+                >
+                  <Ionicons
+                    name={
+                      isDownloaded
+                        ? 'checkmark-circle'
+                        : isDownloading
+                        ? 'stop-circle-outline'
+                        : 'cloud-download-outline'
+                    }
+                    size={26}
+                    color={
+                      isDownloaded
+                        ? colors.primary
+                        : isDownloading
+                        ? colors.secondaryBlue
+                        : colors.primary
+                    }
+                  />
+                </PressableScale>
               </View>
-            );
-          })}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+
+              {!isLast && (
+                <View
+                  style={[
+                    styles.divider,
+                    { backgroundColor: colors.border + '20' },
+                  ]}
+                />
+              )}
+            </View>
+          );
+        })}
+      </SettingsSection>
+    </SettingsScaffold>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    padding: 18,
+    marginBottom: 20,
+    ...Shadows.card,
+  },
+  storageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  storageTitle: {
+    fontSize: Typography.fontSize.md,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '700',
+  },
+  progressBarContainer: {
+    height: 10,
+    borderRadius: 5,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  progressBarApp: {
+    height: '100%',
+    borderRadius: 5,
+  },
+  storageLegends: {
+    flexDirection: 'row',
+    gap: 20,
+    marginBottom: 12,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamilyBody,
+  },
+  storageDesc: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamilyBody,
+    lineHeight: 18,
+  },
+  packageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  packageInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  packageName: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  packageSize: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamilyBody,
+  },
+  downloadProgressWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  downloadTrack: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  downloadFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  downloadPercent: {
+    fontSize: 11,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '700',
+  },
+  downloadBtn: {
+    padding: 4,
+  },
+  divider: {
+    height: 1,
+    marginHorizontal: 16,
+  },
+});

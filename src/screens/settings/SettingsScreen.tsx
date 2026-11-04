@@ -1,249 +1,580 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Modal, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, Image, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, Radius } from '../../theme';
+import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
+import * as MailComposer from 'expo-mail-composer';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useAuth } from '../../context/AuthContext';
-import * as DocumentPicker from 'expo-document-picker';
-import * as MailComposer from 'expo-mail-composer';
+import { useLanguage, useT } from '../../i18n';
+import { useTheme } from '../../context/ThemeContext';
+import { useFeedPreferences } from '../../context/FeedPreferencesContext';
 import { handleError, showSuccess } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
+import {
+  SettingsScaffold,
+  SettingsSection,
+  SettingsRow,
+} from '../../components/settings';
+import {
+  PressableScale,
+  SegmentedControl,
+  AnimatedDialog,
+} from '../../components/animated';
+import { Radius, Typography, Shadows } from '../../theme';
+
 type SettingsNavProp = NativeStackNavigationProp<RootStackParamList, 'Settings'>;
-
-interface SettingItem {
-  id: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  danger?: boolean;
-}
-
-interface SettingSection {
-  title: string;
-  data: SettingItem[];
-}
-
-const SETTING_SECTIONS: SettingSection[] = [
-  {
-    title: 'Account',
-    data: [
-      { id: '1', icon: 'person-outline', label: 'Edit Profile' },
-      { id: '2', icon: 'lock-closed-outline', label: 'Privacy & Security' },
-      { id: '3', icon: 'notifications-outline', label: 'Notifications' },
-      { id: 'verify', icon: 'mail-outline', label: 'Request Verification as a Certified Birdwatcher' },
-    ],
-  },
-  {
-    title: 'Preferences',
-    data: [
-
-      { id: '5', icon: 'moon-outline', label: 'Theme' },
-    ],
-  },
-  {
-    title: 'Support & About',
-    data: [
-      { id: '6', icon: 'help-circle-outline', label: 'Help & Support' },
-      { id: '7', icon: 'information-circle-outline', label: 'About Birdify' },
-    ],
-  },
-  {
-    title: 'Actions',
-    data: [{ id: '8', icon: 'log-out-outline', label: 'Log Out', danger: true }],
-  },
-];
-
-export const createStyles = (colors: any) =>
-  StyleSheet.create({
-    safe: { flex: 1, backgroundColor: colors.surface },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: Spacing.md,
-      paddingVertical: Spacing.sm,
-      backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border + '20',
-    },
-    backBtn: { padding: 4 },
-    headerTitle: { fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.bold, color: colors.textPrimary },
-    placeholder: { width: 32 },
-    content: { padding: Spacing.md, paddingBottom: Spacing.xxl },
-    section: { marginBottom: Spacing.lg },
-    sectionTitle: {
-      fontSize: Typography.fontSize.sm,
-      fontWeight: Typography.fontWeight.bold,
-      color: colors.textSecondary,
-      marginBottom: Spacing.sm,
-      marginLeft: Spacing.sm,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
-    card: { backgroundColor: colors.canvasPure, borderRadius: Radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: colors.border + '20' },
-    itemRow: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md },
-    iconWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary + '20', justifyContent: 'center', alignItems: 'center', marginRight: Spacing.md },
-    iconWrapDanger: { backgroundColor: colors.errorRed + '15' },
-    itemLabel: { flex: 1, fontSize: Typography.fontSize.md, color: colors.textPrimary, fontWeight: Typography.fontWeight.medium },
-    itemLabelDanger: { color: colors.errorRed },
-    divider: { height: 1, backgroundColor: colors.border + '20', marginLeft: 52 + Spacing.md },
-  });
 
 export default function SettingsScreen() {
   const navigation = useNavigation<SettingsNavProp>();
-  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
-  const { signOut, session } = useAuth();
+  const { colors, isDark } = useDynamicStyles();
+  const { signOut, user, session } = useAuth();
+  const { language, setLanguage } = useLanguage();
+  const { t } = useT();
+  const { theme } = useTheme();
+  const { preferences: feedPrefs } = useFeedPreferences();
 
+  const feedFilterLabel =
+    feedPrefs.filterMode === 'following'
+      ? t('settings.feedFilterFollowing')
+      : feedPrefs.filterMode === 'followers'
+      ? t('settings.feedFilterFollowers')
+      : feedPrefs.filterMode === 'mutuals'
+      ? t('settings.feedFilterMutuals')
+      : feedPrefs.filterMode === 'proximity'
+      ? `${feedPrefs.proximityRadiusKm} km`
+      : t('settings.feedFilterAll');
+
+  // Verification modal state
   const [verificationModalVisible, setVerificationModalVisible] = useState(false);
   const [selectedFile, setSelectedFile] = useState<{ uri: string; name: string } | null>(null);
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+
+  // Logout confirmation modal state
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    message: string;
+    type: 'success' | 'error';
+  }>({
     visible: false,
     message: '',
     type: 'success',
   });
 
-  const handlePress = (item: SettingItem) => {
-    if (item.danger) {
-      signOut().catch(err => handleError(err, setToast, 'Logout failed'));
-    } else if (item.id === '1') {
-      navigation.navigate('EditProfile' as any);
-    } else if (item.id === '2') {
-      navigation.navigate('PrivacySettings' as any);
-    } else if (item.id === '3') {
-      navigation.navigate('NotificationSettings' as any);
-    } else if (item.id === '4') {
-      navigation.navigate('LanguageSettings' as any);
-    } else if (item.id === '5') {
-      navigation.navigate('ThemeSettings' as any);
-    } else if (item.id === '6') {
-      navigation.navigate('HelpSupport' as any);
-    } else if (item.id === '7') {
-      navigation.navigate('AboutBirdify' as any);
-    } else if (item.id === 'verify') {
-      setVerificationModalVisible(true);
-    } else {
-      console.log(`Navigating to ${item.label}`);
+  // Profile metadata
+  const userMeta = (user as any)?.user_metadata || {};
+  const displayName = userMeta.fullname || userMeta.full_name || t('common.user');
+  const displayUsername = userMeta.username || user?.email?.split('@')[0] || 'birdwatcher';
+  const avatarUrl =
+    userMeta.profile_pic_url ||
+    userMeta.avatar_url ||
+    'https://gravatar.com/avatar/?d=mp';
+
+  const themeLabel =
+    theme === 'dark'
+      ? t('settings.themeDark')
+      : theme === 'light'
+      ? t('settings.themeLight')
+      : t('settings.themeSystem');
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      setLogoutModalVisible(false);
+      await signOut();
+    } catch (err) {
+      handleError(err, setToast, t('settings.logoutFailed'));
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  const handleSendVerification = async () => {
+    if (!selectedFile) return;
+    try {
+      const isAvailable = await MailComposer.isAvailableAsync().catch(() => false);
+      if (isAvailable) {
+        const { status } = await MailComposer.composeAsync({
+          recipients: ['authbirdify@gmail.com'],
+          subject: `${t('settings.verificationTitle')} - ${session?.user?.email || ''}`,
+          body: `${t('settings.verificationDesc')} (${selectedFile.name})`,
+          attachments: [selectedFile.uri],
+        });
+        if (status === 'sent') {
+          showSuccess(t('settings.requestSent'), setToast);
+        }
+      } else {
+        showSuccess(t('settings.requestSent'), setToast);
+      }
+    } catch (e) {
+      handleError(e, setToast, t('settings.requestFailed'));
+    } finally {
+      setVerificationModalVisible(false);
+      setSelectedFile(null);
     }
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
-        <View style={styles.placeholder} />
+    <SettingsScaffold
+      title={t('settings.title')}
+      subtitle={t('settings.subtitle')}
+      onBack={() => navigation.goBack()}
+    >
+      <AppToast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
+
+      {/* Profile Card Header */}
+      <PressableScale
+        activeScale={0.98}
+        haptic="light"
+        onPress={() => navigation.navigate('Profile', { userId: 'me' })}
+        style={[
+          styles.profileCard,
+          {
+            backgroundColor: colors.canvasPure,
+            borderColor: isDark ? colors.border + '30' : colors.border + '20',
+          },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={t('settings.viewProfile')}
+      >
+        <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+        <View style={styles.profileTextWrap}>
+          <Text
+            numberOfLines={1}
+            style={[styles.profileName, { color: colors.textPrimary }]}
+          >
+            {displayName}
+          </Text>
+          <Text
+            numberOfLines={1}
+            style={[styles.profileUsername, { color: colors.textSecondary }]}
+          >
+            @{displayUsername}
+          </Text>
+          <Text style={[styles.viewProfileText, { color: colors.primary }]}>
+            {t('settings.viewProfile')} →
+          </Text>
+        </View>
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color={colors.outlineGrey + '70'}
+        />
+      </PressableScale>
+
+      {/* Account Section */}
+      <SettingsSection title={t('settings.account')}>
+        <SettingsRow
+          icon="person-outline"
+          iconColor="#2E7D32"
+          label={t('settings.editProfile')}
+          onPress={() => navigation.navigate('EditProfile')}
+        />
+        <SettingsRow
+          icon="shield-checkmark-outline"
+          iconColor="#1565C0"
+          label={t('settings.privacy')}
+          onPress={() => navigation.navigate('PrivacySettings')}
+        />
+        <SettingsRow
+          icon="notifications-outline"
+          iconColor="#EF6C00"
+          label={t('settings.notifications')}
+          onPress={() => navigation.navigate('NotificationSettings')}
+        />
+        <SettingsRow
+          icon="ribbon-outline"
+          iconColor="#6A1B9A"
+          label={t('settings.verify')}
+          isLast
+          onPress={() => setVerificationModalVisible(true)}
+        />
+      </SettingsSection>
+
+      {/* Preferences Section */}
+      <SettingsSection title={t('settings.preferences')}>
+        {/* Inline Language Segmented Control */}
+        <SettingsRow
+          icon="language-outline"
+          iconColor="#00838F"
+          label={t('settings.language')}
+          showChevron={true}
+          onPress={() => navigation.navigate('LanguageSettings')}
+          rightElement={
+            <View style={{ width: 120 }}>
+              <SegmentedControl
+                height={34}
+                compact
+                options={[
+                  { id: 'es', label: 'ES' },
+                  { id: 'en', label: 'EN' },
+                ]}
+                selectedId={language}
+                onSelect={(id) => setLanguage(id as 'es' | 'en')}
+              />
+            </View>
+          }
+        />
+        <SettingsRow
+          icon="moon-outline"
+          iconColor="#4527A0"
+          label={t('settings.theme')}
+          value={themeLabel}
+          onPress={() => navigation.navigate('ThemeSettings')}
+        />
+        <SettingsRow
+          icon="options-outline"
+          iconColor="#E65100"
+          label={t('settings.feedPreferences')}
+          sublabel={t('settings.feedPreferencesSubtitle')}
+          value={feedFilterLabel}
+          onPress={() => navigation.navigate('FeedPreferences')}
+        />
+        <SettingsRow
+          icon="cloud-offline-outline"
+          iconColor="#4E342E"
+          label={t('settings.offlineStorage')}
+          sublabel={t('settings.offlineStorageSubtitle')}
+          isLast
+          onPress={() => navigation.navigate('OfflineStorage')}
+        />
+      </SettingsSection>
+
+      {/* Support & About Section */}
+      <SettingsSection title={t('settings.support')}>
+        <SettingsRow
+          icon="help-circle-outline"
+          iconColor="#0277BD"
+          label={t('settings.help')}
+          onPress={() => navigation.navigate('HelpSupport')}
+        />
+        <SettingsRow
+          icon="leaf-outline"
+          iconColor="#2E7D32"
+          label={t('settings.about')}
+          isLast
+          onPress={() => navigation.navigate('AboutBirdify')}
+        />
+      </SettingsSection>
+
+      {/* Actions Section */}
+      <SettingsSection title={t('settings.actions')}>
+        <SettingsRow
+          icon="log-out-outline"
+          label={t('settings.logout')}
+          danger
+          showChevron={false}
+          isLast
+          onPress={() => setLogoutModalVisible(true)}
+        />
+      </SettingsSection>
+
+      {/* App Version Info */}
+      <View style={styles.footerVersion}>
+        <Text style={[styles.versionText, { color: colors.textSecondary }]}>
+          Birdify v1.0.4
+        </Text>
       </View>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        {SETTING_SECTIONS.map((section, index) => (
-          <View key={index} style={styles.section}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-            <View style={styles.card}>
-              {section.data.map(item => {
-                const isLast = item.id === section.data[section.data.length - 1].id;
-                return (
-                  <View key={item.id}>
-                    <TouchableOpacity style={styles.itemRow} activeOpacity={0.7} onPress={() => handlePress(item)}>
-                      <View style={[styles.iconWrap, item.danger && styles.iconWrapDanger]}>
-                        <Ionicons name={item.icon as any} size={20} color={item.danger ? colors.errorRed : colors.primary} />
-                      </View>
-                      <Text style={[styles.itemLabel, item.danger && styles.itemLabelDanger]}>{item.label}</Text>
-                      {!item.danger && (
-                        <Ionicons name="chevron-forward" size={18} color={colors.outlineGrey} />
-                      )}
-                    </TouchableOpacity>
-                    {!isLast && <View style={styles.divider} />}
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        ))}
-      </ScrollView>
-        <Modal
-          visible={verificationModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setVerificationModalVisible(false)}
-        >
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-            <View style={{ margin: 20, backgroundColor: colors.canvasPure, padding: 35, borderRadius: 20, elevation: 5 }}>
-              <Text style={{ fontSize: 18, marginBottom: 15, fontWeight: 'bold', color: colors.textPrimary, textAlign: 'center' }}>Solicitar verificación</Text>
-              <Text style={{ marginBottom: 15, color: colors.textSecondary, textAlign: 'center' }}>Sube un PDF o imagen que acredite tu experiencia como ornitólogo o biólogo.</Text>
 
-              <TouchableOpacity
-                style={{ paddingVertical: 10, paddingHorizontal: 14, backgroundColor: colors.primary + '20', borderRadius: 8, alignItems: 'center', marginBottom: 15 }}
-                onPress={async () => {
-                  try {
-                    const result = await DocumentPicker.getDocumentAsync({
-                      type: ['application/pdf', 'image/*'],
-                      copyToCacheDirectory: true,
-                    });
-                    if (!result.canceled) {
-                      setSelectedFile({ uri: result.assets[0].uri, name: result.assets[0].name });
-                    }
-                  } catch (e) {
-                    handleError(e, setToast, 'Error selecting file');
-                  }
-                }}
+      {/* Verification Modal */}
+      <AnimatedDialog
+        visible={verificationModalVisible}
+        onClose={() => setVerificationModalVisible(false)}
+      >
+        <View style={styles.modalBody}>
+          <View
+            style={[
+              styles.modalIconBox,
+              { backgroundColor: colors.primary + '18' },
+            ]}
+          >
+            <Ionicons name="ribbon-outline" size={32} color={colors.primary} />
+          </View>
+          <Text style={[styles.dialogTitle, { color: colors.textPrimary }]}>
+            {t('settings.verificationTitle')}
+          </Text>
+          <Text
+            style={[styles.dialogDesc, { color: colors.textSecondary }]}
+          >
+            {t('settings.verificationDesc')}
+          </Text>
+
+          <PressableScale
+            activeScale={0.97}
+            haptic="light"
+            style={[
+              styles.filePickerBtn,
+              {
+                backgroundColor: colors.primary + '12',
+                borderColor: colors.primary + '30',
+              },
+            ]}
+            onPress={async () => {
+              try {
+                const result = await DocumentPicker.getDocumentAsync({
+                  type: ['application/pdf', 'image/*'],
+                  copyToCacheDirectory: true,
+                });
+                if (!result.canceled && result.assets?.[0]) {
+                  setSelectedFile({
+                    uri: result.assets[0].uri,
+                    name: result.assets[0].name,
+                  });
+                }
+              } catch (e) {
+                handleError(e, setToast, 'Error selecting file');
+              }
+            }}
+          >
+            <Ionicons
+              name={selectedFile ? 'document-text' : 'cloud-upload-outline'}
+              size={20}
+              color={colors.primary}
+              style={{ marginRight: 8 }}
+            />
+            <Text
+              numberOfLines={1}
+              style={[styles.filePickerText, { color: colors.primary }]}
+            >
+              {selectedFile ? selectedFile.name : t('settings.selectFile')}
+            </Text>
+          </PressableScale>
+
+          <View style={styles.dialogActions}>
+            <PressableScale
+              activeScale={0.96}
+              style={[
+                styles.dialogBtn,
+                styles.cancelDialogBtn,
+                { borderColor: colors.border + '40' },
+              ]}
+              onPress={() => {
+                setVerificationModalVisible(false);
+                setSelectedFile(null);
+              }}
+            >
+              <Text
+                style={[
+                  styles.cancelBtnText,
+                  { color: colors.textSecondary },
+                ]}
               >
-                <Text style={{ color: colors.primary }}>{selectedFile ? selectedFile.name : 'Seleccionar archivo'}</Text>
-              </TouchableOpacity>
+                {t('common.cancel')}
+              </Text>
+            </PressableScale>
 
-              {selectedFile && (
-                <Text style={{ marginBottom: 15, color: colors.textPrimary, textAlign: 'center' }}>{selectedFile.name}</Text>
-              )}
-
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <TouchableOpacity
-                    style={{ backgroundColor: colors.errorRed, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8 }}
-                    onPress={() => {
-                      setVerificationModalVisible(false);
-                      setSelectedFile(null);
-                    }}>
-                    <Text style={{ color: colors.canvasPure, fontWeight: '600' }}>Cancelar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: selectedFile ? colors.primary : colors.outlineGrey,
-                      paddingVertical: 10,
-                      paddingHorizontal: 14,
-                      borderRadius: 8,
-                    }}
-                    disabled={!selectedFile}
-                    onPress={async () => {
-                      if (selectedFile) {
-                        try {
-                          const { status } = await MailComposer.composeAsync({
-                            recipients: ['authbirdify@gmail.com'],
-                            subject: 'Solicitud de verificación - ' + session?.user?.email,
-                            body: `Adjunto mi documento de verificación (${selectedFile.name}).`,
-                            attachments: [selectedFile.uri],
-                          });
-                          if (status === 'sent') {
-                            showSuccess('Correo enviado correctamente', setToast);
-                          } else {
-                            handleError('El correo no se pudo enviar', setToast, 'Error');
-                          }
-                        } catch (e) {
-                          handleError(e, setToast, 'No se pudo enviar la solicitud');
-                        }
-                        setVerificationModalVisible(false);
-                        setSelectedFile(null);
-                      }
-                    }}>
-                    <Text style={{ color: colors.canvasPure, fontWeight: '600' }}>Enviar solicitud</Text>
-                  </TouchableOpacity>
-                </View>
-            </View>
+            <PressableScale
+              activeScale={0.96}
+              haptic="medium"
+              disabled={!selectedFile}
+              style={[
+                styles.dialogBtn,
+                styles.confirmDialogBtn,
+                {
+                  backgroundColor: selectedFile
+                    ? colors.primary
+                    : colors.outlineGrey + '40',
+                },
+              ]}
+              onPress={handleSendVerification}
+            >
+              <Text style={styles.confirmBtnText}>
+                {t('settings.sendRequest')}
+              </Text>
+            </PressableScale>
           </View>
-        </Modal>
-    </SafeAreaView>
+        </View>
+      </AnimatedDialog>
+
+      {/* Logout Confirmation Dialog */}
+      <AnimatedDialog
+        visible={logoutModalVisible}
+        onClose={() => setLogoutModalVisible(false)}
+      >
+        <View style={styles.modalBody}>
+          <View
+            style={[
+              styles.modalIconBox,
+              { backgroundColor: colors.errorRed + '18' },
+            ]}
+          >
+            <Ionicons name="log-out-outline" size={32} color={colors.errorRed} />
+          </View>
+          <Text style={[styles.dialogTitle, { color: colors.textPrimary }]}>
+            {t('settings.logoutConfirmTitle')}
+          </Text>
+          <Text
+            style={[styles.dialogDesc, { color: colors.textSecondary }]}
+          >
+            {t('settings.logoutConfirmDesc')}
+          </Text>
+
+          <View style={styles.dialogActions}>
+            <PressableScale
+              activeScale={0.96}
+              disabled={isLoggingOut}
+              style={[
+                styles.dialogBtn,
+                styles.cancelDialogBtn,
+                { borderColor: colors.border + '40' },
+              ]}
+              onPress={() => setLogoutModalVisible(false)}
+            >
+              <Text
+                style={[
+                  styles.cancelBtnText,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                {t('common.cancel')}
+              </Text>
+            </PressableScale>
+
+            <PressableScale
+              activeScale={0.96}
+              haptic="medium"
+              disabled={isLoggingOut}
+              style={[
+                styles.dialogBtn,
+                styles.confirmDialogBtn,
+                { backgroundColor: colors.errorRed },
+              ]}
+              onPress={handleLogout}
+            >
+              <Text style={styles.confirmBtnText}>
+                {t('settings.logout')}
+              </Text>
+            </PressableScale>
+          </View>
+        </View>
+      </AnimatedDialog>
+    </SettingsScaffold>
   );
 }
+
+const styles = StyleSheet.create({
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    marginBottom: 24,
+    ...Shadows.card,
+  },
+  avatar: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    marginRight: 14,
+  },
+  profileTextWrap: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: Typography.fontSize.lg,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '700',
+  },
+  profileUsername: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamilyBody,
+    marginTop: 2,
+  },
+  viewProfileText: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  footerVersion: {
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  versionText: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamilyBody,
+  },
+  modalBody: {
+    alignItems: 'center',
+  },
+  modalIconBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  dialogTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  dialogDesc: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamilyBody,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 18,
+  },
+  filePickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    marginBottom: 20,
+  },
+  filePickerText: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '600',
+    maxWidth: '85%',
+  },
+  dialogActions: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 12,
+  },
+  dialogBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelDialogBtn: {
+    borderWidth: 1.5,
+  },
+  confirmDialogBtn: {
+    ...Shadows.button,
+  },
+  cancelBtnText: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '600',
+  },
+  confirmBtnText: {
+    color: '#FFF',
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '700',
+  },
+});

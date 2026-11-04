@@ -372,6 +372,21 @@ export const SightingRepository = {
         [birdId, limit]
       );
 
+      const sightingIds = rows.map((r) => r.id);
+      let localReactions: any[] = [];
+      let localComments: any[] = [];
+      if (sightingIds.length > 0) {
+        const placeholders = sightingIds.map(() => '?').join(',');
+        localReactions = await db.getAllAsync<any>(
+          `SELECT sighting_id, user_id FROM reactions WHERE sighting_id IN (${placeholders})`,
+          ...sightingIds
+        );
+        localComments = await db.getAllAsync<any>(
+          `SELECT id, sighting_id FROM comments WHERE sighting_id IN (${placeholders})`,
+          ...sightingIds
+        );
+      }
+
       return rows.map((r) => ({
         ...r,
         photo_url: r.local_photo_path ?? r.photo_url,
@@ -385,8 +400,8 @@ export const SightingRepository = {
         bird: r.common_name
           ? { id: r.bird_id, common_name: r.common_name, scientific_name: r.scientific_name }
           : null,
-        reactions: [],
-        comments: [],
+        reactions: localReactions.filter((react) => react.sighting_id === r.id),
+        comments: localComments.filter((comment) => comment.sighting_id === r.id),
       }));
     }
 
@@ -428,10 +443,13 @@ export const SightingRepository = {
   async getForMap(currentUserId?: string, limit = 200): Promise<any[]> {
     if (!isOnline) {
       const rows = await db.getAllAsync<any>(
-        `SELECT s.id, s.user_id, s.bird_id, s.latitude, s.longitude, s.is_location_private, s.created_at,
-                b.common_name, b.scientific_name
+        `SELECT s.id, s.user_id, s.bird_id, s.description, s.photo_url, s.local_photo_path,
+                s.latitude, s.longitude, s.is_location_private, s.created_at,
+                b.common_name, b.scientific_name,
+                u.username, u.fullname, u.profile_pic_url, u.is_verified
          FROM sightings s
          LEFT JOIN birds b ON s.bird_id = b.id
+         LEFT JOIN users u ON s.user_id = u.id
          WHERE s.is_location_private = 0
            AND s.latitude IS NOT NULL
            AND s.longitude IS NOT NULL
@@ -440,20 +458,59 @@ export const SightingRepository = {
         [limit]
       );
 
+      const sightingIds = rows.map((r) => r.id);
+      let localReactions: any[] = [];
+      let localComments: any[] = [];
+      if (sightingIds.length > 0) {
+        const placeholders = sightingIds.map(() => '?').join(',');
+        localReactions = await db.getAllAsync<any>(
+          `SELECT sighting_id, user_id FROM reactions WHERE sighting_id IN (${placeholders})`,
+          ...sightingIds
+        );
+        localComments = await db.getAllAsync<any>(
+          `SELECT id, sighting_id FROM comments WHERE sighting_id IN (${placeholders})`,
+          ...sightingIds
+        );
+      }
+
       return rows.map((r) => ({
         ...r,
         is_location_private: Boolean(r.is_location_private),
-        bird: r.common_name
-          ? { id: r.bird_id, common_name: r.common_name, scientific_name: r.scientific_name }
+        user: r.username
+          ? {
+              id: r.user_id,
+              username: r.username,
+              fullname: r.fullname,
+              profile_pic_url: r.profile_pic_url,
+              is_verified: Boolean(r.is_verified),
+            }
           : null,
+        bird: r.common_name
+          ? {
+              id: r.bird_id,
+              common_name: r.common_name,
+              scientific_name: r.scientific_name,
+              image_url: r.photo_url || r.local_photo_path,
+            }
+          : {
+              id: r.bird_id || r.id,
+              common_name: 'Ave observada',
+              scientific_name: 'Especie silvestre',
+              image_url: r.photo_url || r.local_photo_path,
+            },
+        reactions: localReactions.filter((react) => react.sighting_id === r.id),
+        comments: localComments.filter((comment) => comment.sighting_id === r.id),
       }));
     }
 
     const { data, error } = await supabase
       .from('sightings')
       .select(`
-        id, user_id, bird_id, latitude, longitude, is_location_private, created_at,
-        birds (id, common_name, scientific_name)
+        id, user_id, bird_id, description, photo_url, latitude, longitude, is_location_private, created_at,
+        users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
+        birds!sightings_bird_id_fkey (id, common_name, scientific_name, season, habitat_info, description),
+        reactions (user_id),
+        comments (id)
       `)
       .eq('is_location_private', false)
       .not('latitude', 'is', null)
@@ -469,10 +526,27 @@ export const SightingRepository = {
     const excludedUserIds = await getExcludedUserIds(currentUserId);
     return (data || [])
       .filter((item) => !excludedUserIds.has(item.user_id))
-      .map((item) => ({
-        ...item,
-        bird: item.birds,
-      }));
+      .map((item) => {
+        const rawBird = Array.isArray(item.birds) ? item.birds[0] : item.birds;
+        const rawUser = Array.isArray(item.users) ? item.users[0] : item.users;
+        return {
+          ...item,
+          user: rawUser || null,
+          bird: rawBird
+            ? {
+                ...rawBird,
+                image_url: item.photo_url,
+              }
+            : {
+                id: item.bird_id || item.id,
+                common_name: 'Ave observada',
+                scientific_name: 'Especie silvestre',
+                image_url: item.photo_url,
+              },
+          reactions: item.reactions || [],
+          comments: item.comments || [],
+        };
+      });
   },
 
   async getByUserId(userId: string, page = 0, limit = 20): Promise<any[]> {

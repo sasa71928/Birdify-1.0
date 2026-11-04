@@ -17,6 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import FeedItem from '../../components/FeedItem';
 import { FeedSkeleton } from '../../components/skeleton';
 import { mapSightingToPost } from '../../hooks/useFeed';
+import { useT } from '../../i18n';
 
 interface LocalSighting {
   id: string;
@@ -38,6 +39,7 @@ interface LocalSighting {
 export default function OfflineFeedScreen() {
   const { colors, isDark } = useDynamicStyles(createStyles);
   const { user } = useAuth();
+  const { t } = useT();
   const [sightings, setSightings] = useState<LocalSighting[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -88,11 +90,11 @@ export default function OfflineFeedScreen() {
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <View style={styles.offlinePill}>
           <Ionicons name="cloud-offline-outline" size={14} color="#92400e" />
-          <Text style={styles.offlinePillText}>Modo sin conexión</Text>
+          <Text style={styles.offlinePillText}>{t('feed.offlinePill')}</Text>
         </View>
-        <Text style={[styles.headerTitle, { color: colors.primary }]}>Mis avistamientos</Text>
+        <Text style={[styles.headerTitle, { color: colors.primary }]}>{t('feed.offlineHeaderTitle')}</Text>
         <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
-          Se sincronizarán cuando haya conexión
+          {t('feed.offlineHeaderSub')}
         </Text>
       </View>
 
@@ -101,9 +103,9 @@ export default function OfflineFeedScreen() {
       ) : sightings.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="binoculars-outline" size={48} color={Colors.textSecondary} />
-          <Text style={[styles.emptyTitle, { color: colors.primary }]}>Sin avistamientos locales</Text>
+          <Text style={[styles.emptyTitle, { color: colors.primary }]}>{t('feed.offlineEmptyTitle')}</Text>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            Registra un avistamiento y se guardará aquí aunque no tengas internet.
+            {t('feed.offlineEmptyText')}
           </Text>
         </View>
       ) : (

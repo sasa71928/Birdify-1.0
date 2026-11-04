@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  TouchableOpacity,
   Text,
   ViewStyle,
   ActivityIndicator,
@@ -9,6 +8,7 @@ import {
 import { Shadows } from '../theme';
 import { useDynamicStyles } from '../hooks/useDynamicStyles';
 import { createStyles } from '../styles/components/SocialButton.styles';
+import { PressableScale } from './animated/PressableScale';
 
 type SocialButtonProps = {
   label: string;
@@ -27,27 +27,34 @@ export default function SocialButton({
   disabled = false,
   loading = false,
 }: SocialButtonProps) {
-
   const { screen: styles, colors } = useDynamicStyles(createStyles);
   const isDisabled = disabled || loading;
 
   return (
-    <TouchableOpacity
-      style={[styles.button, Shadows.card, style, isDisabled && { opacity: 0.6 }]}
+    <PressableScale
+      activeScale={0.98}
+      haptic="light"
+      style={[
+        styles.button,
+        Shadows.card,
+        style,
+        isDisabled && { opacity: 0.6 },
+      ]}
       onPress={onPress}
-      activeOpacity={0.8}
       disabled={isDisabled}
       accessibilityRole="button"
       accessibilityLabel={`Continuar con ${label}`}
       accessibilityState={{ disabled: isDisabled, busy: loading }}
     >
-      {loading
-        ? <ActivityIndicator size="small" color={colors.textSecondary} />
-        : typeof iconSymbol === 'string'
-          ? <Text style={styles.icon}>{iconSymbol}</Text>
-          : iconSymbol}
+      {loading ? (
+        <ActivityIndicator size="small" color={colors.textSecondary} />
+      ) : typeof iconSymbol === 'string' ? (
+        <Text style={styles.icon}>{iconSymbol}</Text>
+      ) : (
+        iconSymbol
+      )}
 
       <Text style={styles.label}>{label}</Text>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }

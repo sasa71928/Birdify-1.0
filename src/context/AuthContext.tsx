@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import * as Linking from 'expo-linking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { NotificationService } from '../services/notification.service';
@@ -35,8 +37,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (user) {
       registerPush(user.id);
+      checkAndPromptFirstLoginLocation();
     }
   }, [user]);
+
+  const checkAndPromptFirstLoginLocation = async () => {
+    try {
+      const alreadyPrompted = await AsyncStorage.getItem('@birdify_first_login_location_prompt');
+      if (!alreadyPrompted) {
+        await AsyncStorage.setItem('@birdify_first_login_location_prompt', 'true');
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          await Location.requestForegroundPermissionsAsync();
+        }
+      }
+    } catch (e) {
+      console.warn('Error checking first login location permission:', e);
+    }
+  };
 
   const registerPush = async (userId: string) => {
     try {

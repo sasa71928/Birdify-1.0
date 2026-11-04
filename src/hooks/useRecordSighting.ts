@@ -13,13 +13,15 @@ import { supabase } from '../lib/supabase';
 import { BirdRepository } from '../repositories/bird.repository';
 import { SightingRepository } from '../repositories/sighting.repository';
 import { handleError } from '../utils/errorHandler';
-import { compressImage } from '../utils/imageCompressor';
+import { compressImage, prepareImageForUpload } from '../utils/imageCompressor';
+import { useT } from '../i18n';
 
 type RecordSightingNavProp = NativeStackNavigationProp<RootStackParamList>;
 
-export function useRecordSighting(editingSightingId?: string) {
+export function useRecordSighting(editingSightingId?: string, preselectedBird?: any) {
   const navigation = useNavigation<RecordSightingNavProp>();
   const { user } = useAuth();
+  const { t } = useT();
 
   const isEditMode = !!editingSightingId;
   const [editingSighting, setEditingSighting] = useState<any>(null);
@@ -48,9 +50,19 @@ export function useRecordSighting(editingSightingId?: string) {
     };
   }, []);
 
-  const [birdName, setBirdName] = useState('');
+  const [birdName, setBirdName] = useState(
+    preselectedBird ? (preselectedBird.name || preselectedBird.common_name || '') : ''
+  );
   const [notes, setNotes] = useState('');
-  const [selectedBird, setSelectedBird] = useState<any>(null);
+  const [selectedBird, setSelectedBird] = useState<any>(
+    preselectedBird
+      ? {
+          id: preselectedBird.id,
+          common_name: preselectedBird.name || preselectedBird.common_name,
+          scientific_name: preselectedBird.scientificName || preselectedBird.scientific_name,
+        }
+      : null
+  );
   const [showDropdown, setShowDropdown] = useState(false);
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [imageBase64s, setImageBase64s] = useState<string[]>([]);
@@ -370,11 +382,11 @@ export function useRecordSighting(editingSightingId?: string) {
       return;
     }
     if (!birdName.trim()) {
-      handleError('Información incompleta', setToast, 'Debes seleccionar una especie de ave.');
+      handleError('Información incompleta', setToast, t('sighting.requireBird'));
       return;
     }
     if (imageUris.length === 0) {
-      handleError('Información incompleta', setToast, '¡Debes añadir al menos una foto!');
+      handleError('Información incompleta', setToast, t('sighting.requirePhoto'));
       return;
     }
 
@@ -467,26 +479,15 @@ export function useRecordSighting(editingSightingId?: string) {
           continue;
         }
 
-        const rawExt = uri?.split('?')[0]?.split('.').pop()?.toLowerCase() || 'jpg';
-        const fileExt = rawExt === 'png' || rawExt === 'webp' ? rawExt : 'jpg';
-        const mimeType =
-          fileExt === 'png'
-            ? 'image/png'
-            : fileExt === 'webp'
-              ? 'image/webp'
-              : 'image/jpeg';
-        const fileName = `${user.id}/${Date.now()}_${i}.${fileExt}`;
-
-        // Comprimir con el algoritmo universal optimizado para feed (alta calidad y carga veloz)
-        const compressed = await compressImage(uri, 'feed');
-        const response = await fetch(compressed.uri);
-        const arrayBuffer = await response.arrayBuffer();
+        // Preparar y comprimir con decodificación binaria directa (sin fetch a localUri)
+        const prepared = await prepareImageForUpload(uri, 'feed');
+        const fileName = `${user.id}/${Date.now()}_${i}.${prepared.fileExt}`;
 
         let bucketName = 'Sightings';
         let { error: uploadError } = await supabase.storage
           .from(bucketName)
-          .upload(fileName, arrayBuffer, {
-            contentType: mimeType,
+          .upload(fileName, prepared.arrayBuffer, {
+            contentType: prepared.mimeType,
             upsert: true,
           });
 
@@ -494,8 +495,8 @@ export function useRecordSighting(editingSightingId?: string) {
           bucketName = 'sightings';
           const retry = await supabase.storage
             .from(bucketName)
-            .upload(fileName, arrayBuffer, {
-              contentType: mimeType,
+            .upload(fileName, prepared.arrayBuffer, {
+              contentType: prepared.mimeType,
               upsert: true,
             });
           uploadError = retry.error;
@@ -524,7 +525,7 @@ export function useRecordSighting(editingSightingId?: string) {
 
       if (isEditMode) {
         await SightingRepository.update(editingSighting.id, sightingData);
-        showToast('¡Avistamiento actualizado con éxito!', 'success');
+        showToast(t('sighting.successSaved'), 'success');
       } else {
         await SightingRepository.create({
           ...sightingData,
@@ -534,7 +535,7 @@ export function useRecordSighting(editingSightingId?: string) {
           _birdName: matchedBird.common_name,
           _scientificName: matchedBird.scientific_name ?? null,
         } as any);
-        showToast('¡Avistamiento publicado con éxito!', 'success');
+        showToast(t('sighting.successPublished'), 'success');
       }
 
       setShouldNavigateToFeed(true);

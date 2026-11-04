@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import { DeviceEventEmitter } from 'react-native';
-import { compressImage } from '../utils/imageCompressor';
+import { compressImage, prepareImageForUpload } from '../utils/imageCompressor';
 
 export let isOnline = false;
 
@@ -112,20 +112,14 @@ export async function flushSyncQueue() {
                   continue;
                 }
 
-                const rawExt = (path.split('?')[0].split('.').pop() || 'jpg').toLowerCase();
-                const ext = rawExt === 'png' || rawExt === 'webp' ? rawExt : 'jpg';
-                const contentType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-                const fileName = `${sightingData.user_id}/${Date.now()}_${i}.${ext}`;
-
-                const compressed = await compressImage(path, 'feed');
-                const response = await fetch(compressed.uri);
-                const arrayBuffer = await response.arrayBuffer();
+                const prepared = await prepareImageForUpload(path, 'feed');
+                const fileName = `${sightingData.user_id}/${Date.now()}_${i}.${prepared.fileExt}`;
 
                 let bucketName = 'Sightings';
                 let { error: uploadError } = await supabase.storage
                   .from(bucketName)
-                  .upload(fileName, arrayBuffer, {
-                    contentType,
+                  .upload(fileName, prepared.arrayBuffer, {
+                    contentType: prepared.mimeType,
                     upsert: true,
                   });
 
@@ -133,8 +127,8 @@ export async function flushSyncQueue() {
                   bucketName = 'sightings';
                   const retry = await supabase.storage
                     .from(bucketName)
-                    .upload(fileName, arrayBuffer, {
-                      contentType,
+                    .upload(fileName, prepared.arrayBuffer, {
+                      contentType: prepared.mimeType,
                       upsert: true,
                     });
                   uploadError = retry.error;

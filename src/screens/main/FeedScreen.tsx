@@ -1,8 +1,14 @@
-import React, { useCallback, useState, useRef, useEffect } from 'react';
-import { FlatList, StyleSheet, StatusBar, RefreshControl, ActivityIndicator, View, Text, TouchableOpacity } from 'react-native';
+import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react';
+import {
+  FlatList,
+  StatusBar,
+  RefreshControl,
+  View,
+  Text,
+  TouchableOpacity,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
-import { Colors, Shadows } from '../../theme';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import FeedItem, { Post } from '../../components/FeedItem';
 import TopNavBar from '../../components/TopNavBar';
@@ -12,10 +18,16 @@ import { createStyles } from '../../styles/screens/main/feedScreen.styles';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { useFeed } from '../../hooks/useFeed';
 import { useNewSightings } from '../../context/NewSightingsContext';
+import { useFeedPreferences } from '../../context/FeedPreferencesContext';
+import { useT } from '../../i18n';
+import { FeedCategoryBar } from '../../components/feed/FeedCategoryBar';
+import { FeedEmptyState } from '../../components/feed/FeedEmptyState';
 
 export default function FeedScreen() {
-  const { shared, screen, isDark, colors } = useDynamicStyles(createStyles);
-  
+  const navigation = useNavigation<any>();
+  const { screen: styles, isDark, colors } = useDynamicStyles(createStyles);
+  const { t } = useT();
+
   const {
     posts,
     isLoading,
@@ -23,12 +35,39 @@ export default function FeedScreen() {
     toast,
     setToast,
     handlePostDeleted,
+    handleLikeToggled,
+    handleCommentAdded,
     onRefresh,
   } = useFeed();
+
+  const {
+    preferences,
+    filterPosts,
+    refreshFollows,
+    setFilterMode,
+    setProximityRadius,
+    setOnlyVerified,
+  } = useFeedPreferences();
 
   const { hasNewPosts, newPostIds, clearNewPosts } = useNewSightings();
   const [showNewBanner, setShowNewBanner] = useState(false);
   const listRef = useRef<FlatList>(null);
+
+  // Filtrar publicaciones según preferencias del usuario
+  const filteredPosts = useMemo(
+    () => filterPosts(posts),
+    [posts, filterPosts]
+  );
+
+  // Al enfocar, refrescar relaciones de follow para que los filtros estén siempre al día
+  useFocusEffect(
+    useCallback(() => {
+      refreshFollows();
+      if (hasNewPosts) {
+        setShowNewBanner(true);
+      }
+    }, [hasNewPosts, refreshFollows])
+  );
 
   // Mostrar banner instantáneamente cuando llegue un nuevo avistamiento
   useEffect(() => {
@@ -37,18 +76,18 @@ export default function FeedScreen() {
     }
   }, [hasNewPosts]);
 
-  // Al entrar a Feed, verificar si hay nuevos avistamientos pendientes
-  useFocusEffect(
-    useCallback(() => {
-      if (hasNewPosts) {
-        setShowNewBanner(true);
-      }
-    }, [hasNewPosts])
+  const renderItem = useCallback(
+    ({ item }: { item: Post }) => (
+      <FeedItem
+        post={item}
+        onPostDeleted={handlePostDeleted}
+        onLikeToggled={handleLikeToggled}
+        onCommentAdded={handleCommentAdded}
+        isNew={newPostIds.has(item.id)}
+      />
+    ),
+    [handlePostDeleted, handleLikeToggled, handleCommentAdded, newPostIds]
   );
-
-  const renderItem = useCallback(({ item }: { item: Post }) => (
-    <FeedItem post={item} onPostDeleted={handlePostDeleted} isNew={newPostIds.has(item.id)} />
-  ), [handlePostDeleted, newPostIds]);
 
   const keyExtractor = useCallback((item: Post) => item.id, []);
 
@@ -59,37 +98,81 @@ export default function FeedScreen() {
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
 
+  const emptyFilterMessage = useMemo(() => {
+    if (posts.length === 0) {
+      return t('feed.emptyCommunity');
+    }
+    switch (preferences.filterMode) {
+      case 'following':
+        return t('feed.emptyFilterFollowing');
+      case 'followers':
+        return t('feed.emptyFilterFollowers');
+      case 'mutuals':
+        return t('feed.emptyFilterMutuals');
+      case 'proximity':
+        return t('feed.emptyFilterProximity', {
+          radius: preferences.proximityRadiusKm,
+        });
+      default:
+        return preferences.onlyVerified
+          ? t('feed.emptyFilterVerified')
+          : t('feed.emptyCommunity');
+    }
+  }, [posts.length, preferences.filterMode, preferences.proximityRadiusKm, preferences.onlyVerified, t]);
+
   return (
-    <SafeAreaView style={shared.safe}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <TopNavBar />
-      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
-      
+      <AppToast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
+
+      {/* Selector Rápido de Categorías y Filtros con Input Manual de Distancia */}
+      <FeedCategoryBar
+        preferences={preferences}
+        onSelectMode={(mode) => setFilterMode(mode)}
+        onRadiusChange={(radius) => setProximityRadius(radius)}
+        onToggleVerified={() => setOnlyVerified(!preferences.onlyVerified)}
+        onOpenPreferences={() => navigation.navigate('FeedPreferences')}
+        colors={colors}
+      />
+
       {isLoading ? (
         <FeedSkeleton />
-      ) : posts.length === 0 ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <Text style={{ color: colors.textSecondary, fontSize: 16, textAlign: 'center' }}>
-            Aún no hay avistamientos en la comunidad. ¡Sé el primero en compartir uno!
-          </Text>
-        </View>
+      ) : filteredPosts.length === 0 ? (
+        <FeedEmptyState
+          filterMode={preferences.filterMode}
+          onlyVerified={preferences.onlyVerified}
+          message={emptyFilterMessage}
+          onResetFilters={() => {
+            setFilterMode('all');
+            setOnlyVerified(false);
+          }}
+          onOpenPreferences={() => navigation.navigate('FeedPreferences')}
+          onNewSighting={() => navigation.navigate('RecordSighting')}
+          colors={colors}
+        />
       ) : (
-        <View style={{ flex: 1 }}>
+        <View style={styles.container}>
           <FlatList
             ref={listRef}
-            data={posts}
+            data={filteredPosts}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
-            contentContainerStyle={screen.listContent}
+            contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             initialNumToRender={3}
             maxToRenderPerBatch={3}
             windowSize={5}
             removeClippedSubviews={true}
             refreshControl={
-              <RefreshControl 
-                refreshing={isRefreshing} 
-                onRefresh={onRefresh} 
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={onRefresh}
                 colors={[colors.primary]}
                 tintColor={colors.primary}
               />
@@ -98,27 +181,13 @@ export default function FeedScreen() {
 
           {showNewBanner && (
             <TouchableOpacity
-              style={{
-                position: 'absolute',
-                top: 12,
-                left: 16,
-                right: 16,
-                backgroundColor: colors.primary,
-                borderRadius: 24,
-                paddingVertical: 12,
-                paddingHorizontal: 20,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                zIndex: 100,
-              }}
+              style={styles.newPostsBanner}
               activeOpacity={0.85}
               onPress={handleBannerPress}
             >
-              <Ionicons name="refresh" size={18} color={colors.white} />
-              <Text style={{ color: colors.white, fontWeight: '700', fontSize: 14 }}>
-                Nuevo avistamiento — Recargar
+              <Ionicons name="refresh" size={16} color="#FFFFFF" />
+              <Text style={styles.newPostsBannerText}>
+                {t('feed.newSightingBanner')}
               </Text>
             </TouchableOpacity>
           )}
@@ -127,4 +196,3 @@ export default function FeedScreen() {
     </SafeAreaView>
   );
 }
-

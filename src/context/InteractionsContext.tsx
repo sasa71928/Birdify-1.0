@@ -156,6 +156,10 @@ export function InteractionsProvider({ children }: { children: React.ReactNode }
                 <View onStartShouldSetResponder={() => true}>
                   <FeedItem
                     post={selectedPost}
+                    onPostDeleted={() => {
+                      setSelectedPost(null);
+                      setIsLoadingPost(false);
+                    }}
                     onNavigateAway={() => {
                       setSelectedPost(null);
                       setIsLoadingPost(false);

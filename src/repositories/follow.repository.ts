@@ -34,6 +34,24 @@ export const FollowRepository = {
     );
   },
 
+  async getFollowerIds(followingId: string): Promise<Set<string>> {
+    const { data, error } = await supabase
+      .from('follows')
+      .select('follower_id')
+      .eq('following_id', followingId);
+
+    if (error) {
+      console.error('Error in getFollowerIds:', error);
+      return new Set<string>();
+    }
+
+    return new Set<string>(
+      (data ?? [])
+        .map((row: { follower_id?: string | null }) => row.follower_id)
+        .filter((id): id is string => Boolean(id))
+    );
+  },
+
   async follow(followerId: string, followingId: string): Promise<void> {
     const { error } = await supabase
       .from('follows')

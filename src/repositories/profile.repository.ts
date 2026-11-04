@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { User, UpdateProfileDTO } from '../types/models';
+import db from '../lib/database';
+import { isOnline } from '../services/syncService';
 
 export const PUBLIC_USER_COLUMNS =
   'id, username, fullname, bio, profile_pic_url, is_private, is_verified, user_level, created_at';
@@ -33,9 +35,19 @@ export const ProfileRepository = {
   },
 
   async getAll(): Promise<any[]> {
+    if (!isOnline) {
+      try {
+        const rows = await db.getAllAsync<any>(
+          `SELECT id, username, fullname, bio, profile_pic_url, is_verified FROM users ORDER BY username ASC`
+        );
+        return rows || [];
+      } catch {
+        return [];
+      }
+    }
     const { data, error } = await supabase
       .from('users')
-      .select('id, username, fullname, profile_pic_url')
+      .select('id, username, fullname, bio, profile_pic_url, is_verified')
       .order('username');
 
     if (error) throw error;

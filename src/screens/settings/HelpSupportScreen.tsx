@@ -1,140 +1,288 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StatusBar,
-  Linking,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Linking } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
+import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  LinearTransition,
+  FadeIn,
+  FadeOut,
+} from 'react-native-reanimated';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
-import { Spacing } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
+import { useT } from '../../i18n';
 import { handleError } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
-
-const FAQS = [
-  {
-    id: '1',
-    question: 'How do I record a bird sighting?',
-    answer:
-      'Tap the + button in the bottom navigation bar, take a photo or select one from your gallery, choose the bird species, and publish your sighting.',
-  },
-  {
-    id: '2',
-    question: 'Can I use the app offline?',
-    answer:
-      'Yes! When you lose internet connection, Birdify automatically switches to Offline Mode so you can record sightings locally and sync them once you are back online.',
-  },
-  {
-    id: '3',
-    question: 'How do I change my privacy settings?',
-    answer:
-      'Navigate to Settings > Privacy & Security to enable Private Profile, manage blocked users, or mark individual sighting locations as private.',
-  },
-];
+import { SettingsScaffold } from '../../components/settings';
+import { PressableScale } from '../../components/animated';
+import { Radius, Typography, Shadows } from '../../theme';
 
 export default function HelpSupportScreen() {
   const navigation = useNavigation();
-  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+  const { colors, isDark } = useDynamicStyles();
+  const { user } = useAuth();
+  const { t } = useT();
+
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    message: string;
+    type: 'success' | 'error';
+  }>({
     visible: false,
     message: '',
     type: 'success',
   });
 
-  const { user } = useAuth();
+  const faqs = [
+    {
+      id: '1',
+      question: t('settings.faq1Q'),
+      answer: t('settings.faq1A'),
+    },
+    {
+      id: '2',
+      question: t('settings.faq2Q'),
+      answer: t('settings.faq2A'),
+    },
+    {
+      id: '3',
+      question: t('settings.faq3Q'),
+      answer: t('settings.faq3A'),
+    },
+  ];
 
   const toggleExpand = (id: string) => {
-    setExpanded(expanded === id ? null : id);
+    setExpandedId((prev) => (prev === id ? null : id));
   };
 
   const handleContactSupport = async () => {
-    const subject = `Birdify Support Request - ${user?.email || 'Unknown User'}`;
-    const body = `Describe your issue here, including steps to reproduce if applicable:\n\nDevice:\nApp Version: 1.0.4\n`;
-    const emailUrl =
-      `mailto:birdifysupport@gmail.com` +
-      `?subject=${encodeURIComponent(subject)}` +
-      `&body=${encodeURIComponent(body)}`;
+    const subject = `Birdify Support - ${user?.email || 'User'}`;
+    const body = `Hola equipo de soporte de Birdify,\n\nDescribe tu consulta o problema aquí:\n\nApp Version: 1.0.4\n`;
+    const emailUrl = `mailto:birdifysupport@gmail.com?subject=${encodeURIComponent(
+      subject
+    )}&body=${encodeURIComponent(body)}`;
 
-    const supported = await Linking.canOpenURL(emailUrl);
+    const supported = await Linking.canOpenURL(emailUrl).catch(() => false);
     if (supported) {
       await Linking.openURL(emailUrl);
     } else {
-      handleError('No se encontró una aplicación de correo disponible', setToast, 'Error');
+      handleError('No se encontró aplicación de correo', setToast);
     }
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      <AppToast visible={toast.visible} message={toast.message} type={toast.type} onClose={() => setToast(prev => ({ ...prev, visible: false }))} />
+    <SettingsScaffold
+      title={t('settings.help')}
+      subtitle={t('settings.helpSubtitle')}
+      onBack={() => navigation.goBack()}
+    >
+      <AppToast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Help & Support</Text>
+      {/* FAQs Section */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+          {t('settings.faqsTitle')}
+        </Text>
+
+        {faqs.map((faq) => {
+          const isOpen = expandedId === faq.id;
+          return (
+            <Animated.View
+              key={faq.id}
+              layout={LinearTransition.springify().damping(20)}
+              style={[
+                styles.faqCard,
+                {
+                  backgroundColor: colors.canvasPure,
+                  borderColor: isOpen
+                    ? colors.primary + '50'
+                    : isDark
+                    ? colors.border + '30'
+                    : colors.border + '20',
+                },
+              ]}
+            >
+              <PressableScale
+                activeScale={0.98}
+                haptic="light"
+                onPress={() => toggleExpand(faq.id)}
+                style={styles.faqHeader}
+                accessibilityRole="button"
+                accessibilityLabel={faq.question}
+              >
+                <Text
+                  style={[
+                    styles.faqQuestion,
+                    {
+                      color: isOpen ? colors.primary : colors.textPrimary,
+                    },
+                  ]}
+                >
+                  {faq.question}
+                </Text>
+                <Ionicons
+                  name={isOpen ? 'chevron-up' : 'chevron-down'}
+                  size={20}
+                  color={isOpen ? colors.primary : colors.textSecondary}
+                />
+              </PressableScale>
+
+              {isOpen && (
+                <Animated.View
+                  entering={FadeIn.duration(180)}
+                  exiting={FadeOut.duration(120)}
+                  style={styles.faqBody}
+                >
+                  <View
+                    style={[
+                      styles.bodyDivider,
+                      { backgroundColor: colors.border + '20' },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.faqAnswer,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {faq.answer}
+                  </Text>
+                </Animated.View>
+              )}
+            </Animated.View>
+          );
+        })}
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.mainTitle}>Frequently Asked Questions</Text>
-        <Text style={styles.subtitle}>Find answers to the most common questions about Birdify.</Text>
+      {/* Contact Card */}
+      <View
+        style={[
+          styles.contactCard,
+          {
+            backgroundColor: isDark ? colors.primary + '18' : colors.primary + '0C',
+            borderColor: colors.primary + '30',
+          },
+        ]}
+      >
+        <View style={styles.contactIconWrap}>
+          <Ionicons name="mail" size={26} color={colors.primary} />
+        </View>
+        <Text style={[styles.contactTitle, { color: colors.textPrimary }]}>
+          {t('settings.contactUs')}
+        </Text>
+        <Text style={[styles.contactDesc, { color: colors.textSecondary }]}>
+          {t('settings.contactDesc')}
+        </Text>
 
-        {FAQS.map((faq) => (
-          <TouchableOpacity
-            key={faq.id}
-            style={styles.faqItem}
-            onPress={() => toggleExpand(faq.id)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.faqQuestion}>
-              <Text style={styles.faqQuestion}>{faq.question}</Text>
-              <Ionicons
-                name={expanded === faq.id ? 'chevron-up' : 'chevron-down'}
-                size={20}
-                color={colors.placeholder}
-              />
-            </View>
-            {expanded === faq.id && (
-              <Text style={styles.faqAnswer}>{faq.answer}</Text>
-            )}
-          </TouchableOpacity>
-        ))}
-
-        <TouchableOpacity style={styles.contactCard} activeOpacity={0.8} onPress={handleContactSupport}>
-          <View style={{ backgroundColor: colors.primary + '15', padding: Spacing.sm, borderRadius: 12 }}>
-            <Ionicons name="mail" size={24} color={colors.primary} />
-          </View>
-          <View style={styles.contactInfo}>
-            <Text style={styles.contactTitle}>Contact Support</Text>
-            <Text style={styles.contactSubtitle}>Get help from our team via email.</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.placeholder} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.contactCard, { marginTop: Spacing.sm, opacity: 0.5 }]} disabled={true} activeOpacity={1}>
-          <View style={{ backgroundColor: colors.secondaryBlue + '15', padding: Spacing.sm, borderRadius: 12 }}>
-            <Ionicons name="chatbubbles" size={24} color={colors.secondaryBlue} />
-          </View>
-          <View style={styles.contactInfo}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={styles.contactTitle}>Community Forum</Text>
-              <View style={{ backgroundColor: '#EEE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 }}>
-                <Text style={{ fontSize: 10, color: '#666', fontWeight: 'bold' }}>SOON</Text>
-              </View>
-            </View>
-            <Text style={styles.contactSubtitle}>Ask other users for tips and tricks.</Text>
-          </View>
-          <Ionicons name="lock-closed-outline" size={18} color={colors.placeholder} />
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+        <PressableScale
+          activeScale={0.96}
+          haptic="medium"
+          onPress={handleContactSupport}
+          style={[
+            styles.contactBtn,
+            { backgroundColor: colors.primary, ...Shadows.button },
+          ]}
+        >
+          <Text style={styles.contactBtnText}>
+            {t('settings.sendEmailBtn')}
+          </Text>
+        </PressableScale>
+      </View>
+    </SettingsScaffold>
   );
 }
+
+const styles = StyleSheet.create({
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+    marginLeft: 6,
+  },
+  faqCard: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    marginBottom: 10,
+    overflow: 'hidden',
+    ...Shadows.card,
+  },
+  faqHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  faqQuestion: {
+    flex: 1,
+    fontSize: Typography.fontSize.md,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '700',
+    marginRight: 12,
+    lineHeight: 20,
+  },
+  faqBody: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  bodyDivider: {
+    height: 1,
+    marginBottom: 12,
+  },
+  faqAnswer: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamilyBody,
+    lineHeight: 22,
+  },
+  contactCard: {
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  contactIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    ...Shadows.card,
+  },
+  contactTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  contactDesc: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamilyBody,
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  contactBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    borderRadius: Radius.md,
+  },
+  contactBtnText: {
+    color: '#FFF',
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '700',
+  },
+});

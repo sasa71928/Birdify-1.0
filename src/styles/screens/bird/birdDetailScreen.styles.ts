@@ -5,79 +5,135 @@ export const createStyles = (colors: typeof Colors) =>
   StyleSheet.create({
     safe: {
       flex: 1,
-      backgroundColor: colors.background,
-    },
-
-    // Hero
-    hero: {
-      margin: Spacing.sm,
-      height: 260,
-      position: 'relative',
-      paddingVertical: 0,
-      paddingHorizontal: 0,
-      backgroundColor: colors.componentBase,
-      borderRadius: Radius.lg,
-    },
-
-    backBtn: {
-      position: 'absolute',
-      top: Spacing.md,
-      left: Spacing.md,
-      width: 38,
-      height: 38,
-      borderRadius: 19,
       backgroundColor: colors.surface,
-      justifyContent: 'center',
-      alignItems: 'center',
-      zIndex: 10,
+    },
+    scrollContent: {
+      paddingBottom: 50,
     },
 
-    heroImageContainer: {
-      width: '100%',
-      height: '100%',
-      backgroundColor: colors.componentBase,
-      borderRadius: Radius.lg,
+    // Hero Section
+    hero: {
+      marginHorizontal: Spacing.md,
+      marginTop: Spacing.sm,
+      height: 280,
+      position: 'relative',
+      borderRadius: Radius.xl,
       overflow: 'hidden',
+      backgroundColor: colors.componentBase,
+      ...Shadows.card,
     },
-
     heroImage: {
       width: '100%',
       height: '100%',
-      borderRadius: Radius.lg,
     },
-
     heroOverlay: {
       ...StyleSheet.absoluteFill,
-      backgroundColor: 'transparent',
+      backgroundColor: 'rgba(0, 0, 0, 0.32)',
+      justifyContent: 'space-between',
+      padding: Spacing.md,
     },
-
-    heroContent: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      paddingHorizontal: 10,
-      backgroundColor: colors.componentBase + 'CC',
-      borderBottomLeftRadius: Radius.lg,
-      borderBottomRightRadius: Radius.lg,
-      paddingVertical: Spacing.sm,
+    heroTopRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
       width: '100%',
     },
-
+    backBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.88)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      ...Shadows.card,
+    },
+    statusBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: Radius.full,
+    },
+    statusBadgeResident: {
+      backgroundColor: 'rgba(22, 101, 52, 0.92)',
+    },
+    statusBadgeMigratory: {
+      backgroundColor: 'rgba(30, 64, 175, 0.92)',
+    },
+    statusBadgeText: {
+      color: '#FFFFFF',
+      fontSize: 11.5,
+      fontWeight: '700',
+      fontFamily: Typography.fontFamilyBody,
+    },
+    heroBottomContent: {
+      backgroundColor: 'rgba(0, 0, 0, 0.55)',
+      marginHorizontal: -Spacing.md,
+      marginBottom: -Spacing.md,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.sm + 4,
+    },
     heroName: {
       fontSize: Typography.fontSize.xxl,
-      fontWeight: Typography.fontWeight.extraBold,
-      color: colors.textPrimary,
-      lineHeight: 38,
+      fontWeight: '800',
+      fontFamily: Typography.fontFamilyDisplay,
+      color: '#FFFFFF',
+      lineHeight: 32,
     },
-
     heroScientific: {
-      fontSize: Typography.fontSize.sm,
+      fontSize: Typography.fontSize.sm + 1,
       fontStyle: 'italic',
-      color: colors.primary,
+      fontFamily: Typography.fontFamilyBody,
+      color: 'rgba(255, 255, 255, 0.9)',
       marginTop: 2,
     },
 
-    // Card
+    // Quick Actions Bar
+    actionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginHorizontal: Spacing.md,
+      marginTop: Spacing.md,
+    },
+    actionBtnPrimary: {
+      flex: 1.2,
+      height: 48,
+      backgroundColor: colors.primary,
+      borderRadius: Radius.lg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      ...Shadows.button,
+    },
+    actionBtnPrimaryText: {
+      color: '#FFFFFF',
+      fontSize: 13.5,
+      fontWeight: '700',
+      fontFamily: Typography.fontFamilyDisplay,
+    },
+    actionBtnSecondary: {
+      flex: 1,
+      height: 48,
+      backgroundColor: colors.componentBase,
+      borderRadius: Radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border + '25',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+    },
+    actionBtnSecondaryText: {
+      color: colors.textPrimary,
+      fontSize: 13,
+      fontWeight: '600',
+      fontFamily: Typography.fontFamilyBody,
+    },
+
+    // Card (Taxonomy)
     card: {
       backgroundColor: colors.canvasPure,
       marginHorizontal: Spacing.md,
@@ -85,185 +141,162 @@ export const createStyles = (colors: typeof Colors) =>
       borderRadius: Radius.lg,
       padding: Spacing.md,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: colors.border + '20',
       ...Shadows.card,
     },
-
     sectionRow: {
       flexDirection: 'row',
       alignItems: 'center',
+      gap: 8,
       marginBottom: Spacing.md,
     },
-
     cardTitle: {
       fontSize: Typography.fontSize.md,
-      fontWeight: Typography.fontWeight.bold,
+      fontWeight: '800',
+      fontFamily: Typography.fontFamilyDisplay,
       color: colors.textPrimary,
     },
-
     classGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
+      gap: 8,
     },
-
     classCell: {
-      width: '33.33%',
-      paddingVertical: Spacing.sm,
-      paddingRight: Spacing.sm,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
+      width: '31%',
+      flexGrow: 1,
+      backgroundColor: colors.componentBase,
+      borderRadius: Radius.md,
+      padding: Spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.border + '15',
     },
-
     classCellLabel: {
-      fontSize: 9,
-      fontWeight: Typography.fontWeight.bold,
-      color: colors.outlineGrey,
-      letterSpacing: 0.8,
-      marginBottom: 2,
+      fontSize: 9.5,
+      fontWeight: '700',
+      fontFamily: Typography.fontFamilyBody,
+      color: colors.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+      marginBottom: 3,
     },
-
     classCellValue: {
       fontSize: Typography.fontSize.sm,
-      fontWeight: Typography.fontWeight.semiBold,
+      fontWeight: '700',
+      fontFamily: Typography.fontFamilyBody,
       color: colors.textPrimary,
       fontStyle: 'italic',
     },
 
-    // Section
+    // Ecology & Overview
     section: {
       marginHorizontal: Spacing.md,
-      marginTop: Spacing.lg,
+      marginTop: Spacing.md,
     },
-
     sectionTitle: {
       fontSize: Typography.fontSize.lg,
-      fontWeight: Typography.fontWeight.bold,
+      fontWeight: '800',
+      fontFamily: Typography.fontFamilyDisplay,
       color: colors.textPrimary,
-      marginBottom: Spacing.md,
+      marginBottom: Spacing.sm,
     },
-
     overviewText: {
-      fontSize: Typography.fontSize.sm,
+      fontSize: Typography.fontSize.sm + 1,
+      fontFamily: Typography.fontFamilyBody,
       color: colors.textSecondary,
       lineHeight: 22,
       marginBottom: Spacing.md,
     },
-
-    // Info blocks
     infoBlock: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       backgroundColor: colors.componentBase,
-      borderRadius: Radius.md,
+      borderRadius: Radius.lg,
       padding: Spacing.md,
       marginBottom: Spacing.sm,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: colors.border + '20',
     },
-
     infoIconCircle: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       justifyContent: 'center',
       alignItems: 'center',
       marginRight: Spacing.md,
     },
-
     infoBlockText: {
       flex: 1,
     },
-
     infoBlockTitle: {
       fontSize: Typography.fontSize.sm,
-      fontWeight: Typography.fontWeight.bold,
+      fontWeight: '700',
+      fontFamily: Typography.fontFamilyDisplay,
       color: colors.textPrimary,
       marginBottom: 2,
     },
-
     infoBlockBody: {
       fontSize: Typography.fontSize.sm,
+      fontFamily: Typography.fontFamilyBody,
       color: colors.textSecondary,
       lineHeight: 20,
     },
 
-    // Sightings
-    sightingsHeader: {
+    // Sightings Section
+    sightingsHeaderRow: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
+      justifyContent: 'space-between',
       marginBottom: Spacing.md,
     },
-
-    viewAll: {
-      fontSize: Typography.fontSize.sm,
-      fontWeight: Typography.fontWeight.semiBold,
+    sightingsCountBadge: {
+      paddingHorizontal: 9,
+      paddingVertical: 3,
+      borderRadius: Radius.full,
+      backgroundColor: colors.primary + '18',
+    },
+    sightingsCountText: {
+      fontSize: 11.5,
+      fontWeight: '700',
       color: colors.primary,
+      fontFamily: Typography.fontFamilyDisplay,
     },
-
-    sightingCard: {
-      backgroundColor: colors.canvasPure,
-      borderRadius: Radius.lg,
-      overflow: 'hidden',
-      marginBottom: Spacing.md,
-      borderWidth: 1,
-      borderColor: colors.border,
-      ...Shadows.card,
-    },
-
-    sightingAuthorRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: Spacing.md,
-      gap: Spacing.sm,
-    },
-
-    sightingAvatar: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+    emptySightingsCard: {
       backgroundColor: colors.componentBase,
+      borderRadius: Radius.lg,
+      padding: Spacing.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border + '20',
+      gap: 10,
     },
-
-    sightingUser: {
-      fontSize: Typography.fontSize.sm,
-      fontWeight: Typography.fontWeight.bold,
+    emptySightingsTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+      fontFamily: Typography.fontFamilyDisplay,
       color: colors.textPrimary,
+      textAlign: 'center',
     },
-
-    sightingMeta: {
-      fontSize: Typography.fontSize.xs,
+    emptySightingsSubtitle: {
+      fontSize: 13,
+      fontFamily: Typography.fontFamilyBody,
       color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 18,
     },
-
-    sightingImage: {
-      width: '100%',
-      height: 200,
-    },
-
-    sightingActions: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: Spacing.md,
-      paddingVertical: Spacing.sm,
-      backgroundColor: colors.canvasPure,
-    },
-
-    sightingActionGroup: {
-      flexDirection: 'row',
-      gap: Spacing.md,
-    },
-
-    sightingAction: {
+    emptyRecordBtn: {
+      marginTop: 6,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: Radius.full,
+      backgroundColor: colors.primary,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: 6,
     },
-
-    sightingActionText: {
-      fontSize: Typography.fontSize.sm,
-      color: colors.textPrimary,
-      fontWeight: Typography.fontWeight.medium,
+    emptyRecordBtnText: {
+      fontSize: 12.5,
+      fontWeight: '700',
+      color: '#FFFFFF',
     },
   });

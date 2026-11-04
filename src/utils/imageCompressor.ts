@@ -47,28 +47,46 @@ export interface CompressedImageResult {
   base64?: string;
 }
 
+export interface PreparedImageUpload {
+  arrayBuffer: ArrayBuffer;
+  mimeType: string;
+  fileExt: string;
+  uri: string;
+  width: number;
+  height: number;
+  sizeBytes: number;
+}
+
 /**
- * Decodificador nativo de base64 a ArrayBuffer para subidas directas a Supabase Storage
+ * Decodificador nativo de base64 a ArrayBuffer para subidas directas a Supabase Storage.
+ * Limpia prefijos data: y espacios en blanco automáticamente.
  */
 export function decodeBase64ToArrayBuffer(base64: string): ArrayBuffer {
+  let clean = base64;
+  const commaIdx = clean.indexOf(',');
+  if (commaIdx !== -1 && clean.slice(0, commaIdx).includes('base64')) {
+    clean = clean.slice(commaIdx + 1);
+  }
+  clean = clean.replace(/\s+/g, '');
+
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   const lookup = new Uint8Array(256);
   for (let i = 0; i < chars.length; i++) {
     lookup[chars.charCodeAt(i)] = i;
   }
-  let bufferLength = base64.length * 0.75;
-  if (base64[base64.length - 1] === '=') {
+  let bufferLength = clean.length * 0.75;
+  if (clean[clean.length - 1] === '=') {
     bufferLength--;
-    if (base64[base64.length - 2] === '=') bufferLength--;
+    if (clean[clean.length - 2] === '=') bufferLength--;
   }
   const arrayBuffer = new ArrayBuffer(bufferLength);
   const bytes = new Uint8Array(arrayBuffer);
   let p = 0;
-  for (let i = 0; i < base64.length; i += 4) {
-    const b1 = lookup[base64.charCodeAt(i)];
-    const b2 = lookup[base64.charCodeAt(i + 1)];
-    const b3 = lookup[base64.charCodeAt(i + 2)];
-    const b4 = lookup[base64.charCodeAt(i + 3)];
+  for (let i = 0; i < clean.length; i += 4) {
+    const b1 = lookup[clean.charCodeAt(i)];
+    const b2 = lookup[clean.charCodeAt(i + 1)];
+    const b3 = lookup[clean.charCodeAt(i + 2)];
+    const b4 = lookup[clean.charCodeAt(i + 3)];
     bytes[p++] = (b1 << 2) | (b2 >> 4);
     if (p < bufferLength) bytes[p++] = ((b2 & 15) << 4) | (b3 >> 2);
     if (p < bufferLength) bytes[p++] = ((b3 & 3) << 6) | (b4 & 63);
@@ -133,11 +151,76 @@ export async function compressImage(
       base64: result.base64,
     };
   } catch (error) {
-    console.warn('[imageCompressor] Fallo en la compresión, usando URI original:', error);
-    return {
-      uri,
-      width: config.maxWidth,
-      height: Math.round(config.maxWidth * 0.75),
-    };
+    console.warn('[imageCompressor] Fallo en la compresión principal, intentando fallback con base64:', error);
+    try {
+      const fallback = await ImageManipulator.manipulateAsync(uri, [], {
+        compress: 0.8,
+        format: ImageManipulator.SaveFormat.JPEG,
+        base64: true,
+      });
+      return {
+        uri: fallback.uri,
+        width: fallback.width,
+        height: fallback.height,
+        base64: fallback.base64,
+      };
+    } catch (fallbackError) {
+      console.warn('[imageCompressor] Fallo en fallback:', fallbackError);
+      return {
+        uri,
+        width: config.maxWidth,
+        height: Math.round(config.maxWidth * 0.75),
+      };
+    }
   }
+}
+
+/**
+ * Prepara y comprime una imagen local (file://, content://) para subida binaria directa a Supabase Storage.
+ * Convierte a ArrayBuffer puro mediante decodificación base64 SIN invocar fetch(localUri),
+ * lo que erradica por completo la corrupción de archivos "File not found" (14 bytes) en React Native.
+ */
+export async function prepareImageForUpload(
+  uri: string,
+  preset: CompressionPreset = 'feed',
+  customOptions?: Partial<PresetConfig>
+): Promise<PreparedImageUpload> {
+  const compressed = await compressImage(uri, preset, customOptions);
+
+  let base64 = compressed.base64;
+  if (!base64) {
+    const raw = await ImageManipulator.manipulateAsync(
+      compressed.uri || uri,
+      [],
+      {
+        compress: 0.8,
+        format: ImageManipulator.SaveFormat.JPEG,
+        base64: true,
+      }
+    );
+    base64 = raw.base64;
+  }
+
+  if (!base64) {
+    throw new Error('[prepareImageForUpload] No se pudo obtener la representación binaria en base64.');
+  }
+
+  const arrayBuffer = decodeBase64ToArrayBuffer(base64);
+
+  // Determinar extensión limpia y tipo MIME
+  const cleanUri = (compressed.uri || uri).split('?')[0];
+  const rawExt = cleanUri.split('.').pop()?.toLowerCase() || 'jpg';
+  const fileExt = rawExt === 'png' || rawExt === 'webp' ? rawExt : 'jpg';
+  const mimeType =
+    fileExt === 'png' ? 'image/png' : fileExt === 'webp' ? 'image/webp' : 'image/jpeg';
+
+  return {
+    arrayBuffer,
+    mimeType,
+    fileExt,
+    uri: compressed.uri,
+    width: compressed.width,
+    height: compressed.height,
+    sizeBytes: arrayBuffer.byteLength,
+  };
 }

@@ -1,14 +1,17 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Image, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeOutLeft, LinearTransition } from 'react-native-reanimated';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
-import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
 import { useAuth } from '../../context/AuthContext';
+import { useT } from '../../i18n';
 import { UserBlockRepository } from '../../repositories/user_block.repository';
 import { handleError, showSuccess } from '../../utils/errorHandler';
 import AppToast from '../../components/AppToast';
+import { SettingsScaffold } from '../../components/settings';
+import { PressableScale } from '../../components/animated';
+import { Radius, Typography, Shadows } from '../../theme';
 
 interface BlockedUserItem {
   id: string;
@@ -19,13 +22,18 @@ interface BlockedUserItem {
 
 export default function BlockedUsersScreen() {
   const navigation = useNavigation();
-  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const { colors, isDark } = useDynamicStyles();
   const { user } = useAuth();
+  const { t } = useT();
 
   const [blockedUsers, setBlockedUsers] = useState<BlockedUserItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [unblockingUserId, setUnblockingUserId] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    message: string;
+    type: 'success' | 'error';
+  }>({
     visible: false,
     message: '',
     type: 'success',
@@ -38,7 +46,7 @@ export default function BlockedUsersScreen() {
       const data = await UserBlockRepository.getBlockedUsers(user.id);
       setBlockedUsers(data || []);
     } catch (error) {
-      handleError(error, setToast, 'No se pudieron cargar los usuarios bloqueados');
+      handleError(error, setToast, 'Error loading blocked users');
     } finally {
       setLoading(false);
     }
@@ -56,94 +64,178 @@ export default function BlockedUsersScreen() {
     try {
       setUnblockingUserId(blockedId);
       await UserBlockRepository.unblock(user.id, blockedId);
-      setBlockedUsers(prev => prev.filter(item => item.id !== blockedId));
-      showSuccess(`Desbloqueaste a @${username}`, setToast);
+      setBlockedUsers((prev) => prev.filter((item) => item.id !== blockedId));
+      showSuccess(t('settings.unblockedSuccess'), setToast);
     } catch (error) {
-      handleError(error, setToast, 'No se pudo desbloquear al usuario');
+      handleError(error, setToast, 'Failed to unblock user');
     } finally {
       setUnblockingUserId(null);
     }
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SettingsScaffold
+      title={t('settings.blockedTitle')}
+      onBack={() => navigation.goBack()}
+    >
       <AppToast
         visible={toast.visible}
         message={toast.message}
         type={toast.type}
-        onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+        onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
 
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Blocked Users</Text>
-      </View>
-
       {loading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <View style={styles.loadingBox}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
+      ) : blockedUsers.length === 0 ? (
+        <View style={styles.emptyBox}>
+          <View
+            style={[
+              styles.emptyIconBox,
+              { backgroundColor: colors.primary + '14' },
+            ]}
+          >
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={36}
+              color={colors.primary}
+            />
+          </View>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            {t('settings.noBlockedUsers')}
+          </Text>
+        </View>
       ) : (
-        <FlatList
-          data={blockedUsers}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16, paddingBottom: 24, flexGrow: blockedUsers.length ? 0 : 1 }}
-          ListEmptyComponent={
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <Ionicons name="shield-checkmark-outline" size={42} color={colors.textSecondary} />
-              <Text style={{ marginTop: 12, color: colors.textSecondary, textAlign: 'center' }}>
-                No tienes usuarios bloqueados.
-              </Text>
-            </View>
-          }
-          renderItem={({ item }) => (
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: colors.canvasPure,
-                borderColor: colors.border + '20',
-                borderWidth: 1,
-                borderRadius: 14,
-                padding: 12,
-                marginBottom: 10,
-              }}
+        <View style={styles.listContainer}>
+          {blockedUsers.map((item) => (
+            <Animated.View
+              key={item.id}
+              exiting={FadeOutLeft.duration(220)}
+              layout={LinearTransition.springify().damping(18)}
+              style={[
+                styles.userCard,
+                {
+                  backgroundColor: colors.canvasPure,
+                  borderColor: isDark ? colors.border + '30' : colors.border + '20',
+                },
+              ]}
             >
               <Image
-                source={{ uri: item.profile_pic_url || 'https://gravatar.com/avatar/?d=mp' }}
-                style={{ width: 44, height: 44, borderRadius: 22, marginRight: 12 }}
+                source={{
+                  uri: item.profile_pic_url || 'https://gravatar.com/avatar/?d=mp',
+                }}
+                style={styles.avatar}
               />
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.textPrimary, fontWeight: '700' }}>
+              <View style={styles.userInfo}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.fullName, { color: colors.textPrimary }]}
+                >
                   {item.fullname || item.username}
                 </Text>
-                <Text style={{ color: colors.textSecondary, marginTop: 2 }}>@{item.username}</Text>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.username, { color: colors.textSecondary }]}
+                >
+                  @{item.username}
+                </Text>
               </View>
 
-              <TouchableOpacity
-                onPress={() => handleUnblock(item.id, item.username)}
+              <PressableScale
+                activeScale={0.94}
+                haptic="medium"
                 disabled={unblockingUserId === item.id}
-                style={{
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  borderRadius: 20,
-                  backgroundColor: colors.primary + '15',
-                  minWidth: 94,
-                  alignItems: 'center',
-                }}
+                onPress={() => handleUnblock(item.id, item.username)}
+                style={[
+                  styles.unblockBtn,
+                  { backgroundColor: colors.primary + '18' },
+                ]}
               >
                 {unblockingUserId === item.id ? (
                   <ActivityIndicator size="small" color={colors.primary} />
                 ) : (
-                  <Text style={{ color: colors.primary, fontWeight: '700' }}>Desbloquear</Text>
+                  <Text style={[styles.unblockBtnText, { color: colors.primary }]}>
+                    {t('settings.unblock')}
+                  </Text>
                 )}
-              </TouchableOpacity>
-            </View>
-          )}
-        />
+              </PressableScale>
+            </Animated.View>
+          ))}
+        </View>
       )}
-    </SafeAreaView>
+    </SettingsScaffold>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingBox: {
+    padding: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyBox: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyIconBox: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  emptyText: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamilyBody,
+    textAlign: 'center',
+  },
+  listContainer: {
+    paddingTop: 8,
+  },
+  userCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    marginBottom: 10,
+    ...Shadows.card,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 14,
+  },
+  userInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  fullName: {
+    fontSize: Typography.fontSize.md,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '700',
+  },
+  username: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamilyBody,
+    marginTop: 2,
+  },
+  unblockBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 96,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unblockBtnText: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '700',
+  },
+});

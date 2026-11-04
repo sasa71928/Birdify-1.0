@@ -130,6 +130,18 @@ export function useFeed() {
     await loadFeed(true);
   }, [loadFeed]);
 
+  const handleLikeToggled = useCallback((postId: string, hasLiked: boolean, newCount: number) => {
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, hasLiked, likes: newCount } : p))
+    );
+  }, []);
+
+  const handleCommentAdded = useCallback((postId: string, newCount: number) => {
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, comments: newCount } : p))
+    );
+  }, []);
+
   const initialLoad = async () => {
     setIsLoading(true);
     await loadFeed();
@@ -174,6 +186,8 @@ export function useFeed() {
     setToast,
     loadFeed,
     handlePostDeleted,
+    handleLikeToggled,
+    handleCommentAdded,
     onRefresh,
   };
 }

@@ -30,8 +30,8 @@ export const BirdRepository = {
 
             for (const b of data) {
               await db.runAsync(
-                `INSERT OR REPLACE INTO birds (id, common_name, scientific_name, description, season, habitat_info, ideal_zones) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [b.id, b.common_name, b.scientific_name, b.description, b.season, b.habitat_info, b.ideal_zones]
+                `INSERT OR REPLACE INTO birds (id, common_name, scientific_name, description, season, habitat_info, ideal_zones, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [b.id, b.common_name, b.scientific_name, b.description, b.season, b.habitat_info, b.ideal_zones, b.image_url ?? null]
               );
             }
           } catch (sqliteErr) {

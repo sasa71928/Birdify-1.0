@@ -1,22 +1,37 @@
-import React from 'react';
+import React, { useCallback } from 'react';
+import { View, Share, Alert, Animated } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuth } from '../context/AuthContext';
 import { useOffline } from '../context/OfflineContext';
 import { ReactionRepository } from '../repositories/reaction.repository';
 import { CommentRepository } from '../repositories/comment.repository';
 import { SightingRepository } from '../repositories/sighting.repository';
 import { UserBlockRepository } from '../repositories/user_block.repository';
-import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput, ScrollView, Modal, KeyboardAvoidingView, Platform, PanResponder, Animated, Dimensions, TouchableWithoutFeedback, Share, Alert, ActivityIndicator, Keyboard } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
-import { Colors, Spacing, Typography, Radius, Shadows } from '../theme';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { createStyles } from '../styles/components/FeedItem.styles';
 import { useDynamicStyles } from '../hooks/useDynamicStyles';
-import PagerView from 'react-native-pager-view';
 import AppToast from './AppToast';
 import ReportModal from './ReportModal';
-import { CommentsSkeleton } from './skeleton';
+import { useT, formatTimeAgo } from '../i18n';
+import { haptics } from '../utils/haptics';
+import {
+  useSharedValue,
+  useAnimatedStyle,
+  interpolate,
+  Extrapolation,
+  withTiming,
+} from 'react-native-reanimated';
+import PagerView from 'react-native-pager-view';
+
+import { FeedCardHeader } from './feed/FeedCardHeader';
+import { FeedCardMedia } from './feed/FeedCardMedia';
+import { FeedCardActions } from './feed/FeedCardActions';
+import { FeedCardCaption } from './feed/FeedCardCaption';
+import { FeedCommentsModal } from './feed/FeedCommentsModal';
+import { FeedOptionsMenuModal } from './feed/FeedOptionsMenuModal';
+import { FeedDeleteConfirmModal } from './feed/FeedDeleteConfirmModal';
+import { FeedBlockConfirmModal } from './feed/FeedBlockConfirmModal';
 
 export interface Comment {
   id: string;
@@ -52,19 +67,29 @@ interface FeedItemProps {
   post: Post;
   onPostDeleted?: () => void;
   onNavigateAway?: () => void;
+  onLikeToggled?: (postId: string, hasLiked: boolean, newCount: number) => void;
+  onCommentAdded?: (postId: string, newCount: number) => void;
   isNew?: boolean;
 }
 
-const CAPTION_LIMIT = 100;
 const INITIAL_COMMENTS_DISPLAY = 5;
+const DOUBLE_TAP_DELAY = 380;
 
-function FeedItem({ post, onPostDeleted, onNavigateAway, isNew }: FeedItemProps) {
+function FeedItem({
+  post,
+  onPostDeleted,
+  onNavigateAway,
+  onLikeToggled,
+  onCommentAdded,
+  isNew,
+}: FeedItemProps) {
   const isOffline = useOffline();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
   const { user } = useAuth();
+  const { t } = useT();
+  const displayTime = post.createdAt ? formatTimeAgo(post.createdAt) : post.timeAgo;
 
-  const [isCaptionExpanded, setIsCaptionExpanded] = React.useState(false);
   const [showComments, setShowComments] = React.useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = React.useState(false);
   const [visibleCommentsCount, setVisibleCommentsCount] = React.useState(INITIAL_COMMENTS_DISPLAY);
@@ -72,18 +97,23 @@ function FeedItem({ post, onPostDeleted, onNavigateAway, isNew }: FeedItemProps)
   const [likesCount, setLikesCount] = React.useState(post.likes);
   const [commentsCount, setCommentsCount] = React.useState(post.comments);
   const [commentsList, setCommentsList] = React.useState<Comment[]>([]);
+  const [loadingComments, setLoadingComments] = React.useState(false);
 
   React.useEffect(() => {
     setLiked(post.hasLiked || false);
     setLikesCount(post.likes);
     setCommentsCount(post.comments);
   }, [post.hasLiked, post.likes, post.comments]);
-  const [loadingComments, setLoadingComments] = React.useState(false);
+
+  // Double tap heart animation
   const [showHeartAnimation, setShowHeartAnimation] = React.useState(false);
   const heartScale = React.useRef(new Animated.Value(0)).current;
   const heartOpacity = React.useRef(new Animated.Value(0)).current;
+  const heartTranslateY = React.useRef(new Animated.Value(0)).current;
   const heartAnimationRef = React.useRef<Animated.CompositeAnimation | null>(null);
   const lastTap = React.useRef(0);
+
+  // Comments state
   const [expandedComments, setExpandedComments] = React.useState<Record<string, boolean>>({});
   const [commentText, setCommentText] = React.useState('');
   const [replyingTo, setReplyingTo] = React.useState<{
@@ -91,25 +121,73 @@ function FeedItem({ post, onPostDeleted, onNavigateAway, isNew }: FeedItemProps)
     username: string;
     parentId: string | null;
   } | null>(null);
+
+  // Carousel & Image state
   const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
   const [imageLoaded, setImageLoaded] = React.useState<Record<number, boolean>>({});
   const [imageError, setImageError] = React.useState<Record<number, boolean>>({});
+  const pagerRef = React.useRef<PagerView>(null);
+
+  const scrollProgress = useSharedValue(0);
+  const counterOpacity = useSharedValue(1);
+  const hideCounterTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerCounterVisibility = React.useCallback(() => {
+    counterOpacity.value = withTiming(1, { duration: 150 });
+    if (hideCounterTimeout.current) {
+      clearTimeout(hideCounterTimeout.current);
+    }
+    hideCounterTimeout.current = setTimeout(() => {
+      counterOpacity.value = withTiming(0, { duration: 350 });
+    }, 2200);
+  }, [counterOpacity]);
+
+  React.useEffect(() => {
+    triggerCounterVisibility();
+    return () => {
+      if (hideCounterTimeout.current) clearTimeout(hideCounterTimeout.current);
+    };
+  }, [triggerCounterVisibility]);
+
+  const counterAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: counterOpacity.value,
+      transform: [
+        {
+          scale: interpolate(
+            counterOpacity.value,
+            [0, 1],
+            [0.9, 1],
+            Extrapolation.CLAMP
+          ),
+        },
+      ],
+    };
+  });
 
   React.useEffect(() => {
     setImageLoaded({});
     setImageError({});
   }, [post.image]);
+
+  // Modals state
   const [showDeleteModal, setShowDeleteModal] = React.useState(false);
   const [showBlockModal, setShowBlockModal] = React.useState(false);
   const [showReportModal, setShowReportModal] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isBlocking, setIsBlocking] = React.useState(false);
-  const [toast, setToast] = React.useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
+
+  // Toast state
+  const [toast, setToast] = React.useState<{
+    visible: boolean;
+    message: string;
+    type: 'success' | 'error';
+  }>({
     visible: false,
     message: '',
     type: 'success',
   });
-const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = React.useCallback((message: string, type: 'success' | 'error') => {
     if (toastTimerRef.current) {
@@ -117,7 +195,7 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     }
     setToast({ visible: true, message, type });
     toastTimerRef.current = setTimeout(() => {
-      setToast(prev => ({ ...prev, visible: false }));
+      setToast((prev) => ({ ...prev, visible: false }));
     }, 4500);
   }, []);
 
@@ -131,13 +209,6 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const images = Array.isArray(post.image) ? post.image : [post.image];
   const currentImage = images[currentImageIndex];
-  const totalImages = images.length;
-
-
-  const screenHeight = Dimensions.get('window').height;
-  const panY = React.useRef(new Animated.Value(screenHeight)).current;
-  const optionsPanY = React.useRef(new Animated.Value(screenHeight)).current;
-
 
   const loadComments = React.useCallback(async (showLoadingState = true) => {
     try {
@@ -151,40 +222,20 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     }
   }, [post.id]);
 
-  const [keyboardHeight, setKeyboardHeight] = React.useState(0);
-
-  React.useEffect(() => {
-    if (Platform.OS !== 'android') return;
-
-    const showSubscription = Keyboard.addListener('keyboardDidShow', (e) => {
-      setKeyboardHeight(e.endCoordinates.height);
-    });
-    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
-      setKeyboardHeight(0);
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, []);
-
   React.useEffect(() => {
     return () => {
       heartScale.stopAnimation();
       heartOpacity.stopAnimation();
-      panY.stopAnimation();
-      optionsPanY.stopAnimation();
+      heartTranslateY.stopAnimation();
     };
-  }, []);
+  }, [heartScale, heartOpacity, heartTranslateY]);
 
   React.useEffect(() => {
     let intervalId: ReturnType<typeof setTimeout>;
     if (showComments) {
       loadComments();
-      // Refrescar silenciosamente los comentarios cada 1 minuto (60,000 ms)
       intervalId = setInterval(() => {
-        loadComments(false); // asumiendo que loadComments puede tomar un flag para no mostrar loading, o simplemente llamarlo
+        loadComments(false);
       }, 60000);
     }
     return () => {
@@ -193,9 +244,9 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   }, [showComments, loadComments]);
 
   const toggleCommentExpansion = (commentId: string) => {
-    setExpandedComments(prev => ({
+    setExpandedComments((prev) => ({
       ...prev,
-      [commentId]: !prev[commentId]
+      [commentId]: !prev[commentId],
     }));
   };
 
@@ -212,7 +263,7 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     }
 
     try {
-      const parentId = replyingTo ? (replyingTo.parentId || replyingTo.id) : null;
+      const parentId = replyingTo ? replyingTo.parentId || replyingTo.id : null;
       let finalContent = commentText.trim();
 
       if (replyingTo && replyingTo.parentId && replyingTo.parentId !== replyingTo.id) {
@@ -223,15 +274,12 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
       }
 
       await CommentRepository.create(post.id, user.id, finalContent, parentId);
-      
-      // Limpiar input y estado
       setCommentText('');
       setReplyingTo(null);
-
-      // Recargar comentarios y actualizar contador
       await loadComments();
-      setCommentsCount(prev => prev + 1);
-      
+      const updatedCount = commentsCount + 1;
+      setCommentsCount(updatedCount);
+      onCommentAdded?.(post.id, updatedCount);
     } catch (error) {
       Alert.alert('Error', 'No se pudo publicar tu comentario. Inténtalo de nuevo.');
     }
@@ -249,9 +297,11 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     }
 
     const wasLiked = liked;
-    // Actualización de UI Optimista
-    setLiked(!wasLiked);
-    setLikesCount(prev => wasLiked ? prev - 1 : prev + 1);
+    const newLiked = !wasLiked;
+    const newLikesCount = wasLiked ? likesCount - 1 : likesCount + 1;
+    setLiked(newLiked);
+    setLikesCount(newLikesCount);
+    onLikeToggled?.(post.id, newLiked, newLikesCount);
 
     try {
       if (wasLiked) {
@@ -260,14 +310,12 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
         await ReactionRepository.react(post.id, user.id);
       }
     } catch (error) {
-      // Revertir si el servidor de Supabase arroja error
       setLiked(wasLiked);
-      setLikesCount(prev => wasLiked ? prev + 1 : prev - 1);
+      setLikesCount(likesCount);
+      onLikeToggled?.(post.id, wasLiked, likesCount);
       Alert.alert('Reacción no registrada', 'Hubo un error de conexión con la base de datos.');
     }
   };
-
-  const DOUBLE_TAP_DELAY = 380;
 
   const triggerHeartAnimation = () => {
     if (heartAnimationRef.current) {
@@ -277,25 +325,22 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     setShowHeartAnimation(true);
     heartScale.setValue(0);
     heartOpacity.setValue(0);
+    heartTranslateY.setValue(0);
 
     const anim = Animated.parallel([
       Animated.sequence([
-        // 1. Pop rápido con efecto rebote elástico
         Animated.spring(heartScale, {
           toValue: 1.25,
           friction: 4,
           tension: 50,
           useNativeDriver: true,
         }),
-        // 2. Se estabiliza en tamaño natural
         Animated.timing(heartScale, {
           toValue: 1,
           duration: 100,
           useNativeDriver: true,
         }),
-        // 3. Pausa visible en pantalla
         Animated.delay(220),
-        // 4. Se expande suavemente mientras se desvanece
         Animated.timing(heartScale, {
           toValue: 1.35,
           duration: 250,
@@ -303,17 +348,22 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
         }),
       ]),
       Animated.sequence([
-        // Aparición rápida
         Animated.timing(heartOpacity, {
           toValue: 1,
           duration: 140,
           useNativeDriver: true,
         }),
-        // Mantener visible
         Animated.delay(320),
-        // Desvanecimiento suave
         Animated.timing(heartOpacity, {
           toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.sequence([
+        Animated.delay(240),
+        Animated.timing(heartTranslateY, {
+          toValue: -24,
           duration: 250,
           useNativeDriver: true,
         }),
@@ -331,228 +381,93 @@ const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleImageTap = () => {
     const now = Date.now();
     if (now - lastTap.current < DOUBLE_TAP_DELAY) {
-      // Doble tap: dar like si todavía no lo tiene
       if (!liked) {
         handleLike();
       }
-      // Siempre reproducir la animación visual de corazón
+      haptics.medium();
       triggerHeartAnimation();
       lastTap.current = 0;
     } else {
       lastTap.current = now;
+      triggerCounterVisibility();
     }
   };
 
   const handleShare = async () => {
     try {
       const shareMessage = `¡Mira este increíble avistamiento en Birdify!\n\nSe avistó un ${post.tag} por @${post.username}\n\n${currentImage}`;
-
-      const result = await Share.share({
+      await Share.share({
         message: shareMessage,
         url: currentImage,
       });
-      if (result.action === Share.sharedAction) {
-        if (result.activityType) {
-          // shared with activity type of result.activityType
-        } else {
-          // shared
-        }
-      } else if (result.action === Share.dismissedAction) {
-        // dismissed
-      }
     } catch (error: any) {
       console.log(error.message);
     }
   };
 
-  const isLongCaption = post.caption.length > CAPTION_LIMIT;
-  const displayedCaption = isLongCaption && !isCaptionExpanded 
-    ? post.caption.substring(0, CAPTION_LIMIT) + '...' 
-    : post.caption;
-
-  const panResponder = React.useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dy) > 5;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0) {
-          panY.setValue(gestureState.dy);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > 150 || gestureState.vy > 0.5) {
-          Animated.timing(panY, {
-            toValue: screenHeight,
-            duration: 300,
-            useNativeDriver: true,
-          }).start(() => {
-            resetModal();
-          });
-        } else {
-          Animated.spring(panY, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
-        }
-      },
-    })
-  ).current;
-
-  const backdropOpacity = panY.interpolate({
-    inputRange: [0, screenHeight],
-    outputRange: [0.5, 0],
-    extrapolate: 'clamp',
-  });
-
-  React.useEffect(() => {
-    if (showComments) {
-      // Entrance animation
-      Animated.spring(panY, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 50,
-        friction: 8
-      }).start();
-    } else {
-      // Ensure it starts from bottom when closed
-      panY.setValue(screenHeight);
-    }
-  }, [showComments, screenHeight]);
-
-  const resetModal = () => {
-    Animated.timing(panY, {
-      toValue: screenHeight,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setShowComments(false);
-      setCommentsList([]); // Liberar memoria y asegurar que los comentarios se carguen frescos bajo demanda
-    });
-  };
-
-  const optionsPanResponder = React.useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 5,
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0) {
-          optionsPanY.setValue(gestureState.dy);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > 150 || gestureState.vy > 0.5) {
-          Animated.timing(optionsPanY, {
-            toValue: screenHeight,
-            duration: 300,
-            useNativeDriver: true,
-          }).start(() => {
-            setShowOptionsMenu(false);
-          });
-        } else {
-          Animated.spring(optionsPanY, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 50,
-            friction: 8
-          }).start();
-        }
-      },
-    })
-  ).current;
-
-  const optionsBackdropOpacity = optionsPanY.interpolate({
-    inputRange: [0, screenHeight],
-    outputRange: [0.5, 0],
-    extrapolate: 'clamp',
-  });
-
-  React.useEffect(() => {
-    if (showOptionsMenu) {
-      Animated.spring(optionsPanY, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 50,
-        friction: 8
-      }).start();
-    } else {
-      optionsPanY.setValue(screenHeight);
-    }
-  }, [showOptionsMenu, screenHeight]);
-
-  const resetOptionsModal = () => {
-    Animated.timing(optionsPanY, {
-      toValue: screenHeight,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setShowOptionsMenu(false);
-    });
-  };
-
   const isOwnPost = user?.id === post.userId;
 
   const handleEditSighting = () => {
-    resetOptionsModal();
+    setShowOptionsMenu(false);
+    onNavigateAway?.();
     setTimeout(() => {
       navigation.navigate('RecordSighting', { editingSighting: post.id });
     }, 300);
   };
 
-const handleDeleteSighting = async () => {
-  const createdAt = new Date(post.createdAt);
-  const now = new Date();
-  const diffMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
+  const handleDeleteSighting = () => {
+    const createdAt = new Date(post.createdAt);
+    const now = new Date();
+    const diffMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
 
-  if (diffMinutes > 10 && post.syncStatus !== 'pending') {
-    resetOptionsModal();
+    if (diffMinutes > 10 && post.syncStatus !== 'pending') {
+      setShowOptionsMenu(false);
+      setTimeout(() => {
+        showToast(t('feed.deleteTimeLimit'), 'error');
+      }, 350);
+      return;
+    }
+
+    setShowOptionsMenu(false);
     setTimeout(() => {
-      showToast('Solo puedes eliminar avistamientos dentro de los 10 minutos después de publicarlos.', 'error');
+      setShowDeleteModal(true);
     }, 350);
-    return;
-  }
-
-  // Esperar a que el options sheet cierre antes de abrir el delete modal
-  resetOptionsModal();
-  setTimeout(() => {
-    setShowDeleteModal(true);
-  }, 350);
-};
+  };
 
   const confirmDeleteSighting = async () => {
     setIsDeleting(true);
     try {
       await SightingRepository.delete(post.id);
       setShowDeleteModal(false);
+      onNavigateAway?.();
       if (onPostDeleted) {
         onPostDeleted();
       }
     } catch (error) {
-      Alert.alert('Error', 'No se pudo eliminar el avistamiento. Intenta de nuevo.');
+      Alert.alert(t('common.error'), t('feed.deleteFailed'));
       console.error('Error deleting sighting:', error);
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const handleBlockUser = async () => {
+  const handleBlockUser = () => {
     if (!user) {
-      Alert.alert('Inicia Sesión', 'Debes iniciar sesión para bloquear usuarios.');
+      Alert.alert(t('auth.login'), t('feed.mustLoginToBlock'));
       return;
     }
 
     if (!post.userId) {
-      Alert.alert('Error', 'No se puede bloquear este usuario.');
+      Alert.alert(t('common.error'), t('feed.cannotBlockUser'));
       return;
     }
 
     if (user.id === post.userId) {
-      Alert.alert('Error', 'No puedes bloquearte a ti mismo.');
+      Alert.alert(t('common.error'), t('feed.cannotBlockSelf'));
       return;
     }
 
-    resetOptionsModal();
+    setShowOptionsMenu(false);
     setShowBlockModal(true);
   };
 
@@ -561,7 +476,7 @@ const handleDeleteSighting = async () => {
 
     if (user.id === post.userId) {
       setShowBlockModal(false);
-      showToast('No puedes bloquearte a ti mismo.', 'error');
+      showToast(t('feed.cannotBlockSelf'), 'error');
       return;
     }
 
@@ -569,19 +484,29 @@ const handleDeleteSighting = async () => {
     try {
       await UserBlockRepository.block(user.id, post.userId);
       setShowBlockModal(false);
-      showToast(`Has bloqueado a @${post.username}.`, 'success');
+      showToast(t('feed.blockSuccess', { username: post.username }), 'success');
+      onNavigateAway?.();
       if (onPostDeleted) {
         onPostDeleted();
       }
     } catch (error) {
-      showToast('No se pudo bloquear al usuario. Intenta de nuevo.', 'error');
+      showToast(t('feed.blockFailed'), 'error');
       console.error('Error blocking user:', error);
     } finally {
       setIsBlocking(false);
     }
   };
 
-  const pagerRef = React.useRef<PagerView>(null);
+  const handleTagPress = useCallback(() => {
+    if (post.tag) {
+      onNavigateAway?.();
+      navigation.navigate('MainTabs', {
+        screen: 'Dictionary',
+        params: { searchQuery: post.tag },
+      });
+    }
+  }, [navigation, onNavigateAway, post.tag]);
+
   return (
     <View style={[styles.container, isNew && { borderWidth: 2, borderColor: colors.primary }]}>
       {toast.visible && (
@@ -589,615 +514,120 @@ const handleDeleteSighting = async () => {
           visible={toast.visible}
           message={toast.message}
           type={toast.type}
-          onClose={() => setToast(prev => ({ ...prev, visible: false }))}
+          onClose={() => setToast((prev) => ({ ...prev, visible: false }))}
           topOffset={8}
           containerStyle={{ left: 12, right: 12 }}
         />
       )}
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.userInfo}
-          onPress={() => {
-            onNavigateAway?.();
-            navigation.navigate('Profile', { userId: post.userId });
-          }}
-        >
-          {!post.syncStatus && (
-            <Image source={{ uri: post.userAvatar }} style={styles.avatar} fadeDuration={0} />
-          )}
-          <View style={styles.userText}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={styles.username} numberOfLines={1}>
-                  {post.username}
-                </Text>
-                {post.isVerified && (
-                  <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />
-                )}
-                {post.syncStatus && (
-                  <View style={{
-                    flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 99, paddingHorizontal: 6, paddingVertical: 2,
-                    backgroundColor: post.syncStatus === 'pending' ? '#fef3c7' : '#dcfce7'
-                  }}>
-                    <Ionicons
-                      name={post.syncStatus === 'pending' ? 'cloud-upload-outline' : 'cloud-done-outline'}
-                      size={12}
-                      color={post.syncStatus === 'pending' ? '#92400e' : '#166534'}
-                    />
-                    <Text style={{
-                      fontSize: 10, fontFamily: 'PlusJakartaSans-SemiBold',
-                      color: post.syncStatus === 'pending' ? '#92400e' : '#166534'
-                    }}>
-                      {post.syncStatus === 'pending' ? 'Pendiente' : 'Sincronizado'}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            <TouchableOpacity disabled={post.latitude == null || post.longitude == null || post.location === 'Ubicación Privada'} onPress={() => {
-              if (post.latitude != null && post.longitude != null && post.location !== 'Ubicación Privada') {
-                const targetSighting = {
-                  id: post.id,
-                  latitude: post.latitude,
-                  longitude: post.longitude,
-                };
-                // Si Explore está en el navigator actual (tab), navegar directamente.
-                // Si no (ej. desde modal de Profile en stack), navegar a MainTabs -> Explore.
-                if (navigation.getState().routeNames.includes('Explore')) {
-                  navigation.navigate('Explore', { targetSighting });
-                } else {
-                  (navigation as any).navigate('MainTabs', { screen: 'Explore', params: { targetSighting } });
-                }
-              }
-            }}>
-              <Text style={styles.location}>{post.location}</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setShowOptionsMenu(true)}>
-          <MaterialCommunityIcons name="dots-horizontal" size={24} color={Colors.textSecondary} />
-        </TouchableOpacity>
-      </View>
 
-      {/* Media Carousel with Double-Tap Heart Animation */}
-      <View style={styles.mediaWrapper}>
-        <PagerView
-          ref={pagerRef}
-          style={styles.imageContainer}
-          initialPage={0}
-          scrollEnabled={true}
-          offscreenPageLimit={1}
-          overdrag={false}
-          onPageSelected={(e) => setCurrentImageIndex(e.nativeEvent.position)}
-        >
-          {images.map((img, index) => {
-            const isImgLoaded = Boolean(imageLoaded[index]);
-            const isImgError = Boolean(imageError[index] || !img);
+      {/* 1. Header */}
+      <FeedCardHeader
+        post={post}
+        styles={styles}
+        navigation={navigation}
+        onNavigateAway={onNavigateAway}
+        onOptionsPress={() => setShowOptionsMenu(true)}
+      />
 
-            return (
-              <View key={index} style={styles.pageItem}>
-                <TouchableWithoutFeedback onPress={handleImageTap}>
-                  <View style={{ width: '100%', height: '100%', position: 'relative' }}>
-                    {/* Placeholder estilizado: visible mientras carga o si no se encuentra la imagen */}
-                    {(!isImgLoaded || isImgError) && (
-                      <View style={styles.placeholderContainer} pointerEvents="none">
-                        <View style={styles.placeholderGlow} />
-                        <View style={styles.placeholderIconWrapper}>
-                          <MaterialCommunityIcons
-                            name="feather"
-                            size={36}
-                            color={isDark ? '#A3D494' : colors.primary}
-                          />
-                        </View>
-                        <Text style={styles.placeholderBadgeText}>
-                          {isImgError ? 'Avistamiento de ave' : 'Cargando fotografía'}
-                        </Text>
-                        <Text style={styles.placeholderBirdTitle} numberOfLines={2}>
-                          {post.tag || 'Ave sin identificar'}
-                        </Text>
-                        {isImgError ? (
-                          <View style={styles.placeholderStatusPill}>
-                            <Ionicons name="image-outline" size={13} color={colors.textSecondary} />
-                            <Text style={styles.placeholderStatusText}>Fotografía no disponible</Text>
-                          </View>
-                        ) : (
-                          <View style={styles.placeholderStatusPill}>
-                            <ActivityIndicator size="small" color={colors.primary} />
-                            <Text style={styles.placeholderStatusText}>Cargando imagen...</Text>
-                          </View>
-                        )}
-                      </View>
-                    )}
+      {/* 2. Media Carousel */}
+      <FeedCardMedia
+        images={images}
+        postTag={post.tag}
+        pagerRef={pagerRef}
+        currentImageIndex={currentImageIndex}
+        setCurrentImageIndex={setCurrentImageIndex}
+        imageLoaded={imageLoaded}
+        setImageLoaded={setImageLoaded}
+        imageError={imageError}
+        setImageError={setImageError}
+        scrollProgress={scrollProgress}
+        counterAnimatedStyle={counterAnimatedStyle}
+        triggerCounterVisibility={triggerCounterVisibility}
+        showHeartAnimation={showHeartAnimation}
+        heartScale={heartScale}
+        heartOpacity={heartOpacity}
+        heartTranslateY={heartTranslateY}
+        onImageTap={handleImageTap}
+        onTagPress={handleTagPress}
+        styles={styles}
+        colors={colors}
+        isDark={isDark}
+      />
 
-                    {/* Imagen real */}
-                    {Boolean(img) && !isImgError && (
-                      <Image
-                        source={{ uri: img }}
-                        style={[
-                          styles.postImage,
-                          { opacity: isImgLoaded ? 1 : 0 },
-                        ]}
-                        fadeDuration={180}
-                        resizeMode="cover"
-                        onLoad={() => {
-                          setImageLoaded(prev => ({ ...prev, [index]: true }));
-                        }}
-                        onError={() => {
-                          setImageError(prev => ({ ...prev, [index]: true }));
-                        }}
-                      />
-                    )}
-                  </View>
-                </TouchableWithoutFeedback>
-              </View>
-            );
-          })}
-        </PagerView>
+      {/* 3. Actions */}
+      <FeedCardActions
+        liked={liked}
+        likesCount={likesCount}
+        commentsCount={commentsCount}
+        onLikePress={handleLike}
+        onCommentPress={() => {
+          setShowComments(true);
+          loadComments();
+        }}
+        onSharePress={handleShare}
+        styles={styles}
+      />
 
-        {/* Double-tap animated heart (pointerEvents="none" ensures it NEVER blocks swipe/scroll) */}
-        {showHeartAnimation && (
-          <View style={styles.heartOverlay} pointerEvents="none">
-            <Animated.View
-              style={[
-                styles.heartAnimated,
-                {
-                  transform: [{ scale: heartScale }],
-                  opacity: heartOpacity,
-                },
-              ]}
-            >
-              <Ionicons
-                name="heart"
-                size={110}
-                color="#FF2E63"
-                style={styles.heartIcon}
-              />
-            </Animated.View>
-          </View>
-        )}
+      {/* 4. Caption */}
+      <FeedCardCaption
+        username={post.username}
+        caption={post.caption}
+        displayTime={displayTime}
+        styles={styles}
+      />
 
-        {/* Image Counter (e.g., 1 / 3) */}
-        {totalImages > 1 && (
-          <View style={styles.imageCounter} pointerEvents="none">
-            <Text style={styles.imageCounterText}>
-              {currentImageIndex + 1} / {totalImages}
-            </Text>
-          </View>
-        )}
-
-        {/* Carousel Dots indicator */}
-        {totalImages > 1 && (
-          <View style={styles.dotsContainer} pointerEvents="none">
-            {images.map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.dot,
-                  currentImageIndex === index && styles.activeDot,
-                ]}
-              />
-            ))}
-          </View>
-        )}
-      </View>
-
-      {/* Actions */}
-      <View style={styles.actions}>
-        <View style={styles.leftActions}>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={handleLike}
-          >
-            <Ionicons 
-              name={liked ? "heart" : "heart-outline"} 
-              size={26} 
-              color={liked ? "#FF5252" : Colors.primary} 
-            />
-            <Text style={[styles.actionText, liked && { color: "#FF5252" }]}>
-              {likesCount}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => setShowComments(true)}
-          >
-            <MaterialCommunityIcons 
-              name="comment-outline" 
-              size={24} 
-              color={Colors.primary} 
-            />
-            <Text style={styles.actionText}>
-              {commentsCount}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity onPress={handleShare}>
-          <Ionicons name="share-outline" size={24} color={Colors.primary} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Caption */}
-      <View style={styles.captionContainer}>
-        <Text style={styles.caption}>
-          <Text style={styles.captionUsername}>{post.username} </Text>
-          {displayedCaption}
-          {isLongCaption && (
-            <Text 
-              style={styles.seeMore} 
-              onPress={() => setIsCaptionExpanded(!isCaptionExpanded)}
-            >
-              {" "}{isCaptionExpanded ? "ver menos" : "ver más"}
-            </Text>
-          )}
-        </Text>
-        <Text style={styles.timeAgo}>{post.timeAgo}</Text>
-      </View>
-
-      {/* Comments Modal */}
-      <Modal
+      {/* 5. Comments Modal */}
+      <FeedCommentsModal
         visible={showComments}
-        animationType="none"
-        transparent={true}
-        statusBarTranslucent={true}
-        onRequestClose={resetModal}
-      >
-        <View style={styles.modalOverlayContainer}>
-          <Animated.View 
-            style={[
-              styles.modalOverlay, 
-              { opacity: backdropOpacity }
-            ]} 
-          >
-            <TouchableOpacity 
-              style={{ flex: 1 }} 
-              onPress={resetModal} 
-              activeOpacity={1} 
-            />
-          </Animated.View>
-          
-          <Animated.View 
-            style={[
-              styles.modalContent, 
-              { transform: [{ translateY: panY }] }
-            ]}
-          >
-            <KeyboardAvoidingView
-              style={{ flex: 1 }}
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-            >
-            {/* Draggable Header */}
-            <View {...panResponder.panHandlers} style={styles.modalDragArea}>
-              <View style={styles.modalHandle} />
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Comentarios</Text>
-              </View>
-            </View>
+        onClose={() => {
+          setShowComments(false);
+          setCommentsList([]);
+        }}
+        commentsList={commentsList}
+        loadingComments={loadingComments}
+        visibleCommentsCount={visibleCommentsCount}
+        setVisibleCommentsCount={setVisibleCommentsCount}
+        expandedComments={expandedComments}
+        toggleCommentExpansion={toggleCommentExpansion}
+        commentText={commentText}
+        setCommentText={setCommentText}
+        replyingTo={replyingTo}
+        setReplyingTo={setReplyingTo}
+        onCommentSubmit={handleCommentSubmit}
+        isOffline={isOffline}
+        postSyncStatus={post.syncStatus}
+        navigation={navigation}
+        onNavigateAway={onNavigateAway}
+        styles={styles}
+        colors={colors}
+      />
 
-            <ScrollView 
-              style={styles.modalScrollView} 
-              showsVerticalScrollIndicator={false}
-            >
-              {loadingComments ? (
-                <CommentsSkeleton count={4} />
-              ) : commentsList.length === 0 ? (
-                <View style={{ paddingVertical: 40, justifyContent: 'center', alignItems: 'center' }}>
-                  <Ionicons name="chatbubbles-outline" size={32} color={colors.primary + '80'} />
-                  <Text style={{ marginTop: 10, color: Colors.textSecondary, fontSize: 14, textAlign: 'center' }}>
-                    Aún no hay comentarios.{"\n"}¡Sé el primero en compartir tu opinión!
-                  </Text>
-                </View>
-              ) : (
-                commentsList.slice(0, visibleCommentsCount).map((comment) => (
-                  <View key={comment.id} style={styles.commentItem}>
-                    <View style={styles.commentHeader}>
-                      <TouchableOpacity onPress={() => {
-                        if (comment.userId) {
-                          setShowComments(false);
-                          onNavigateAway?.();
-                          navigation.navigate('Profile', { userId: comment.userId });
-                        }
-                      }}>
-                        <Text style={styles.commentUsername}>{comment.username}</Text>
-                      </TouchableOpacity>
-                      <Text style={styles.commentText}>{comment.text}</Text>
-                    </View>
-                    
-                    {!(isOffline && post.syncStatus !== 'pending') && (
-                      <TouchableOpacity 
-                        onPress={() => setReplyingTo({ id: comment.id, username: comment.username, parentId: null })}
-                        style={styles.replyButton}
-                      >
-                        <Text style={styles.replyButtonText}>Responder</Text>
-                      </TouchableOpacity>
-                    )}
-                    
-                    {comment.replies && comment.replies.length > 0 && (
-                      <View style={styles.repliesContainer}>
-                        <TouchableOpacity 
-                          onPress={() => toggleCommentExpansion(comment.id)}
-                          style={styles.viewRepliesButton}
-                        >
-                          <Text style={styles.viewRepliesText}>
-                            {expandedComments[comment.id] 
-                              ? 'Ocultar subcomentarios' 
-                              : `Ver ${comment.replies.length} subcomentarios`}
-                          </Text>
-                        </TouchableOpacity>
-                        
-                        {expandedComments[comment.id] && (
-                          <View style={styles.repliesList}>
-                            {comment.replies.map((reply) => (
-                              <View key={reply.id} style={{ marginBottom: Spacing.sm }}>
-                                <View style={styles.replyItem}>
-                                  <TouchableOpacity onPress={() => {
-                                    if (reply.userId) {
-                                      setShowComments(false);
-                                      onNavigateAway?.();
-                                      navigation.navigate('Profile', { userId: reply.userId });
-                                    }
-                                  }}>
-                                    <Text style={styles.commentUsername}>{reply.username}</Text>
-                                  </TouchableOpacity>
-                                  <Text style={styles.commentText}>{reply.text}</Text>
-                                </View>
-                                {!(isOffline && post.syncStatus !== 'pending') && (
-                                  <TouchableOpacity 
-                                    onPress={() => setReplyingTo({ id: reply.id, username: reply.username, parentId: comment.id })}
-                                    style={styles.replyButton}
-                                  >
-                                    <Text style={styles.replyButtonText}>Responder</Text>
-                                  </TouchableOpacity>
-                                )}
-                              </View>
-                            ))}
-                          </View>
-                        )}
-                      </View>
-                    )}
-                  </View>
-                ))
-              )}
-
-              {!loadingComments && commentsList.length > visibleCommentsCount && (
-                <TouchableOpacity 
-                  style={styles.loadMoreButton}
-                  onPress={() => setVisibleCommentsCount(prev => prev + 5)}
-                >
-                  <Text style={styles.loadMoreText}>Cargar más comentarios</Text>
-                </TouchableOpacity>
-              )}
-            </ScrollView>
-
-            {/* Input Area */}
-            <View style={[
-              styles.modalInputContainer,
-              Platform.OS === 'android' && keyboardHeight > 0 && { paddingBottom: keyboardHeight }
-            ]}>
-              {replyingTo && (
-                <View style={styles.replyingToBadge}>
-                  <Text style={styles.replyingToText}>Respondiendo a @{replyingTo.username}</Text>
-                  <TouchableOpacity onPress={() => setReplyingTo(null)}>
-                    <Ionicons name="close-circle" size={16} color={Colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-              )}
-              <View style={styles.inputRow}>
-                {isOffline && post.syncStatus !== 'pending' ? (
-                  <Text style={[styles.commentInput, { color: Colors.textSecondary, textAlignVertical: 'center', paddingTop: 12 }]}>
-                    Comentarios desactivados sin conexión
-                  </Text>
-                ) : (
-                  <>
-                    <TextInput
-                      style={styles.commentInput}
-                      placeholder={replyingTo ? "Escribe una respuesta..." : "Añade un comentario..."}
-                      value={commentText}
-                      onChangeText={setCommentText}
-                      multiline
-                    />
-                    <TouchableOpacity 
-                      style={[styles.sendButton, !commentText.trim() && styles.sendButtonDisabled]}
-                      onPress={handleCommentSubmit}
-                      disabled={!commentText.trim()}
-                    >
-                      <Ionicons 
-                        name="send" 
-                        size={20} 
-                        color={commentText.trim() ? Colors.primary : Colors.textSecondary} 
-                      />
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
-            </View>
-            </KeyboardAvoidingView>
-          </Animated.View>
-        </View>
-      </Modal>
-
-      {/* Options Menu Modal */}
-      <Modal
+      {/* 6. Options Menu Modal */}
+      <FeedOptionsMenuModal
         visible={showOptionsMenu}
-        animationType="none"
-        transparent={true}
-        statusBarTranslucent={true}
-        onRequestClose={resetOptionsModal}
-      >
-        <View style={styles.optionsOverlay}>
-          <Animated.View
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: '#000', opacity: optionsBackdropOpacity }
-            ]}
-          >
-            <TouchableOpacity
-              style={{ flex: 1 }}
-              activeOpacity={1}
-              onPress={resetOptionsModal}
-            />
-          </Animated.View>
+        isOwnPost={isOwnPost}
+        onClose={() => setShowOptionsMenu(false)}
+        onEdit={handleEditSighting}
+        onDelete={handleDeleteSighting}
+        onReport={() => {
+          setShowOptionsMenu(false);
+          setShowReportModal(true);
+        }}
+        onBlock={handleBlockUser}
+        styles={styles}
+      />
 
-          <Animated.View
-            style={[
-              styles.optionsContent,
-              { transform: [{ translateY: optionsPanY }] }
-            ]}
-          >
-            <View {...optionsPanResponder.panHandlers} style={{ width: '100%', alignItems: 'center', paddingVertical: 10 }}>
-              <View style={styles.modalHandle} />
-            </View>
-
-            <View style={styles.optionsList}>
-              {isOwnPost && (
-                <>
-                  <TouchableOpacity style={styles.optionItem} onPress={handleEditSighting}>
-                    <Ionicons name="pencil-outline" size={22} color={Colors.textPrimary} />
-                    <Text style={styles.optionText}>Editar publicación</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.optionItem} onPress={handleDeleteSighting}>
-                    <Ionicons name="trash-outline" size={22} color="#FF5252" />
-                    <Text style={[styles.optionText, { color: '#FF5252' }]}>Eliminar avistamiento</Text>
-                  </TouchableOpacity>
-                  <View style={styles.optionDivider} />
-                </>
-              )}
-
-              {!isOwnPost && (
-                <>
-                  <TouchableOpacity style={styles.optionItem} onPress={() => { resetOptionsModal(); setShowReportModal(true); }}>
-                    <Ionicons name="flag-outline" size={22} color="#FF9800" />
-                    <Text style={styles.optionText}>Reportar publicación</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.optionItem} onPress={handleBlockUser}>
-                    <Ionicons name="ban-outline" size={22} color="#FF5252" />
-                    <Text style={[styles.optionText, { color: '#FF5252' }]}>Bloquear usuario</Text>
-                  </TouchableOpacity>
-                  <View style={styles.optionDivider} />
-                </>
-              )}
-
-              <TouchableOpacity style={styles.optionItem} onPress={resetOptionsModal}>
-                <Ionicons name="close-outline" size={22} color={Colors.textPrimary} />
-                <Text style={styles.optionText}>Cerrar</Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </View>
-      </Modal>
-
-      {/* Delete Confirmation Modal */}
-      <Modal
+      {/* 7. Delete Confirmation Modal */}
+      <FeedDeleteConfirmModal
         visible={showDeleteModal}
-        animationType="fade"
-        transparent={true}
-        statusBarTranslucent={true}
-        onRequestClose={() => { if (!isDeleting) setShowDeleteModal(false); }}
-      >
-        <View style={[styles.optionsOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
-          <Animated.View
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: '#000', opacity: 0.5 }
-            ]}
-          />
+        isDeleting={isDeleting}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={confirmDeleteSighting}
+        styles={styles}
+        colors={colors}
+      />
 
-          <View style={{
-            backgroundColor: colors.canvasPure,
-            borderRadius: 20,
-            padding: Spacing.lg,
-            width: '80%',
-            ...Shadows.modal
-          }}>
-            <View style={{ alignItems: 'center', marginBottom: Spacing.lg }}>
-              <View style={{
-                width: 80,
-                height: 80,
-                borderRadius: 40,
-                backgroundColor: '#FF5252',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginBottom: Spacing.md
-              }}>
-                <Ionicons name="trash-bin-outline" size={40} color={colors.canvasPure} />
-              </View>
-
-              <Text style={{
-                fontSize: Typography.fontSize.lg,
-                fontWeight: Typography.fontWeight.bold,
-                color: colors.textPrimary,
-                textAlign: 'center',
-                fontFamily: Typography.fontFamilyDisplay,
-                marginBottom: Spacing.sm
-              }}>
-                Eliminar avistamiento
-              </Text>
-
-              <Text style={{
-                fontSize: Typography.fontSize.md,
-                color: colors.textSecondary,
-                textAlign: 'center',
-                fontFamily: Typography.fontFamilyBody,
-                lineHeight: Typography.lineHeight.normal
-              }}>
-                ¿Estás seguro de que deseas eliminar este avistamiento? Esta acción no se puede deshacer.
-              </Text>
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.lg }}>
-              <TouchableOpacity
-                disabled={isDeleting}
-                onPress={() => setShowDeleteModal(false)}
-                style={{
-                  flex: 1,
-                  paddingVertical: Spacing.md,
-                  borderRadius: Radius.md,
-                  backgroundColor: colors.componentBase,
-                  justifyContent: 'center',
-                  alignItems: 'center'
-                }}
-              >
-                <Text style={{
-                  fontSize: Typography.fontSize.md,
-                  fontWeight: Typography.fontWeight.semiBold,
-                  color: colors.textPrimary,
-                  fontFamily: Typography.fontFamilyDisplay
-                }}>
-                  Cancelar
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                disabled={isDeleting}
-                onPress={confirmDeleteSighting}
-                style={{
-                  flex: 1,
-                  paddingVertical: Spacing.md,
-                  borderRadius: Radius.md,
-                  backgroundColor: '#FF5252',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  opacity: isDeleting ? 0.7 : 1
-                }}
-              >
-                {isDeleting ? (
-                  <ActivityIndicator size="small" color={colors.canvasPure} />
-                ) : (
-                  <Text style={{
-                    fontSize: Typography.fontSize.md,
-                    fontWeight: Typography.fontWeight.semiBold,
-                    color: colors.canvasPure,
-                    fontFamily: Typography.fontFamilyDisplay
-                  }}>
-                    Eliminar
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Block User Confirmation Modal */}
+      {/* 8. Report Modal */}
       {user?.id && (
         <ReportModal
           visible={showReportModal}
@@ -1206,121 +636,21 @@ const handleDeleteSighting = async () => {
           reportedUserId={post.userId || null}
           targetLabel={`@${post.username}`}
           onClose={() => setShowReportModal(false)}
-          onSuccess={() => showToast('Reporte enviado. Gracias por ayudar a mantener segura la comunidad.', 'success')}
+          onSuccess={() => showToast(t('feed.reportSent'), 'success')}
           onError={(msg) => showToast(msg, 'error')}
         />
       )}
-      <Modal
+
+      {/* 9. Block Confirmation Modal */}
+      <FeedBlockConfirmModal
         visible={showBlockModal}
-        animationType="fade"
-        transparent={true}
-        statusBarTranslucent={true}
-        onRequestClose={() => { if (!isBlocking) setShowBlockModal(false); }}
-      >
-        <View style={[styles.optionsOverlay, { justifyContent: 'center', alignItems: 'center' }]}>
-          <Animated.View
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: '#000', opacity: 0.5 }
-            ]}
-          />
-
-          <View style={{
-            backgroundColor: colors.canvasPure,
-            borderRadius: 20,
-            padding: Spacing.lg,
-            width: '80%',
-            ...Shadows.modal
-          }}>
-            <View style={{ alignItems: 'center', marginBottom: Spacing.lg }}>
-              <View style={{
-                width: 80,
-                height: 80,
-                borderRadius: 40,
-                backgroundColor: '#FF5252',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginBottom: Spacing.md
-              }}>
-                <Ionicons name="ban-outline" size={40} color={colors.canvasPure} />
-              </View>
-
-              <Text style={{
-                fontSize: Typography.fontSize.lg,
-                fontWeight: Typography.fontWeight.bold,
-                color: colors.textPrimary,
-                textAlign: 'center',
-                fontFamily: Typography.fontFamilyDisplay,
-                marginBottom: Spacing.sm
-              }}>
-                Bloquear a @{post.username}
-              </Text>
-
-              <Text style={{
-                fontSize: Typography.fontSize.md,
-                color: colors.textSecondary,
-                textAlign: 'center',
-                fontFamily: Typography.fontFamilyBody,
-                lineHeight: Typography.lineHeight.normal,
-                marginBottom: Spacing.sm
-              }}>
-                No podrán ver tu perfil ni tu actividad. Puedes desbloquearlos en tu configuración.
-              </Text>
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.lg }}>
-              <TouchableOpacity
-                disabled={isBlocking}
-                onPress={() => setShowBlockModal(false)}
-                style={{
-                  flex: 1,
-                  paddingVertical: Spacing.md,
-                  borderRadius: Radius.md,
-                  backgroundColor: colors.componentBase,
-                  justifyContent: 'center',
-                  alignItems: 'center'
-                }}
-              >
-                <Text style={{
-                  fontSize: Typography.fontSize.md,
-                  fontWeight: Typography.fontWeight.semiBold,
-                  color: colors.textPrimary,
-                  fontFamily: Typography.fontFamilyDisplay
-                }}>
-                  Cancelar
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                disabled={isBlocking}
-                onPress={confirmBlockUser}
-                style={{
-                  flex: 1,
-                  paddingVertical: Spacing.md,
-                  borderRadius: Radius.md,
-                  backgroundColor: '#FF5252',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  opacity: isBlocking ? 0.7 : 1
-                }}
-              >
-                {isBlocking ? (
-                  <ActivityIndicator size="small" color={colors.canvasPure} />
-                ) : (
-                  <Text style={{
-                    fontSize: Typography.fontSize.md,
-                    fontWeight: Typography.fontWeight.semiBold,
-                    color: colors.canvasPure,
-                    fontFamily: Typography.fontFamilyDisplay
-                  }}>
-                    Bloquear
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        isBlocking={isBlocking}
+        username={post.username}
+        onClose={() => setShowBlockModal(false)}
+        onConfirm={confirmBlockUser}
+        styles={styles}
+        colors={colors}
+      />
     </View>
   );
 }

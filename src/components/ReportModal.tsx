@@ -13,14 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDynamicStyles } from '../hooks/useDynamicStyles';
 import { Radius, Spacing, Typography } from '../theme';
 import { ReportRepository } from '../repositories/report.repository';
-
-const REPORT_REASONS = [
-  'Contenido inapropiado u ofensivo',
-  'Spam o publicidad engañosa',
-  'Identificación falsa o desinformación',
-  'Acoso o comportamiento abusivo',
-  'Exposición de nido o especie protegida en riesgo',
-];
+import { useT } from '../i18n';
 
 interface ReportModalProps {
   visible: boolean;
@@ -144,7 +137,15 @@ export default function ReportModal({
   onError,
 }: ReportModalProps) {
   const { screen: styles, colors } = useDynamicStyles(createStyles);
-  const [selectedReason, setSelectedReason] = useState<string>(REPORT_REASONS[0]);
+  const { t } = useT();
+  const reasons = [
+    { key: 'inappropriate', label: t('reports.reasons.inappropriate') },
+    { key: 'spam', label: t('reports.reasons.spam') },
+    { key: 'misinformation', label: t('reports.reasons.misinformation') },
+    { key: 'harassment', label: t('reports.reasons.harassment') },
+    { key: 'protectedSpecies', label: t('reports.reasons.protectedSpecies') },
+  ];
+  const [selectedReasonKey, setSelectedReasonKey] = useState<string>('inappropriate');
   const [details, setDetails] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -152,9 +153,10 @@ export default function ReportModal({
     if (submitting) return;
     setSubmitting(true);
     try {
+      const selectedLabel = reasons.find((r) => r.key === selectedReasonKey)?.label || selectedReasonKey;
       const fullReason = details.trim()
-        ? `${selectedReason}: ${details.trim()}`
-        : selectedReason;
+        ? `${selectedLabel}: ${details.trim()}`
+        : selectedLabel;
 
       await ReportRepository.create({
         reporterId,
@@ -164,11 +166,11 @@ export default function ReportModal({
       });
 
       setDetails('');
-      setSelectedReason(REPORT_REASONS[0]);
+      setSelectedReasonKey('inappropriate');
       onClose();
       onSuccess?.();
     } catch (e: any) {
-      onError?.(e?.message || 'No se pudo enviar el reporte.');
+      onError?.(e?.message || t('reports.reportFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -185,7 +187,7 @@ export default function ReportModal({
         <View style={styles.card}>
           <View style={styles.headerRow}>
             <Text style={styles.title}>
-              {sightingId ? 'Reportar publicación' : 'Reportar usuario'}
+              {sightingId ? t('reports.reportPost') : t('reports.reportUser')}
             </Text>
             <TouchableOpacity disabled={submitting} onPress={onClose}>
               <Ionicons name="close" size={22} color={colors.textSecondary} />
@@ -194,18 +196,18 @@ export default function ReportModal({
 
           <Text style={styles.subtitle}>
             {targetLabel
-              ? `Selecciona el motivo por el que deseas reportar a ${targetLabel}. Nuestro equipo de moderación lo revisará en menos de 24 horas.`
-              : 'Selecciona el motivo del reporte. Nuestro equipo de moderación revisará el contenido.'}
+              ? t('reports.targetPrompt', { target: targetLabel })
+              : t('reports.generalPrompt')}
           </Text>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            {REPORT_REASONS.map((reason) => {
-              const active = selectedReason === reason;
+            {reasons.map((item) => {
+              const active = selectedReasonKey === item.key;
               return (
                 <TouchableOpacity
-                  key={reason}
+                  key={item.key}
                   style={[styles.reasonOption, active && styles.reasonOptionSelected]}
-                  onPress={() => setSelectedReason(reason)}
+                  onPress={() => setSelectedReasonKey(item.key)}
                   activeOpacity={0.75}
                 >
                   <Ionicons
@@ -213,14 +215,14 @@ export default function ReportModal({
                     size={18}
                     color={active ? colors.primary : colors.textSecondary}
                   />
-                  <Text style={styles.reasonText}>{reason}</Text>
+                  <Text style={styles.reasonText}>{item.label}</Text>
                 </TouchableOpacity>
               );
             })}
 
             <TextInput
               style={styles.notesInput}
-              placeholder="Detalles adicionales (opcional)..."
+              placeholder={t('reports.additionalNotes')}
               placeholderTextColor={colors.placeholder}
               value={details}
               onChangeText={setDetails}
@@ -236,7 +238,7 @@ export default function ReportModal({
               disabled={submitting}
               onPress={onClose}
             >
-              <Text style={styles.cancelText}>Cancelar</Text>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -247,7 +249,7 @@ export default function ReportModal({
               {submitting ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <Text style={styles.submitText}>Enviar reporte</Text>
+                <Text style={styles.submitText}>{t('reports.sendReport')}</Text>
               )}
             </TouchableOpacity>
           </View>

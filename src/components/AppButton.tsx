@@ -1,24 +1,14 @@
 /**
  * AppButton — Botón primario reutilizable
- *
- * Props:
- *  label      — texto del botón
- *  onPress    — callback al presionar
- *  color      — color de fondo (default: Colors.primary)
- *  textColor  — color del texto (default: Colors.textOnPrimary)
- *  fontSize   — tamaño de fuente (default: Typography.fontSize.lg)
- *  disabled   — deshabilita el botón
- *  style      — estilos adicionales para el contenedor
  */
 import React from 'react';
 import {
-  TouchableOpacity,
   Text,
-  StyleSheet,
   ViewStyle,
   ActivityIndicator,
 } from 'react-native';
 import { Colors, Typography, Radius, Shadows } from '../theme';
+import { PressableScale } from './animated/PressableScale';
 
 type AppButtonProps = {
   label: string;
@@ -43,8 +33,12 @@ export default function AppButton({
   loading = false,
   style,
 }: AppButtonProps) {
+  const isDisabled = disabled || loading;
+
   return (
-    <TouchableOpacity
+    <PressableScale
+      activeScale={0.98}
+      haptic="light"
       style={[
         styles.button,
         { backgroundColor: disabled ? Colors.placeholder : color },
@@ -52,8 +46,10 @@ export default function AppButton({
         style,
       ]}
       onPress={onPress}
-      activeOpacity={0.85}
-      disabled={disabled || loading}
+      disabled={isDisabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
     >
       {loading ? (
         <ActivityIndicator color={textColor} />
@@ -62,6 +58,6 @@ export default function AppButton({
           {label}
         </Text>
       )}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }

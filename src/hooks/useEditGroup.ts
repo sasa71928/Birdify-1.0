@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
-import { compressImage } from '../utils/imageCompressor';
+import { compressImage, prepareImageForUpload } from '../utils/imageCompressor';
 import { supabase } from '../lib/supabase';
 import { ConversationRepository } from '../repositories/conversation.repository';
 import { FollowRepository } from '../repositories/follow.repository';
@@ -106,16 +106,13 @@ export function useEditGroup() {
 
       let finalAvatarUrl = image;
       if (image && !image.startsWith('http://') && !image.startsWith('https://')) {
-        const ext = 'jpg';
-        const fileName = `${user.id}/${Date.now()}.${ext}`;
-
-        const response = await fetch(image);
-        const arrayBuffer = await response.arrayBuffer();
+        const prepared = await prepareImageForUpload(image, 'avatar');
+        const fileName = `${user.id}/${Date.now()}.${prepared.fileExt}`;
 
         const { error: uploadError } = await supabase.storage
           .from('group-avatars')
-          .upload(fileName, arrayBuffer, {
-            contentType: 'image/jpeg',
+          .upload(fileName, prepared.arrayBuffer, {
+            contentType: prepared.mimeType,
             upsert: true,
           });
 

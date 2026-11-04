@@ -1,97 +1,148 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StatusBar,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { createStyles } from '../../styles/screens/settings/settingsSubScreens.styles';
+import { Ionicons } from '@expo/vector-icons';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
+import { useT } from '../../i18n';
 import LegalModal, { LegalDocumentType } from '../../components/LegalModal';
+import {
+  SettingsScaffold,
+  SettingsSection,
+  SettingsRow,
+} from '../../components/settings';
+import { Radius, Typography, Shadows } from '../../theme';
 
 export default function AboutBirdifyScreen() {
   const navigation = useNavigation();
-  const { screen: styles, colors, isDark } = useDynamicStyles(createStyles);
+  const { colors, isDark } = useDynamicStyles();
+  const { t } = useT();
   const [legalDoc, setLegalDoc] = useState<LegalDocumentType>(null);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+    <SettingsScaffold
+      title={t('settings.about')}
+      subtitle={t('settings.aboutSubtitle')}
+      onBack={() => navigation.goBack()}
+    >
       <LegalModal documentType={legalDoc} onClose={() => setLegalDoc(null)} />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>About Birdify</Text>
+      {/* Brand Header */}
+      <View style={styles.brandHeader}>
+        <View
+          style={[
+            styles.appLogo,
+            { backgroundColor: colors.primary, ...Shadows.active },
+          ]}
+        >
+          <Ionicons name="leaf" size={44} color="#FFF" />
+        </View>
+        <Text style={[styles.appName, { color: colors.primary }]}>Birdify</Text>
+        <Text style={[styles.appVersion, { color: colors.textSecondary }]}>
+          v1.0.4
+        </Text>
+        <Text style={[styles.appTagline, { color: colors.textPrimary }]}>
+          {t('settings.appTagline')}
+        </Text>
+        <Text style={[styles.appMission, { color: colors.textSecondary }]}>
+          {t('settings.aboutMission')}
+        </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.aboutHeader}>
-          <View style={styles.appLogo}>
-            <Ionicons name="leaf" size={40} color={colors.canvasPure} />
-          </View>
-          <Text style={styles.appName}>Birdify</Text>
-          <Text style={styles.appVersion}>Version 1.0.4</Text>
-        </View>
+      {/* Legal & Info Section */}
+      <SettingsSection>
+        <SettingsRow
+          icon="document-text-outline"
+          label={t('settings.termsOfService')}
+          onPress={() => setLegalDoc('terms')}
+        />
+        <SettingsRow
+          icon="shield-checkmark-outline"
+          label={t('settings.privacyPolicy')}
+          onPress={() => setLegalDoc('privacy')}
+        />
+        <SettingsRow
+          icon="code-slash-outline"
+          label={t('settings.openSourceLicenses')}
+          onPress={() => setLegalDoc('licenses')}
+        />
+        <SettingsRow
+          icon="globe-outline"
+          label={t('settings.visitWebsite')}
+          badge={t('common.soon')}
+          disabled
+          showChevron={false}
+          isLast
+        />
+      </SettingsSection>
 
-        <Text style={styles.aboutDescription}>
-          Birdify is the ultimate companion for bird enthusiasts. Our mission is to connect people with nature and help document the diverse avian life around us.
+      {/* Footer credits */}
+      <View style={styles.footer}>
+        <Text style={[styles.creditText, { color: colors.textSecondary }]}>
+          {t('settings.madeWithLove')}
         </Text>
-
-        <View style={styles.aboutCard}>
-          <TouchableOpacity
-            style={styles.linkRow}
-            activeOpacity={0.7}
-            onPress={() => setLegalDoc('terms')}
-          >
-            <Text style={styles.linkText}>Terms of Service</Text>
-            <Ionicons name="open-outline" size={18} color={colors.placeholder} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.linkRow}
-            activeOpacity={0.7}
-            onPress={() => setLegalDoc('privacy')}
-          >
-            <Text style={styles.linkText}>Privacy Policy</Text>
-            <Ionicons name="open-outline" size={18} color={colors.placeholder} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.linkRow}
-            activeOpacity={0.7}
-            onPress={() => setLegalDoc('licenses')}
-          >
-            <Text style={styles.linkText}>Open Source Licenses</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.placeholder} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.linkRow, { borderBottomWidth: 0, opacity: 0.5 }]}
-            disabled={true}
-            activeOpacity={1}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={styles.linkText}>Visit Website</Text>
-              <View style={{ backgroundColor: '#EEE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 }}>
-                <Text style={{ fontSize: 10, color: '#666', fontWeight: 'bold' }}>SOON</Text>
-              </View>
-            </View>
-            <Ionicons name="lock-closed-outline" size={16} color={colors.placeholder} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ alignItems: 'center', marginTop: 40, marginBottom: 20 }}>
-          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Made with ❤️ by the Birdify Team</Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 4 }}>© 2026 Birdify Inc. All rights reserved.</Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        <Text style={[styles.copyrightText, { color: colors.textSecondary }]}>
+          {t('settings.allRightsReserved')}
+        </Text>
+      </View>
+    </SettingsScaffold>
   );
 }
+
+const styles = StyleSheet.create({
+  brandHeader: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 12,
+  },
+  appLogo: {
+    width: 84,
+    height: 84,
+    borderRadius: Radius.xl,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  appName: {
+    fontSize: Typography.fontSize.xxl,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  appVersion: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '700',
+    marginTop: 2,
+    marginBottom: 10,
+  },
+  appTagline: {
+    fontSize: Typography.fontSize.md,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  appMission: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamilyBody,
+    textAlign: 'center',
+    lineHeight: 22,
+    maxWidth: 320,
+  },
+  footer: {
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 30,
+  },
+  creditText: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamilyDisplay,
+    fontWeight: '600',
+  },
+  copyrightText: {
+    fontSize: 11,
+    fontFamily: Typography.fontFamilyBody,
+    marginTop: 4,
+    opacity: 0.8,
+  },
+});

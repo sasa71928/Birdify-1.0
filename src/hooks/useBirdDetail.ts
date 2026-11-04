@@ -55,9 +55,31 @@ export function useBirdDetail() {
     await loadBirdSightings();
   };
 
+  const handleLikeToggled = useCallback((postId: string, hasLiked: boolean, newCount: number) => {
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, hasLiked, likes: newCount } : p))
+    );
+  }, []);
+
+  const handleCommentAdded = useCallback((postId: string, newCount: number) => {
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, comments: newCount } : p))
+    );
+  }, []);
+
   const goBack = () => {
     navigation.goBack();
   };
+
+  const handleRecordSighting = useCallback(() => {
+    if (bird) {
+      navigation.navigate('RecordSighting', { preselectedBird: bird });
+    }
+  }, [navigation, bird]);
+
+  const handleExploreMap = useCallback(() => {
+    navigation.navigate('MainTabs', { screen: 'Explore' });
+  }, [navigation]);
 
   return {
     bird,
@@ -68,6 +90,10 @@ export function useBirdDetail() {
     setToast,
     loadBirdSightings,
     handlePostDeleted,
+    handleLikeToggled,
+    handleCommentAdded,
     goBack,
+    handleRecordSighting,
+    handleExploreMap,
   };
 }

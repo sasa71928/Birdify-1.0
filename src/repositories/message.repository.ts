@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { prepareImageForUpload } from '../utils/imageCompressor';
 
 export const CHAT_IMAGE_PREFIX = 'storage://chat-images/';
 const CHAT_IMAGES_BUCKET = 'chat-images';
@@ -61,20 +62,13 @@ export const MessageRepository = {
     senderId: string,
     localUri: string
   ): Promise<string> {
-    const cleanUri = localUri.split('?')[0];
-    const rawExt = cleanUri.split('.').pop()?.toLowerCase() || 'jpg';
-    const ext = rawExt === 'png' || rawExt === 'webp' ? rawExt : 'jpg';
-    const mimeType =
-      ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-    const storagePath = `${conversationId}/${senderId}_${Date.now()}.${ext}`;
-
-    const response = await fetch(localUri);
-    const arrayBuffer = await response.arrayBuffer();
+    const prepared = await prepareImageForUpload(localUri, 'chat');
+    const storagePath = `${conversationId}/${senderId}_${Date.now()}.${prepared.fileExt}`;
 
     const { error } = await supabase.storage
       .from(CHAT_IMAGES_BUCKET)
-      .upload(storagePath, arrayBuffer, {
-        contentType: mimeType,
+      .upload(storagePath, prepared.arrayBuffer, {
+        contentType: prepared.mimeType,
         upsert: true,
       });
 

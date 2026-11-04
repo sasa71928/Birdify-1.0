@@ -9,28 +9,35 @@ const VALID_BIRD_IMAGES = [
 ];
 
 export function mapBird(bird: any, index: number = 0): BirdSpeciesData {
+  const customImage = bird.image_url || bird.photo_url || bird.image;
+
   return {
     id: bird.id,
-    name: bird.common_name || 'Unknown Bird',
-    scientificName: bird.scientific_name || 'Unknown',
+    name: bird.common_name || bird.name || 'Unknown Bird',
+    scientificName: bird.scientific_name || bird.scientificName || 'Unknown',
 
-    image: VALID_BIRD_IMAGES[index % VALID_BIRD_IMAGES.length],
+    image: customImage && customImage.trim() !== ''
+      ? customImage
+      : VALID_BIRD_IMAGES[index % VALID_BIRD_IMAGES.length],
 
-    status: bird.season?.toUpperCase() === 'MIGRATORIA'
+    status: bird.season?.toUpperCase() === 'MIGRATORIA' || bird.status === 'MIGRATORIA'
       ? 'MIGRATORIA'
       : 'RESIDENTE',
 
-    overview: bird.description || '',
-    habitat: bird.habitat_info || '',
-    conservationStatus: bird.ideal_zones || '',
+    overview: bird.description || bird.overview || '',
+    habitat: bird.habitat_info || bird.habitat || '',
+    conservationStatus: bird.ideal_zones || bird.conservationStatus || '',
 
     classification: {
-      kingdom: 'Animalia',
-      phylum: 'Chordata',
-      class: 'Aves',
-      order: 'Passeriformes',
-      family: bird.family || 'Unknown',
-      genus: bird.scientific_name?.split(' ')[0] || 'Unknown',
+      kingdom: bird.classification?.kingdom || 'Animalia',
+      phylum: bird.classification?.phylum || 'Chordata',
+      class: bird.classification?.class || 'Aves',
+      order: bird.classification?.order || 'Passeriformes',
+      family: bird.family || bird.classification?.family || 'Unknown',
+      genus:
+        bird.classification?.genus ||
+        (bird.scientific_name || bird.scientificName)?.split(' ')[0] ||
+        'Unknown',
     },
   };
 }

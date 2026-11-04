@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
+import { useT } from '../i18n';
 
 interface ResetPasswordModalProps {
   visible: boolean;
@@ -21,6 +22,7 @@ interface ResetPasswordModalProps {
 
 export default function ResetPasswordModal({ visible, onComplete }: ResetPasswordModalProps) {
   const { colors } = useTheme();
+  const { t } = useT();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -140,15 +142,15 @@ export default function ResetPasswordModal({ visible, onComplete }: ResetPasswor
 
   const handleSavePassword = async () => {
     if (!newPassword || !confirmPassword) {
-      setFeedback({ type: 'error', text: 'Por favor completa ambos campos.' });
+      setFeedback({ type: 'error', text: t('auth.fillAllFields') });
       return;
     }
     if (newPassword.length < 6) {
-      setFeedback({ type: 'error', text: 'La nueva contraseña debe tener al menos 6 caracteres.' });
+      setFeedback({ type: 'error', text: t('auth.passwordMinLength') });
       return;
     }
     if (newPassword !== confirmPassword) {
-      setFeedback({ type: 'error', text: 'Las contraseñas no coinciden.' });
+      setFeedback({ type: 'error', text: t('auth.passwordsMustMatch') });
       return;
     }
 
@@ -158,7 +160,7 @@ export default function ResetPasswordModal({ visible, onComplete }: ResetPasswor
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
 
-      setFeedback({ type: 'success', text: 'Contraseña actualizada correctamente.' });
+      setFeedback({ type: 'success', text: t('auth.passwordUpdatedSuccess') });
       setTimeout(() => {
         resetForm();
         onComplete();
@@ -166,7 +168,7 @@ export default function ResetPasswordModal({ visible, onComplete }: ResetPasswor
     } catch (err: any) {
       setFeedback({
         type: 'error',
-        text: err?.message || 'No se pudo actualizar la contraseña. Solicita un nuevo enlace.',
+        text: err?.message || t('auth.passwordUpdateError'),
       });
     } finally {
       setIsSaving(false);
@@ -189,9 +191,9 @@ export default function ResetPasswordModal({ visible, onComplete }: ResetPasswor
           <View style={styles.iconWrap}>
             <Ionicons name="key-outline" size={26} color={colors.primary} />
           </View>
-          <Text style={styles.title}>Restablecer Contraseña</Text>
+          <Text style={styles.title}>{t('auth.resetPasswordModalTitle')}</Text>
           <Text style={styles.subtitle}>
-            Ingresa y confirma tu nueva contraseña para completar la recuperación de tu cuenta.
+            {t('auth.resetPasswordModalSubtitle')}
           </Text>
 
           {feedback && (
@@ -215,14 +217,14 @@ export default function ResetPasswordModal({ visible, onComplete }: ResetPasswor
             </View>
           )}
 
-          <Text style={styles.label}>Nueva contraseña</Text>
+          <Text style={styles.label}>{t('auth.newPasswordLabel')}</Text>
           <View style={styles.inputRow}>
             <TextInput
               style={styles.input}
               value={newPassword}
               onChangeText={setNewPassword}
               secureTextEntry={!showPassword}
-              placeholder="Mínimo 6 caracteres"
+              placeholder={t('auth.newPasswordPlaceholder')}
               placeholderTextColor={colors.placeholder}
               editable={!isSaving}
               autoCapitalize="none"
@@ -230,7 +232,7 @@ export default function ResetPasswordModal({ visible, onComplete }: ResetPasswor
             <TouchableOpacity
               onPress={() => setShowPassword((prev) => !prev)}
               accessibilityRole="button"
-              accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              accessibilityLabel={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
             >
               <Ionicons
                 name={showPassword ? 'eye-off-outline' : 'eye-outline'}
@@ -240,14 +242,14 @@ export default function ResetPasswordModal({ visible, onComplete }: ResetPasswor
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.label}>Confirmar nueva contraseña</Text>
+          <Text style={styles.label}>{t('auth.confirmNewPasswordLabel')}</Text>
           <View style={styles.inputRow}>
             <TextInput
               style={styles.input}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry={!showPassword}
-              placeholder="Repite tu nueva contraseña"
+              placeholder={t('auth.confirmNewPasswordPlaceholder')}
               placeholderTextColor={colors.placeholder}
               editable={!isSaving}
               autoCapitalize="none"
@@ -259,12 +261,12 @@ export default function ResetPasswordModal({ visible, onComplete }: ResetPasswor
             onPress={handleSavePassword}
             disabled={isSaving}
             accessibilityRole="button"
-            accessibilityLabel="Guardar nueva contraseña"
+            accessibilityLabel={t('auth.saveNewPassword')}
           >
             {isSaving ? (
               <ActivityIndicator size="small" color={colors.canvasPure} />
             ) : (
-              <Text style={styles.primaryBtnText}>Actualizar contraseña</Text>
+              <Text style={styles.primaryBtnText}>{t('auth.updatePasswordBtn')}</Text>
             )}
           </TouchableOpacity>
 
@@ -273,9 +275,9 @@ export default function ResetPasswordModal({ visible, onComplete }: ResetPasswor
             onPress={handleCancel}
             disabled={isSaving}
             accessibilityRole="button"
-            accessibilityLabel="Cerrar ventana de recuperación"
+            accessibilityLabel={t('auth.closeRecoveryModal')}
           >
-            <Text style={styles.cancelBtnText}>Cancelar</Text>
+            <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

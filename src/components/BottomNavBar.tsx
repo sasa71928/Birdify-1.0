@@ -1,122 +1,225 @@
 import React, { useContext } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { OfflineContext } from '../context/OfflineContext';
 import { useNewSightings } from '../context/NewSightingsContext';
 import { useUnreadMessages } from '../context/UnreadMessagesContext';
 import { createStyles } from '../styles/components/BottomNavBar.styles';
 import { useDynamicStyles } from '../hooks/useDynamicStyles';
+import { useT } from '../i18n';
+import { PressableScale } from './animated/PressableScale';
+import { haptics } from '../utils/haptics';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-export default function BottomNavBar({ state, hideNav }: { state?: any; hideNav?: boolean }) {
+export default function BottomNavBar({
+  state,
+  hideNav,
+}: {
+  state?: any;
+  hideNav?: boolean;
+}) {
   const navigation = useNavigation<NavigationProp>();
   const { screen: styles, colors } = useDynamicStyles(createStyles);
+  const insets = useSafeAreaInsets();
   const route = useRoute();
   const { hasNewPosts } = useNewSightings();
   const { unreadCount } = useUnreadMessages();
   const isOffline = useContext(OfflineContext);
+  const { t } = useT();
 
   if (hideNav) return null;
 
   const currentRoute = state ? state.routes[state.index].name : route.name;
+  const bottomPadding = insets.bottom > 0 ? insets.bottom + 2 : 10;
+
+  const handleTabPress = (tabName: 'Feed' | 'Explore' | 'Dictionary' | 'Messages') => {
+    haptics.selection();
+    navigation.navigate('MainTabs', { screen: tabName });
+  };
+
+  const handleRecordPress = () => {
+    haptics.medium();
+    navigation.navigate('RecordSighting' as any);
+  };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: bottomPadding }]}>
       <View style={styles.innerContainer}>
-        {/* Home — oculto en offline */}
-        {!isOffline && (
-          <TouchableOpacity
-            style={[styles.navItem, currentRoute === 'Feed' && styles.activeItem]}
-            onPress={() => navigation.navigate('MainTabs', { screen: 'Feed' })}
-            accessibilityRole="button"
-            accessibilityLabel="Inicio"
-            accessibilityState={{ selected: currentRoute === 'Feed' }}
-          >
+        {/* 1. Inicio / Feed */}
+        <PressableScale
+          activeScale={0.93}
+          style={styles.navItem}
+          onPress={() => handleTabPress('Feed')}
+          accessibilityRole="button"
+          accessibilityLabel={t('nav.feed')}
+          accessibilityState={{ selected: currentRoute === 'Feed' }}
+        >
+          <View style={styles.navItemInner}>
             <View style={styles.iconContainer}>
               <Ionicons
-                name="home-outline"
-                size={currentRoute === 'Feed' ? 26 : 24}
-                color={currentRoute === 'Feed' ? colors.primary : colors.textSecondary}
+                name={currentRoute === 'Feed' ? 'home' : 'home-outline'}
+                size={24}
+                color={
+                  currentRoute === 'Feed' ? colors.primary : colors.textSecondary
+                }
               />
               {hasNewPosts && <View style={styles.newBadge} />}
             </View>
-          </TouchableOpacity>
-        )}
+            <Text
+              style={
+                currentRoute === 'Feed' ? styles.activeText : styles.navText
+              }
+            >
+              {t('nav.feed')}
+            </Text>
+            {currentRoute === 'Feed' && <View style={styles.activeIndicatorDot} />}
+          </View>
+        </PressableScale>
 
-        {/* Explore — oculto en offline */}
+        {/* 2. Explorar / Mapa (solo online) */}
         {!isOffline && (
-          <TouchableOpacity
-            style={[styles.navItem, currentRoute === 'Explore' && styles.activeItem]}
-            onPress={() => navigation.navigate('MainTabs', { screen: 'Explore' })}
+          <PressableScale
+            activeScale={0.93}
+            style={styles.navItem}
+            onPress={() => handleTabPress('Explore')}
             accessibilityRole="button"
-            accessibilityLabel="Explorar mapa"
+            accessibilityLabel={t('nav.explore')}
             accessibilityState={{ selected: currentRoute === 'Explore' }}
           >
-            <Ionicons
-              name="compass-outline"
-              size={currentRoute === 'Explore' ? 26 : 24}
-              color={currentRoute === 'Explore' ? colors.primary : colors.textSecondary}
-            />
-          </TouchableOpacity>
+            <View style={styles.navItemInner}>
+              <View style={styles.iconContainer}>
+                <Ionicons
+                  name={currentRoute === 'Explore' ? 'compass' : 'compass-outline'}
+                  size={24}
+                  color={
+                    currentRoute === 'Explore'
+                      ? colors.primary
+                      : colors.textSecondary
+                  }
+                />
+              </View>
+              <Text
+                style={
+                  currentRoute === 'Explore'
+                    ? styles.activeText
+                    : styles.navText
+                }
+              >
+                {t('nav.explore')}
+              </Text>
+              {currentRoute === 'Explore' && (
+                <View style={styles.activeIndicatorDot} />
+              )}
+            </View>
+          </PressableScale>
         )}
 
-        {/* Botón + siempre visible */}
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => navigation.navigate('RecordSighting' as any)}
+        {/* 3. Botón Central Flotante: Registrar Avistamiento (+) */}
+        <PressableScale
+          activeScale={0.92}
+          style={styles.addButtonWrap}
+          onPress={handleRecordPress}
           accessibilityRole="button"
-          accessibilityLabel="Registrar nuevo avistamiento"
+          accessibilityLabel={t('nav.record')}
         >
           <View style={styles.plusContainer}>
-            <Ionicons name="add" size={32} color={colors.white} />
+            <Ionicons name="camera" size={26} color="#FFFFFF" />
           </View>
-        </TouchableOpacity>
+          <Text style={styles.addLabel}>{t('nav.record')}</Text>
+        </PressableScale>
 
-        {/* Dictionary — oculto en offline */}
-        {!isOffline && (
-          <TouchableOpacity
-            style={[styles.navItem, currentRoute === 'Dictionary' && styles.activeItem]}
-            onPress={() => navigation.navigate('MainTabs', { screen: 'Dictionary' })}
-            accessibilityRole="button"
-            accessibilityLabel="Guía de aves"
-            accessibilityState={{ selected: currentRoute === 'Dictionary' }}
-          >
-            <Ionicons
-              name="book-outline"
-              size={currentRoute === 'Dictionary' ? 26 : 24}
-              color={currentRoute === 'Dictionary' ? colors.primary : colors.textSecondary}
-            />
-          </TouchableOpacity>
-        )}
+        {/* 4. Diccionario / Guía de Aves */}
+        <PressableScale
+          activeScale={0.93}
+          style={styles.navItem}
+          onPress={() => handleTabPress('Dictionary')}
+          accessibilityRole="button"
+          accessibilityLabel={t('nav.dictionary')}
+          accessibilityState={{ selected: currentRoute === 'Dictionary' }}
+        >
+          <View style={styles.navItemInner}>
+            <View style={styles.iconContainer}>
+              <Ionicons
+                name={currentRoute === 'Dictionary' ? 'book' : 'book-outline'}
+                size={24}
+                color={
+                  currentRoute === 'Dictionary'
+                    ? colors.primary
+                    : colors.textSecondary
+                }
+              />
+            </View>
+            <Text
+              style={
+                currentRoute === 'Dictionary'
+                  ? styles.activeText
+                  : styles.navText
+              }
+            >
+              {t('nav.dictionaryShort') || 'Guía'}
+            </Text>
+            {currentRoute === 'Dictionary' && (
+              <View style={styles.activeIndicatorDot} />
+            )}
+          </View>
+        </PressableScale>
 
-        {/* Messages — oculto en offline */}
+        {/* 5. Mensajes (solo online) */}
         {!isOffline && (
-          <TouchableOpacity
-            style={[styles.navItem, currentRoute === 'Messages' && styles.activeItem]}
-            onPress={() => navigation.navigate('MainTabs', { screen: 'Messages' })}
+          <PressableScale
+            activeScale={0.93}
+            style={styles.navItem}
+            onPress={() => handleTabPress('Messages')}
             accessibilityRole="button"
             accessibilityLabel={
-              unreadCount > 0 ? `Mensajes, ${unreadCount} sin leer` : 'Mensajes'
+              unreadCount > 0
+                ? t('nav.unreadMessagesCount', { count: unreadCount })
+                : t('nav.messages')
             }
             accessibilityState={{ selected: currentRoute === 'Messages' }}
           >
-            <View style={styles.iconContainer}>
-              <Ionicons
-                name="chatbubble-outline"
-                size={currentRoute === 'Messages' ? 26 : 24}
-                color={currentRoute === 'Messages' ? colors.primary : colors.textSecondary}
-              />
-              {unreadCount > 0 && (
-                <View style={styles.unreadBadge}>
-                  <Text style={styles.unreadText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-                </View>
+            <View style={styles.navItemInner}>
+              <View style={styles.iconContainer}>
+                <Ionicons
+                  name={
+                    currentRoute === 'Messages'
+                      ? 'chatbubble'
+                      : 'chatbubble-outline'
+                  }
+                  size={24}
+                  color={
+                    currentRoute === 'Messages'
+                      ? colors.primary
+                      : colors.textSecondary
+                  }
+                />
+                {unreadCount > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadText}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text
+                style={
+                  currentRoute === 'Messages'
+                    ? styles.activeText
+                    : styles.navText
+                }
+              >
+                {t('nav.messages')}
+              </Text>
+              {currentRoute === 'Messages' && (
+                <View style={styles.activeIndicatorDot} />
               )}
             </View>
-          </TouchableOpacity>
+          </PressableScale>
         )}
       </View>
     </View>

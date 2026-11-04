@@ -1,0 +1,26 @@
+import type { bird as esBird } from '../es/bird';
+
+export const bird: typeof esBird = {
+  speciesInfo: 'Species Information',
+  status: 'Status',
+  statusResident: 'Resident',
+  statusMigratory: 'Migratory',
+  overview: 'Overview',
+  habitat: 'Habitat',
+  conservation: 'Conservation Status',
+  classification: 'Scientific Classification',
+  kingdom: 'Kingdom',
+  phylum: 'Phylum',
+  class: 'Class',
+  order: 'Order',
+  family: 'Family',
+  genus: 'Genus',
+  recentSightings: 'Recent Sightings',
+  noRecentSightings: 'No recent sightings for this bird.',
+  searchTitle: 'Search Birds & Birders',
+  searchTabBirds: 'Birds',
+  searchTabUsers: 'Birders',
+  recentSearches: 'Recent searches',
+  clearHistory: 'Clear history',
+  noResultsQuery: 'No results found for "{query}"',
+};

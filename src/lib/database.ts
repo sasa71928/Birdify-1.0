@@ -26,7 +26,8 @@ export async function initDatabase() {
       description TEXT,
       season TEXT,
       habitat_info TEXT,
-      ideal_zones TEXT
+      ideal_zones TEXT,
+      image_url TEXT
     );
 
     CREATE TABLE IF NOT EXISTS sightings (
@@ -97,6 +98,15 @@ export async function initDatabase() {
         // Columna ya existe
       }
       await db.execAsync('PRAGMA user_version = 1');
+    }
+
+    if (currentVersion < 2) {
+      try {
+        await db.execAsync(`ALTER TABLE birds ADD COLUMN image_url TEXT`);
+      } catch {
+        // Columna ya existe
+      }
+      await db.execAsync('PRAGMA user_version = 2');
     }
   } catch (migErr) {
     console.warn('[Database] Error comprobando versiones de migración SQLite:', migErr);

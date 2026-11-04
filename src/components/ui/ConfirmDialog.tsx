@@ -4,13 +4,13 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDynamicStyles } from '../../hooks/useDynamicStyles';
 import { Radius, Spacing, Typography, Shadows } from '../../theme';
 import { useT } from '../../i18n';
+import { PressableScale } from '../animated/PressableScale';
 
 interface ConfirmDialogProps {
   visible: boolean;
@@ -42,9 +42,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   const { colors } = useDynamicStyles();
   const { t } = useT();
 
-  const finalConfirmLabel = confirmLabel || (isDestructive ? t('common.delete') : t('common.save'));
+  const finalConfirmLabel =
+    confirmLabel || (isDestructive ? t('common.delete') : t('common.save'));
   const finalCancelLabel = cancelLabel || t('common.cancel');
-  const finalIconColor = iconColor || (isDestructive ? colors.danger : colors.primary);
+  const finalIconColor =
+    iconColor || (isDestructive ? colors.danger : colors.primary);
 
   return (
     <Modal
@@ -100,35 +102,42 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </Text>
 
           <View style={styles.buttonsRow}>
-            <TouchableOpacity
+            <PressableScale
+              activeScale={0.98}
+              haptic="light"
               style={[
                 styles.btn,
                 styles.cancelBtn,
                 { backgroundColor: colors.componentBase },
               ]}
               disabled={loading}
-              activeOpacity={0.7}
               onPress={onCancel}
             >
               <Text
                 style={[
                   styles.cancelBtnText,
-                  { color: colors.textPrimary, fontFamily: Typography.fontFamilyDisplay },
+                  {
+                    color: colors.textPrimary,
+                    fontFamily: Typography.fontFamilyDisplay,
+                  },
                 ]}
               >
                 {finalCancelLabel}
               </Text>
-            </TouchableOpacity>
+            </PressableScale>
 
-            <TouchableOpacity
+            <PressableScale
+              activeScale={0.98}
+              haptic={isDestructive ? 'medium' : 'light'}
               style={[
                 styles.btn,
                 {
-                  backgroundColor: isDestructive ? colors.danger : colors.primary,
+                  backgroundColor: isDestructive
+                    ? colors.danger
+                    : colors.primary,
                 },
               ]}
               disabled={loading}
-              activeOpacity={0.8}
               onPress={onConfirm}
             >
               {loading ? (
@@ -143,7 +152,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                   {finalConfirmLabel}
                 </Text>
               )}
-            </TouchableOpacity>
+            </PressableScale>
           </View>
         </View>
       </View>
@@ -213,4 +222,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-
