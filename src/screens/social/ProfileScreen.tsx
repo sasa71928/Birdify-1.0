@@ -53,13 +53,27 @@ export default function ProfileScreen() {
 
   const userId = route.params?.userId;
 
+  const [activeTab, setActiveTab] = useState<ProfileTabType>('Sightings');
+  const [selectedSighting, setSelectedSighting] = useState<any>(null);
+  const [showSightingModal, setShowSightingModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+
   const {
     isMe,
     displayUserId,
     profile,
     loadingProfile,
     sightings,
+    hasMoreSightings,
+    loadingMoreSightings,
+    loadMoreSightings,
     likes,
+    loadingLikes,
+    likesError,
+    hasMoreLikes,
+    loadingMoreLikes,
+    loadMoreLikes,
+    fetchLikesTab,
     species,
     followersCount,
     followingCount,
@@ -78,12 +92,9 @@ export default function ProfileScreen() {
     openFollowModal,
     handleModalFollowToggle,
     handlePostDeleted,
-  } = useProfileData(authUser, userId);
-
-  const [activeTab, setActiveTab] = useState<ProfileTabType>('Sightings');
-  const [selectedSighting, setSelectedSighting] = useState<any>(null);
-  const [showSightingModal, setShowSightingModal] = useState(false);
-  const [showReportModal, setShowReportModal] = useState(false);
+    syncSightingLike,
+    syncSightingComment,
+  } = useProfileData(authUser, userId, activeTab);
 
   // Scroll tracking for parallax and compact header
   const scrollY = useSharedValue(0);
@@ -98,26 +109,27 @@ export default function ProfileScreen() {
     setShowSightingModal(true);
   };
 
-  const handleLikeToggled = (postId: string, hasLiked: boolean) => {
-    if (!authUser?.id) return;
+  const handleLikeToggled = (postId: string, hasLiked: boolean, newCount: number) => {
     setSelectedSighting((prev: any) => {
       if (!prev || prev.id !== postId) return prev;
-      const currentReactions = prev.reactions || [];
-      const updatedReactions = hasLiked
-        ? currentReactions.some((r: any) => r.user_id === authUser.id)
-          ? currentReactions
-          : [...currentReactions, { user_id: authUser.id }]
-        : currentReactions.filter((r: any) => r.user_id !== authUser.id);
-      return { ...prev, reactions: updatedReactions };
+      return {
+        ...prev,
+        has_liked: hasLiked,
+        likes_count: newCount,
+      };
     });
+    syncSightingLike(postId, hasLiked, newCount, selectedSighting);
   };
 
-  const handleCommentAdded = (postId: string) => {
+  const handleCommentAdded = (postId: string, newCount: number) => {
     setSelectedSighting((prev: any) => {
       if (!prev || prev.id !== postId) return prev;
-      const currentComments = prev.comments || [];
-      return { ...prev, comments: [...currentComments, { id: Date.now().toString() }] };
+      return {
+        ...prev,
+        comments_count: newCount,
+      };
     });
+    syncSightingComment(postId, newCount);
   };
 
   const handleStartConversation = async () => {
@@ -214,6 +226,9 @@ export default function ProfileScreen() {
               <SightingsGrid
                 sightings={sightings}
                 isMe={isMe}
+                hasMore={hasMoreSightings}
+                loadingMore={loadingMoreSightings}
+                onLoadMore={loadMoreSightings}
                 onItemPress={handleSightingPress}
               />
             )}
@@ -224,6 +239,12 @@ export default function ProfileScreen() {
               <LikesView
                 likes={likes}
                 isMe={isMe}
+                loading={loadingLikes}
+                error={likesError}
+                onRetry={() => fetchLikesTab(true)}
+                hasMore={hasMoreLikes}
+                loadingMore={loadingMoreLikes}
+                onLoadMore={loadMoreLikes}
                 onItemPress={handleSightingPress}
               />
             )}
@@ -294,7 +315,7 @@ export default function ProfileScreen() {
                 <FeedItem
                   post={mapSightingToPost(selectedSighting, authUser?.id)}
                   onPostDeleted={() => {
-                    handlePostDeleted();
+                    handlePostDeleted(selectedSighting?.id);
                     setShowSightingModal(false);
                   }}
                   onNavigateAway={() => setShowSightingModal(false)}

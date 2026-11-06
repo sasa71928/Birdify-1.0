@@ -5,11 +5,28 @@ import { getFirstImageUrl, getAllImageUrls } from './parsePhotoUrls';
 export function mapSightingToPost(sighting: any, currentUserId?: string): Post {
   const timeAgoStr = formatTimeAgo(sighting.created_at || sighting.sighting_date);
 
-  const reactionsList = sighting.reactions || [];
-  const likesCount = reactionsList.length;
-  const hasLiked = currentUserId
-    ? reactionsList.some((r: any) => r.user_id === currentUserId)
-    : false;
+  const reactionsList = Array.isArray(sighting.reactions) ? sighting.reactions : [];
+  const likesCount =
+    typeof sighting.likes_count === 'number'
+      ? sighting.likes_count
+      : reactionsList.length === 1 && typeof reactionsList[0]?.count === 'number'
+      ? reactionsList[0].count
+      : reactionsList.length;
+
+  const commentsListRaw = Array.isArray(sighting.comments) ? sighting.comments : [];
+  const commentsCount =
+    typeof sighting.comments_count === 'number'
+      ? sighting.comments_count
+      : commentsListRaw.length === 1 && typeof commentsListRaw[0]?.count === 'number'
+      ? commentsListRaw[0].count
+      : commentsListRaw.length;
+
+  const hasLiked =
+    typeof sighting.has_liked === 'boolean'
+      ? sighting.has_liked
+      : currentUserId
+      ? reactionsList.some((r: any) => r.user_id === currentUserId)
+      : false;
 
   const rawUser = sighting.users || sighting.user;
   const userData = Array.isArray(rawUser) ? rawUser[0] : rawUser;
@@ -35,7 +52,7 @@ export function mapSightingToPost(sighting: any, currentUserId?: string): Post {
     image: imageField,
     tag: sighting.bird?.common_name || 'Ave',
     likes: likesCount,
-    comments: sighting.comments ? sighting.comments.length : 0,
+    comments: commentsCount,
     caption: sighting.description || '',
     timeAgo: timeAgoStr,
     isVerified: userData?.is_verified === true,

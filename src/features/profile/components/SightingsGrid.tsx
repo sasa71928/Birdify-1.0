@@ -1,5 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, Dimensions } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  Dimensions,
+  ActivityIndicator,
+  TouchableOpacity,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDynamicStyles } from '../../../hooks/useDynamicStyles';
 import { useT } from '../../../i18n';
@@ -10,6 +18,9 @@ import { getFirstImageUrl } from '../utils/parsePhotoUrls';
 interface SightingsGridProps {
   sightings: any[];
   isMe: boolean;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
   onItemPress?: (sighting: any) => void;
 }
 
@@ -21,6 +32,9 @@ const ITEM_SIZE = (SCREEN_WIDTH - GRID_PADDING * 2 - GAP * 2) / 3;
 export const SightingsGrid: React.FC<SightingsGridProps> = ({
   sightings,
   isMe,
+  hasMore,
+  loadingMore,
+  onLoadMore,
   onItemPress,
 }) => {
   const { colors, isDark } = useDynamicStyles();
@@ -45,38 +59,62 @@ export const SightingsGrid: React.FC<SightingsGridProps> = ({
   }
 
   return (
-    <View style={styles.grid}>
-      {sightings.map((item) => {
-        const hasLocation = !item.is_location_private && item.latitude && item.longitude;
-        const imageUrl = getFirstImageUrl(item.photo_url);
+    <View>
+      <View style={styles.grid}>
+        {sightings.map((item) => {
+          const hasLocation = !item.is_location_private && item.latitude && item.longitude;
+          const imageUrl = getFirstImageUrl(item.photo_url);
 
-        return (
-          <PressableScale
-            key={item.id}
-            activeScale={0.93}
-            haptic="light"
-            onPress={() => onItemPress?.(item)}
-            style={[
-              styles.gridItem,
-              {
-                backgroundColor: isDark ? '#2A2A2A' : '#E8ECE6',
-              },
-            ]}
-          >
-            <Image
-              source={{ uri: imageUrl }}
-              style={styles.gridImage}
-              fadeDuration={0}
-            />
+          return (
+            <PressableScale
+              key={item.id}
+              activeScale={0.93}
+              haptic="light"
+              onPress={() => onItemPress?.(item)}
+              style={[
+                styles.gridItem,
+                {
+                  backgroundColor: isDark ? '#2A2A2A' : '#E8ECE6',
+                },
+              ]}
+            >
+              <Image
+                source={{ uri: imageUrl }}
+                style={styles.gridImage}
+                fadeDuration={0}
+              />
 
-            {hasLocation && (
-              <View style={styles.locationBadge}>
-                <Ionicons name="location" size={11} color="#FFF" />
-              </View>
-            )}
-          </PressableScale>
-        );
-      })}
+              {hasLocation && (
+                <View style={styles.locationBadge}>
+                  <Ionicons name="location" size={11} color="#FFF" />
+                </View>
+              )}
+            </PressableScale>
+          );
+        })}
+      </View>
+      {hasMore && (
+        <TouchableOpacity
+          style={{ paddingBottom: 32, alignItems: 'center', justifyContent: 'center' }}
+          onPress={onLoadMore}
+          disabled={loadingMore}
+        >
+          {loadingMore ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Text
+              style={{
+                fontSize: 13,
+                color: colors.primary,
+                fontFamily: Typography.fontFamilyDisplay,
+                fontWeight: '700',
+              }}
+            >
+              Cargar más avistamientos
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
     </View>
   );
 };

@@ -1,12 +1,71 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useIsFocused } from '@react-navigation/native';
-import { supabase } from '../../../lib/supabase';
 import { ProfileRepository } from '../../../repositories/profile.repository';
 import { FollowRepository } from '../../../repositories/follow.repository';
 import { User } from '../../../types/models';
 import { handleError } from '../../../utils/errorHandler';
+import { ProfileTabType } from '../components/ProfileTabs';
 
-export function useProfileData(authUser: any, userId?: string) {
+const PROFILE_PAGE_LIMIT = 30;
+
+function buildSpeciesFromSightings(sightingsData: any[]): any[] {
+  const speciesMap = new Map<string, any>();
+  (sightingsData || []).forEach((item: any) => {
+    if (item.bird) {
+      const birdId = item.bird.id;
+      const existing = speciesMap.get(birdId);
+
+      let photoUrls: string[] = [];
+      if (item.photo_url) {
+        if (typeof item.photo_url === 'string') {
+          try {
+            const parsed = JSON.parse(item.photo_url);
+            photoUrls = Array.isArray(parsed) ? parsed : [item.photo_url];
+          } catch {
+            photoUrls = [item.photo_url];
+          }
+        } else if (Array.isArray(item.photo_url)) {
+          photoUrls = item.photo_url;
+        }
+      }
+
+      const sightingDate = new Date(item.sighting_date || item.created_at).toLocaleDateString();
+
+      if (existing) {
+        existing.count += 1;
+        photoUrls.forEach((url) => {
+          existing.images.push({
+            url,
+            date: sightingDate,
+            sightingId: item.id,
+          });
+        });
+      } else {
+        speciesMap.set(birdId, {
+          id: birdId,
+          name: item.bird.common_name,
+          scientificName: item.bird.scientific_name,
+          image: 'bird-icon',
+          count: 1,
+          date: sightingDate,
+          rare: false,
+          images: photoUrls.map((url) => ({
+            url,
+            date: sightingDate,
+            sightingId: item.id,
+          })),
+        });
+      }
+    }
+  });
+  return Array.from(speciesMap.values());
+}
+
+export function useProfileData(
+  authUser: any,
+  userId?: string,
+  activeTab: ProfileTabType = 'Sightings',
+) {
   const isMe = !userId || userId === 'me' || userId === authUser?.id;
   const displayUserId = isMe ? authUser?.id : userId;
   const isFocused = useIsFocused();
@@ -14,7 +73,19 @@ export function useProfileData(authUser: any, userId?: string) {
   const [profile, setProfile] = useState<User | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [sightings, setSightings] = useState<any[]>([]);
+  const [sightingsPage, setSightingsPage] = useState(0);
+  const [hasMoreSightings, setHasMoreSightings] = useState(false);
+  const [loadingMoreSightings, setLoadingMoreSightings] = useState(false);
+
   const [likes, setLikes] = useState<any[]>([]);
+  const [likesLoaded, setLikesLoaded] = useState(false);
+  const [loadingLikes, setLoadingLikes] = useState(false);
+  const [likesError, setLikesError] = useState<string | null>(null);
+  const [likesPage, setLikesPage] = useState(0);
+  const [hasMoreLikes, setHasMoreLikes] = useState(false);
+  const [loadingMoreLikes, setLoadingMoreLikes] = useState(false);
+  const likesInFlightRef = useRef(false);
+
   const [species, setSpecies] = useState<any[]>([]);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
@@ -38,164 +109,207 @@ export function useProfileData(authUser: any, userId?: string) {
     type: 'success',
   });
 
+  // Reiniciar el estado de Likes cuando cambie el perfil visitado
+  useEffect(() => {
+    setLikes([]);
+    setLikesLoaded(false);
+    setLoadingLikes(false);
+    setLikesError(null);
+    setLikesPage(0);
+    setHasMoreLikes(false);
+    likesInFlightRef.current = false;
+  }, [displayUserId]);
+
+  const fetchLikesTab = useCallback(
+    async (force = false) => {
+      if (!displayUserId || !canViewPrivateContent) return;
+      if (likesInFlightRef.current) return;
+      if (likesLoaded && !force) return;
+
+      likesInFlightRef.current = true;
+      setLoadingLikes(true);
+      setLikesError(null);
+      try {
+        const { items: likedSightings, hasMore } = await ProfileRepository.getLikedSightings(
+          displayUserId,
+          authUser?.id,
+          0,
+          PROFILE_PAGE_LIMIT,
+        );
+        setLikes(likedSightings);
+        setLikesPage(0);
+        setHasMoreLikes(hasMore);
+        setLikesLoaded(true);
+      } catch (error) {
+        setLikesError('No se pudieron cargar las publicaciones con Me gusta.');
+        handleError(error, setToast, 'Error cargando likes del perfil');
+      } finally {
+        likesInFlightRef.current = false;
+        setLoadingLikes(false);
+      }
+    },
+    [displayUserId, canViewPrivateContent, likesLoaded, authUser?.id],
+  );
+
+  // Carga diferida de Likes únicamente cuando el usuario abre esa pestaña
+  useEffect(() => {
+    if (
+      activeTab === 'Likes' &&
+      !loadingProfile &&
+      canViewPrivateContent &&
+      !likesLoaded &&
+      !loadingLikes &&
+      !likesError
+    ) {
+      fetchLikesTab();
+    }
+  }, [
+    activeTab,
+    loadingProfile,
+    canViewPrivateContent,
+    likesLoaded,
+    loadingLikes,
+    likesError,
+    fetchLikesTab,
+  ]);
+
+  const loadMoreSightings = useCallback(async () => {
+    if (!displayUserId || !canViewPrivateContent || loadingMoreSightings || !hasMoreSightings) {
+      return;
+    }
+    setLoadingMoreSightings(true);
+    try {
+      const nextPage = sightingsPage + 1;
+      const { items: moreSightings, hasMore } = await ProfileRepository.getProfileSightings(
+        displayUserId,
+        authUser?.id,
+        nextPage,
+        PROFILE_PAGE_LIMIT,
+      );
+      setSightings((prev) => {
+        const existingIds = new Set(prev.map((s) => s.id));
+        const uniqueMore = moreSightings.filter((s: any) => !existingIds.has(s.id));
+        const combined = [...prev, ...uniqueMore];
+        setSpecies(buildSpeciesFromSightings(combined));
+        return combined;
+      });
+      setSightingsPage(nextPage);
+      setHasMoreSightings(hasMore);
+    } catch (error) {
+      handleError(error, setToast, 'Error cargando más avistamientos');
+    } finally {
+      setLoadingMoreSightings(false);
+    }
+  }, [
+    displayUserId,
+    canViewPrivateContent,
+    loadingMoreSightings,
+    hasMoreSightings,
+    sightingsPage,
+    authUser?.id,
+  ]);
+
+  const loadMoreLikes = useCallback(async () => {
+    if (
+      !displayUserId ||
+      !canViewPrivateContent ||
+      loadingMoreLikes ||
+      !hasMoreLikes ||
+      loadingLikes
+    ) {
+      return;
+    }
+    setLoadingMoreLikes(true);
+    try {
+      const nextPage = likesPage + 1;
+      const { items: moreLikes, hasMore } = await ProfileRepository.getLikedSightings(
+        displayUserId,
+        authUser?.id,
+        nextPage,
+        PROFILE_PAGE_LIMIT,
+      );
+      setLikes((prev) => {
+        const existingIds = new Set(prev.map((item) => item.id));
+        const uniqueMore = moreLikes.filter((item: any) => !existingIds.has(item.id));
+        return [...prev, ...uniqueMore];
+      });
+      setLikesPage(nextPage);
+      setHasMoreLikes(hasMore);
+    } catch (error) {
+      handleError(error, setToast, 'Error cargando más likes');
+    } finally {
+      setLoadingMoreLikes(false);
+    }
+  }, [
+    displayUserId,
+    canViewPrivateContent,
+    loadingMoreLikes,
+    hasMoreLikes,
+    loadingLikes,
+    likesPage,
+    authUser?.id,
+  ]);
+
   const loadProfileAndActivity = useCallback(async () => {
     if (!displayUserId) return;
     try {
+      setProfile(null);
+      setSightings([]);
+      setSightingsPage(0);
+      setHasMoreSightings(false);
+      setLikes([]);
+      setLikesLoaded(false);
+      setLoadingLikes(false);
+      setLikesError(null);
+      setLikesPage(0);
+      setHasMoreLikes(false);
+      likesInFlightRef.current = false;
+      setSpecies([]);
+      setFollowersCount(0);
+      setFollowingCount(0);
+      setIsFollowingUser(false);
+      setCanViewPrivateContent(isMe);
       setLoadingProfile(true);
 
-      // 1. Cargar Perfil
-      const data = await ProfileRepository.getById(displayUserId);
-      if (data) setProfile(data);
+      // 1. Cargar resumen unificado de cabecera (RPC con fallback en paralelo)
+      const summary = await ProfileRepository.getProfileSummary(
+        displayUserId,
+        authUser?.id,
+      );
 
-      // 2. Cargar Seguidores / Seguidos
-      const [{ count: fersCount }, { count: fingCount }] = await Promise.all([
-        supabase
-          .from('follows')
-          .select('*', { count: 'exact', head: true })
-          .eq('following_id', displayUserId),
-        supabase
-          .from('follows')
-          .select('*', { count: 'exact', head: true })
-          .eq('follower_id', displayUserId),
-      ]);
+      setProfile(summary.profile);
+      setFollowersCount(summary.followersCount);
+      setFollowingCount(summary.followingCount);
+      setIsFollowingUser(summary.isFollowing);
+      setCanViewPrivateContent(summary.canViewContent);
 
-      setFollowersCount(fersCount || 0);
-      setFollowingCount(fingCount || 0);
-
-      // 3. Verificar si el usuario actual sigue a este perfil
-      if (authUser && displayUserId && !isMe) {
-        const isFollowing = await FollowRepository.isFollowing(authUser.id, displayUserId);
-        setIsFollowingUser(isFollowing);
-      }
-
-      // 4. Determinar si se puede ver contenido privado
-      let canViewActivity = true;
-      if (data?.is_private && !isMe) {
-        if (!authUser) {
-          canViewActivity = false;
-        } else {
-          canViewActivity = await FollowRepository.areMutualFollowers(authUser.id, displayUserId);
-        }
-      }
-
-      setCanViewPrivateContent(canViewActivity);
-
-      if (!canViewActivity) {
+      if (!summary.canViewContent) {
         setSightings([]);
         setSpecies([]);
         setLikes([]);
         return;
       }
 
-      // 5. Cargar Avistamientos Reales
-      const { data: sightingsData, error: sightingsError } = await supabase
-        .from('sightings')
-        .select(`
-          id,
-          user_id,
-          description,
-          photo_url,
-          latitude,
-          longitude,
-          sighting_date,
-          is_location_private,
-          created_at,
-          users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
-          bird:birds (id, common_name, scientific_name),
-          reactions (user_id),
-          comments (id)
-        `)
-        .eq('user_id', displayUserId)
-        .order('created_at', { ascending: false });
+      // 2. Cargar Avistamientos del perfil (con conteos agregados y reacciones propias en lote)
+      const { items: sightingsData, hasMore } = await ProfileRepository.getProfileSightings(
+        displayUserId,
+        authUser?.id,
+        0,
+        PROFILE_PAGE_LIMIT,
+      );
 
-      if (sightingsError) throw sightingsError;
-      setSightings(sightingsData || []);
+      setSightings(sightingsData);
+      setSightingsPage(0);
+      setHasMoreSightings(hasMore);
 
-      // 6. Procesar Especies (Logbook)
-      const speciesMap = new Map<string, any>();
-      (sightingsData || []).forEach((item: any) => {
-        if (item.bird) {
-          const birdId = item.bird.id;
-          const existing = speciesMap.get(birdId);
-
-          let photoUrls: string[] = [];
-          if (item.photo_url) {
-            if (typeof item.photo_url === 'string') {
-              try {
-                const parsed = JSON.parse(item.photo_url);
-                photoUrls = Array.isArray(parsed) ? parsed : [item.photo_url];
-              } catch {
-                photoUrls = [item.photo_url];
-              }
-            } else if (Array.isArray(item.photo_url)) {
-              photoUrls = item.photo_url;
-            }
-          }
-
-          const sightingDate = new Date(item.sighting_date || item.created_at).toLocaleDateString();
-
-          if (existing) {
-            existing.count += 1;
-            photoUrls.forEach((url) => {
-              existing.images.push({
-                url,
-                date: sightingDate,
-                sightingId: item.id,
-              });
-            });
-          } else {
-            speciesMap.set(birdId, {
-              id: birdId,
-              name: item.bird.common_name,
-              scientificName: item.bird.scientific_name,
-              image: 'bird-icon',
-              count: 1,
-              date: sightingDate,
-              rare: false,
-              images: photoUrls.map((url) => ({
-                url,
-                date: sightingDate,
-                sightingId: item.id,
-              })),
-            });
-          }
-        }
-      });
-      setSpecies(Array.from(speciesMap.values()));
-
-      // 7. Cargar Likes (Reacciones)
-      const { data: reactionsData, error: reactionsError } = await supabase
-        .from('reactions')
-        .select(`
-          sighting:sightings (
-            id,
-            user_id,
-            description,
-            photo_url,
-            latitude,
-            longitude,
-            is_location_private,
-            created_at,
-            users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
-            bird:birds (id, common_name, scientific_name),
-            reactions (user_id),
-            comments (id)
-          )
-        `)
-        .eq('user_id', displayUserId);
-
-      if (reactionsError) throw reactionsError;
-
-      const mappedLikes = (reactionsData || [])
-        .filter((r: any) => r.sighting)
-        .map((r: any) => r.sighting);
-      setLikes(mappedLikes);
+      // 3. Procesar Especies (Logbook)
+      setSpecies(buildSpeciesFromSightings(sightingsData));
     } catch (error) {
       handleError(error, setToast, 'Error al cargar perfil');
     } finally {
       setLoadingProfile(false);
     }
-  }, [displayUserId, authUser, isMe]);
+  }, [displayUserId, authUser?.id, isMe]);
 
   useEffect(() => {
     if (isFocused) {
@@ -219,6 +333,23 @@ export function useProfileData(authUser: any, userId?: string) {
       if (profile?.is_private) {
         const canView = await FollowRepository.areMutualFollowers(authUser.id, displayUserId);
         setCanViewPrivateContent(canView);
+        if (canView && sightings.length === 0) {
+          const { items: sightingsData, hasMore } = await ProfileRepository.getProfileSightings(
+            displayUserId,
+            authUser.id,
+            0,
+            PROFILE_PAGE_LIMIT,
+          );
+          setSightings(sightingsData);
+          setSightingsPage(0);
+          setHasMoreSightings(hasMore);
+          setSpecies(buildSpeciesFromSightings(sightingsData));
+        } else if (!canView) {
+          setSightings([]);
+          setSpecies([]);
+          setLikes([]);
+          setLikesLoaded(false);
+        }
       }
     } catch (error) {
       handleError(error, setToast, 'Error al seguir');
@@ -286,29 +417,85 @@ export function useProfileData(authUser: any, userId?: string) {
     }
   };
 
-  const handlePostDeleted = async () => {
-    if (displayUserId) {
-      const { data: sightingsData } = await supabase
-        .from('sightings')
-        .select(`
-          id,
-          user_id,
-          description,
-          photo_url,
-          latitude,
-          longitude,
-          created_at,
-          sighting_date,
-          is_location_private,
-          users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
-          bird:birds (id, common_name, scientific_name),
-          reactions (user_id),
-          comments (id)
-        `)
-        .eq('user_id', displayUserId)
-        .order('created_at', { ascending: false });
+  const syncSightingLike = useCallback(
+    (postId: string, liked: boolean, nextLikesCount: number, fallbackSighting?: any) => {
+      setSightings((prev) =>
+        prev.map((item) =>
+          item.id === postId
+            ? { ...item, has_liked: liked, likes_count: nextLikesCount }
+            : item,
+        ),
+      );
 
-      setSightings(sightingsData || []);
+      setLikes((prev) => {
+        if (isMe) {
+          if (!liked) {
+            return prev.filter((item) => item.id !== postId);
+          }
+          const exists = prev.some((item) => item.id === postId);
+          if (exists) {
+            return prev.map((item) =>
+              item.id === postId
+                ? { ...item, has_liked: true, likes_count: nextLikesCount }
+                : item,
+            );
+          }
+          if (likesLoaded && fallbackSighting && fallbackSighting.id === postId) {
+            return [
+              { ...fallbackSighting, has_liked: true, likes_count: nextLikesCount },
+              ...prev,
+            ];
+          }
+          return prev;
+        }
+        return prev.map((item) =>
+          item.id === postId
+            ? { ...item, has_liked: liked, likes_count: nextLikesCount }
+            : item,
+        );
+      });
+    },
+    [isMe, likesLoaded],
+  );
+
+  const syncSightingComment = useCallback((postId: string, nextCommentsCount: number) => {
+    setSightings((prev) =>
+      prev.map((item) =>
+        item.id === postId ? { ...item, comments_count: nextCommentsCount } : item,
+      ),
+    );
+    setLikes((prev) =>
+      prev.map((item) =>
+        item.id === postId ? { ...item, comments_count: nextCommentsCount } : item,
+      ),
+    );
+  }, []);
+
+  const handlePostDeleted = async (deletedId?: string) => {
+    if (deletedId) {
+      setSightings((prev) => {
+        const next = prev.filter((item) => item.id !== deletedId);
+        setSpecies(buildSpeciesFromSightings(next));
+        return next;
+      });
+      setLikes((prev) => prev.filter((item) => item.id !== deletedId));
+      return;
+    }
+    if (displayUserId) {
+      try {
+        const { items: sightingsData, hasMore } = await ProfileRepository.getProfileSightings(
+          displayUserId,
+          authUser?.id,
+          0,
+          PROFILE_PAGE_LIMIT,
+        );
+        setSightings(sightingsData);
+        setSightingsPage(0);
+        setHasMoreSightings(hasMore);
+        setSpecies(buildSpeciesFromSightings(sightingsData));
+      } catch (error) {
+        handleError(error, setToast, 'Error recargando publicaciones');
+      }
     }
   };
 
@@ -318,7 +505,17 @@ export function useProfileData(authUser: any, userId?: string) {
     profile,
     loadingProfile,
     sightings,
+    hasMoreSightings,
+    loadingMoreSightings,
+    loadMoreSightings,
     likes,
+    likesLoaded,
+    loadingLikes,
+    likesError,
+    hasMoreLikes,
+    loadingMoreLikes,
+    loadMoreLikes,
+    fetchLikesTab,
     species,
     followersCount,
     followingCount,
@@ -337,6 +534,8 @@ export function useProfileData(authUser: any, userId?: string) {
     openFollowModal,
     handleModalFollowToggle,
     handlePostDeleted,
+    syncSightingLike,
+    syncSightingComment,
   };
 }
 
