@@ -31,6 +31,11 @@ export type MapSighting = {
     is_verified?: boolean;
   } | null;
   bird?: any;
+  likes_count?: number;
+  comments_count?: number;
+  has_liked?: boolean;
+  reactions?: Array<{ user_id: string }>;
+  comments?: Array<{ id: string }>;
 };
 
 const DEFAULT_REGION = {

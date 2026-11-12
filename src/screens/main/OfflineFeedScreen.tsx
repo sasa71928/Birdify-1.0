@@ -29,6 +29,9 @@ interface LocalSighting {
   is_location_private: number | boolean | null;
   photo_url: string | null;
   local_photo_path: string | null;
+  likes_count?: number | null;
+  comments_count?: number | null;
+  has_liked?: number | boolean | null;
   sighting_date: string | null;
   created_at: string | null;
   sync_status: string | null;
@@ -51,14 +54,18 @@ export default function OfflineFeedScreen() {
         `
         SELECT
           s.id, s.user_id, s.bird_id, s.description, s.latitude, s.longitude, s.is_location_private,
-          s.photo_url, s.local_photo_path, s.sighting_date, s.created_at, s.sync_status,
-          b.common_name, b.scientific_name
+          s.photo_url, s.local_photo_path, s.likes_count, s.comments_count,
+          s.sighting_date, s.created_at, s.sync_status,
+          b.common_name, b.scientific_name,
+          EXISTS(
+            SELECT 1 FROM reactions r WHERE r.sighting_id = s.id AND r.user_id = ?
+          ) AS has_liked
         FROM sightings s
         LEFT JOIN birds b ON b.id = s.bird_id
         WHERE s.user_id = ?
         ORDER BY s.created_at DESC
         `,
-        [user.id]
+        [user.id, user.id]
       );
       setSightings(rows);
     } catch (e) {
@@ -126,6 +133,9 @@ export default function OfflineFeedScreen() {
                 bird: item.common_name
                   ? { id: item.bird_id, common_name: item.common_name, scientific_name: item.scientific_name }
                   : null,
+                likes_count: Math.max(Number(item.likes_count ?? 0), item.has_liked ? 1 : 0),
+                comments_count: Math.max(0, Number(item.comments_count ?? 0)),
+                has_liked: Boolean(item.has_liked),
                 reactions: [],
                 comments: [],
               },

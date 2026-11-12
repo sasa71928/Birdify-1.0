@@ -7,10 +7,20 @@ export const ReactionRepository = {
   // Agregar reacción (Me gusta / Like)
   async react(sightingId: string, userId: string): Promise<void> {
     if (!isOnline) {
+      const existing = await db.getFirstAsync<{ user_id: string }>(
+        `SELECT user_id FROM reactions WHERE user_id = ? AND sighting_id = ?`,
+        [userId, sightingId]
+      );
       await db.runAsync(
         `INSERT OR REPLACE INTO reactions (user_id, sighting_id, created_at) VALUES (?, ?, ?)`,
         [userId, sightingId, new Date().toISOString()]
       );
+      if (!existing) {
+        await db.runAsync(
+          `UPDATE sightings SET likes_count = COALESCE(likes_count, 0) + 1 WHERE id = ?`,
+          [sightingId]
+        );
+      }
       await addToQueue('reactions', 'INSERT', { sighting_id: sightingId, user_id: userId });
       return;
     }
@@ -31,10 +41,20 @@ export const ReactionRepository = {
     }
 
     try {
+      const existing = await db.getFirstAsync<{ user_id: string }>(
+        `SELECT user_id FROM reactions WHERE user_id = ? AND sighting_id = ?`,
+        [userId, sightingId]
+      );
       await db.runAsync(
         `INSERT OR REPLACE INTO reactions (user_id, sighting_id, created_at) VALUES (?, ?, ?)`,
         [userId, sightingId, new Date().toISOString()]
       );
+      if (!existing && !isDuplicate) {
+        await db.runAsync(
+          `UPDATE sightings SET likes_count = COALESCE(likes_count, 0) + 1 WHERE id = ?`,
+          [sightingId]
+        );
+      }
     } catch {
       // Non-blocking local SQLite cache update
     }
@@ -43,10 +63,20 @@ export const ReactionRepository = {
   // Eliminar reacción (Quitar me gusta / Unlike)
   async unreact(sightingId: string, userId: string): Promise<void> {
     if (!isOnline) {
+      const existing = await db.getFirstAsync<{ user_id: string }>(
+        `SELECT user_id FROM reactions WHERE user_id = ? AND sighting_id = ?`,
+        [userId, sightingId]
+      );
       await db.runAsync(
         `DELETE FROM reactions WHERE user_id = ? AND sighting_id = ?`,
         [userId, sightingId]
       );
+      if (existing) {
+        await db.runAsync(
+          `UPDATE sightings SET likes_count = MAX(0, COALESCE(likes_count, 0) - 1) WHERE id = ?`,
+          [sightingId]
+        );
+      }
       await addToQueue('reactions', 'DELETE_REACTION', { sighting_id: sightingId, user_id: userId });
       return;
     }
@@ -62,10 +92,20 @@ export const ReactionRepository = {
     }
 
     try {
+      const existing = await db.getFirstAsync<{ user_id: string }>(
+        `SELECT user_id FROM reactions WHERE user_id = ? AND sighting_id = ?`,
+        [userId, sightingId]
+      );
       await db.runAsync(
         `DELETE FROM reactions WHERE user_id = ? AND sighting_id = ?`,
         [userId, sightingId]
       );
+      if (existing) {
+        await db.runAsync(
+          `UPDATE sightings SET likes_count = MAX(0, COALESCE(likes_count, 0) - 1) WHERE id = ?`,
+          [sightingId]
+        );
+      }
     } catch {
       // Non-blocking local SQLite cache update
     }

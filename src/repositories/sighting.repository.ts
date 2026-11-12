@@ -32,6 +32,214 @@ async function getExcludedUserIds(currentUserId?: string): Promise<Set<string>> 
   return excluded;
 }
 
+function extractAggregatedCount(relation: any): number {
+  if (typeof relation === 'number') return relation;
+  if (Array.isArray(relation)) {
+    if (relation.length === 0) return 0;
+    if (typeof relation[0]?.count === 'number') {
+      return relation[0].count;
+    }
+    return relation.length;
+  }
+  if (relation && typeof relation.count === 'number') {
+    return relation.count;
+  }
+  return 0;
+}
+
+async function fetchUserLikedSightingIds(
+  sightingIds: string[],
+  currentUserId?: string
+): Promise<Set<string>> {
+  const likedSightingIds = new Set<string>();
+  if (!currentUserId || sightingIds.length === 0) {
+    return likedSightingIds;
+  }
+
+  const { data: myReactions, error: myReactionsError } = await supabase
+    .from('reactions')
+    .select('sighting_id')
+    .eq('user_id', currentUserId)
+    .in('sighting_id', sightingIds);
+
+  if (myReactionsError) {
+    console.warn('[SightingRepository] Error consultando reacciones propias:', myReactionsError);
+    return likedSightingIds;
+  }
+
+  for (const row of myReactions || []) {
+    if (row?.sighting_id) {
+      likedSightingIds.add(row.sighting_id);
+    }
+  }
+  return likedSightingIds;
+}
+
+async function fetchLocalLikedSightingIds(
+  sightingIds: string[],
+  currentUserId?: string
+): Promise<Set<string>> {
+  const likedSightingIds = new Set<string>();
+  if (!currentUserId || sightingIds.length === 0) {
+    return likedSightingIds;
+  }
+
+  const placeholders = sightingIds.map(() => '?').join(',');
+  const rows = await db.getAllAsync<{ sighting_id: string }>(
+    `SELECT sighting_id FROM reactions WHERE user_id = ? AND sighting_id IN (${placeholders})`,
+    [currentUserId, ...sightingIds]
+  );
+
+  for (const row of rows) {
+    if (row?.sighting_id) {
+      likedSightingIds.add(row.sighting_id);
+    }
+  }
+  return likedSightingIds;
+}
+
+interface PendingSyncAdjustments {
+  pendingReactionBySighting: Map<string, 'INSERT' | 'DELETE_REACTION'>;
+  pendingCommentsCountBySighting: Map<string, number>;
+}
+
+async function getPendingSyncAdjustments(
+  sightingIds: string[],
+  currentUserId?: string
+): Promise<PendingSyncAdjustments> {
+  const pendingReactionBySighting = new Map<string, 'INSERT' | 'DELETE_REACTION'>();
+  const pendingCommentsCountBySighting = new Map<string, number>();
+
+  if (sightingIds.length === 0) {
+    return { pendingReactionBySighting, pendingCommentsCountBySighting };
+  }
+
+  try {
+    const targetIds = new Set(sightingIds);
+    const queueRows = await db.getAllAsync<{
+      table_name: string;
+      operation: string;
+      payload: string;
+    }>(
+      `SELECT table_name, operation, payload
+       FROM sync_queue
+       WHERE table_name IN ('reactions', 'comments')
+       ORDER BY created_at ASC`
+    );
+
+    for (const row of queueRows) {
+      try {
+        const parsed = JSON.parse(row.payload);
+        const sightingId = parsed?.sighting_id;
+        if (!sightingId || !targetIds.has(sightingId)) continue;
+
+        if (
+          row.table_name === 'reactions' &&
+          currentUserId &&
+          parsed?.user_id === currentUserId &&
+          (row.operation === 'INSERT' || row.operation === 'DELETE_REACTION')
+        ) {
+          pendingReactionBySighting.set(sightingId, row.operation);
+        } else if (row.table_name === 'comments' && row.operation === 'INSERT') {
+          pendingCommentsCountBySighting.set(
+            sightingId,
+            (pendingCommentsCountBySighting.get(sightingId) || 0) + 1
+          );
+        }
+      } catch {
+        // Ignorar payload malformado en cola local
+      }
+    }
+  } catch (e) {
+    console.warn('[SightingRepository] Error leyendo sync_queue local:', e);
+  }
+
+  return { pendingReactionBySighting, pendingCommentsCountBySighting };
+}
+
+function resolveOnlineSightingCounts(
+  item: any,
+  likedSightingIds: Set<string>,
+  adjustments: PendingSyncAdjustments,
+  currentUserId?: string
+) {
+  const remoteLikesCount = extractAggregatedCount(item.reactions);
+  const remoteCommentsCount = extractAggregatedCount(item.comments);
+  const remoteHasLiked = likedSightingIds.has(item.id);
+  const pendingReactionOp = adjustments.pendingReactionBySighting.get(item.id);
+
+  let hasLiked = remoteHasLiked;
+  let likesCount = remoteLikesCount;
+
+  if (pendingReactionOp === 'INSERT') {
+    hasLiked = true;
+    if (!remoteHasLiked) {
+      likesCount = remoteLikesCount + 1;
+    }
+  } else if (pendingReactionOp === 'DELETE_REACTION') {
+    hasLiked = false;
+    if (remoteHasLiked) {
+      likesCount = Math.max(0, remoteLikesCount - 1);
+    }
+  }
+
+  const pendingComments = adjustments.pendingCommentsCountBySighting.get(item.id) || 0;
+  const commentsCount = remoteCommentsCount + pendingComments;
+
+  return {
+    likes_count: likesCount,
+    comments_count: commentsCount,
+    has_liked: hasLiked,
+    reactions: hasLiked && currentUserId ? [{ user_id: currentUserId }] : [],
+    comments: [],
+  };
+}
+
+async function syncLocalUserReaction(
+  sightingId: string,
+  hasLiked: boolean,
+  adjustments: PendingSyncAdjustments,
+  currentUserId?: string
+): Promise<void> {
+  if (!currentUserId || adjustments.pendingReactionBySighting.has(sightingId)) {
+    return;
+  }
+
+  if (hasLiked) {
+    await db.runAsync(
+      `INSERT OR IGNORE INTO reactions (user_id, sighting_id) VALUES (?, ?)`,
+      [currentUserId, sightingId]
+    );
+  } else {
+    await db.runAsync(
+      `DELETE FROM reactions WHERE user_id = ? AND sighting_id = ?`,
+      [currentUserId, sightingId]
+    );
+  }
+}
+
+async function refreshExistingSqliteCounts(
+  items: Array<{ id: string; likes_count: number; comments_count: number; has_liked: boolean }>,
+  adjustments: PendingSyncAdjustments,
+  currentUserId?: string
+): Promise<void> {
+  if (items.length === 0) return;
+
+  await Promise.all(
+    items.map(async (item) => {
+      try {
+        await db.runAsync(
+          `UPDATE sightings SET likes_count = ?, comments_count = ? WHERE id = ?`,
+          [item.likes_count, item.comments_count, item.id]
+        );
+        await syncLocalUserReaction(item.id, item.has_liked, adjustments, currentUserId);
+      } catch {
+        // Non-blocking SQLite cache refresh
+      }
+    })
+  );
+}
+
 export const SightingRepository = {
   async create(sighting: Omit<Sighting, 'id' | 'created_at' | 'updated_at'>): Promise<Sighting> {
     // ── MODO OFFLINE ──────────────────────────────────────────────────────────
@@ -213,37 +421,33 @@ export const SightingRepository = {
       );
 
       const sightingIds = rows.map((r) => r.id);
+      const likedSightingIds = await fetchLocalLikedSightingIds(sightingIds, currentUserId);
 
-      let localReactions: any[] = [];
-      let localComments: any[] = [];
-      if (sightingIds.length > 0) {
-        const placeholders = sightingIds.map(() => '?').join(',');
-        localReactions = await db.getAllAsync<any>(
-          `SELECT sighting_id, user_id FROM reactions WHERE sighting_id IN (${placeholders})`,
-          ...sightingIds
-        );
-        localComments = await db.getAllAsync<any>(
-          `SELECT id, sighting_id FROM comments WHERE sighting_id IN (${placeholders})`,
-          ...sightingIds
-        );
-      }
+      return rows.map((r) => {
+        const hasLiked = likedSightingIds.has(r.id);
+        const likesCount = Math.max(Number(r.likes_count ?? 0), hasLiked ? 1 : 0);
+        const commentsCount = Math.max(0, Number(r.comments_count ?? 0));
 
-      return rows.map((r) => ({
-        ...r,
-        photo_url: r.local_photo_path ?? r.photo_url,
-        user: {
-          id: r.user_id,
-          username: r.username,
-          fullname: r.fullname,
-          profile_pic_url: r.profile_pic_url,
-          is_verified: r.is_verified,
-        },
-        bird: r.common_name
-          ? { id: r.bird_id, common_name: r.common_name, scientific_name: r.scientific_name }
-          : null,
-        reactions: localReactions.filter((react) => react.sighting_id === r.id),
-        comments: localComments.filter((comment) => comment.sighting_id === r.id),
-      }));
+        return {
+          ...r,
+          photo_url: r.local_photo_path ?? r.photo_url,
+          user: {
+            id: r.user_id,
+            username: r.username,
+            fullname: r.fullname,
+            profile_pic_url: r.profile_pic_url,
+            is_verified: r.is_verified,
+          },
+          bird: r.common_name
+            ? { id: r.bird_id, common_name: r.common_name, scientific_name: r.scientific_name }
+            : null,
+          likes_count: likesCount,
+          comments_count: commentsCount,
+          has_liked: hasLiked,
+          reactions: hasLiked && currentUserId ? [{ user_id: currentUserId }] : [],
+          comments: [],
+        };
+      });
     }
 
     const from = page * limit;
@@ -256,8 +460,8 @@ export const SightingRepository = {
         latitude, longitude, is_location_private, created_at, updated_at,
         users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
         birds (id, common_name, scientific_name),
-        reactions (user_id),
-        comments (id)
+        reactions (count),
+        comments (count)
       `)
       .order('created_at', { ascending: false })
       .range(from, to);
@@ -270,13 +474,27 @@ export const SightingRepository = {
     const excludedUserIds = await getExcludedUserIds(currentUserId);
     const filteredData = (data || []).filter((item) => !excludedUserIds.has(item.user_id));
 
-    const formattedData = filteredData.map((item) => ({
-      ...item,
-      user: Array.isArray(item.users) ? item.users[0] : item.users,
-      bird: item.birds,
-      reactions: item.reactions || [],
-      comments: item.comments || [],
-    }));
+    const sightingIds = filteredData.map((item) => item.id);
+    const [likedSightingIds, adjustments] = await Promise.all([
+      fetchUserLikedSightingIds(sightingIds, currentUserId),
+      getPendingSyncAdjustments(sightingIds, currentUserId),
+    ]);
+
+    const formattedData = filteredData.map((item) => {
+      const countsAndLike = resolveOnlineSightingCounts(
+        item,
+        likedSightingIds,
+        adjustments,
+        currentUserId
+      );
+
+      return {
+        ...item,
+        user: Array.isArray(item.users) ? item.users[0] : item.users,
+        bird: item.birds,
+        ...countsAndLike,
+      };
+    });
 
     await Promise.all(
       formattedData.map(async (item) => {
@@ -284,13 +502,16 @@ export const SightingRepository = {
           await db.runAsync(
             `INSERT INTO sightings
               (id, user_id, bird_id, description, latitude, longitude,
-               is_location_private, photo_url, created_at, updated_at, sync_status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')
+               is_location_private, photo_url, likes_count, comments_count,
+               created_at, updated_at, sync_status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')
              ON CONFLICT(id) DO UPDATE SET
-               bird_id     = excluded.bird_id,
-               photo_url   = excluded.photo_url,
-               sync_status = 'synced',
-               updated_at  = excluded.updated_at`,
+               bird_id        = CASE WHEN sightings.sync_status = 'synced' THEN excluded.bird_id ELSE sightings.bird_id END,
+               photo_url      = CASE WHEN sightings.sync_status = 'synced' THEN excluded.photo_url ELSE sightings.photo_url END,
+               likes_count    = excluded.likes_count,
+               comments_count = excluded.comments_count,
+               sync_status    = CASE WHEN sightings.sync_status = 'synced' THEN 'synced' ELSE sightings.sync_status END,
+               updated_at     = CASE WHEN sightings.sync_status = 'synced' THEN excluded.updated_at ELSE sightings.updated_at END`,
             [
               item.id,
               item.user_id,
@@ -300,6 +521,8 @@ export const SightingRepository = {
               item.is_location_private ? null : item.longitude,
               item.is_location_private ? 1 : 0,
               item.photo_url,
+              item.likes_count,
+              item.comments_count,
               item.created_at,
               item.updated_at,
             ]
@@ -328,23 +551,7 @@ export const SightingRepository = {
             );
           }
 
-          if (item.reactions && item.reactions.length > 0) {
-            for (const react of item.reactions) {
-              await db.runAsync(
-                `INSERT OR IGNORE INTO reactions (user_id, sighting_id) VALUES (?, ?)`,
-                [react.user_id, item.id]
-              );
-            }
-          }
-
-          if (item.comments && item.comments.length > 0) {
-            for (const comm of item.comments) {
-              await db.runAsync(
-                `INSERT OR IGNORE INTO comments (id, sighting_id) VALUES (?, ?)`,
-                [comm.id, item.id]
-              );
-            }
-          }
+          await syncLocalUserReaction(item.id, item.has_liked, adjustments, currentUserId);
         } catch (err) {
           console.error('Error caching item in getFeed:', err);
         }
@@ -373,36 +580,33 @@ export const SightingRepository = {
       );
 
       const sightingIds = rows.map((r) => r.id);
-      let localReactions: any[] = [];
-      let localComments: any[] = [];
-      if (sightingIds.length > 0) {
-        const placeholders = sightingIds.map(() => '?').join(',');
-        localReactions = await db.getAllAsync<any>(
-          `SELECT sighting_id, user_id FROM reactions WHERE sighting_id IN (${placeholders})`,
-          ...sightingIds
-        );
-        localComments = await db.getAllAsync<any>(
-          `SELECT id, sighting_id FROM comments WHERE sighting_id IN (${placeholders})`,
-          ...sightingIds
-        );
-      }
+      const likedSightingIds = await fetchLocalLikedSightingIds(sightingIds, currentUserId);
 
-      return rows.map((r) => ({
-        ...r,
-        photo_url: r.local_photo_path ?? r.photo_url,
-        user: {
-          id: r.user_id,
-          username: r.username,
-          fullname: r.fullname,
-          profile_pic_url: r.profile_pic_url,
-          is_verified: r.is_verified,
-        },
-        bird: r.common_name
-          ? { id: r.bird_id, common_name: r.common_name, scientific_name: r.scientific_name }
-          : null,
-        reactions: localReactions.filter((react) => react.sighting_id === r.id),
-        comments: localComments.filter((comment) => comment.sighting_id === r.id),
-      }));
+      return rows.map((r) => {
+        const hasLiked = likedSightingIds.has(r.id);
+        const likesCount = Math.max(Number(r.likes_count ?? 0), hasLiked ? 1 : 0);
+        const commentsCount = Math.max(0, Number(r.comments_count ?? 0));
+
+        return {
+          ...r,
+          photo_url: r.local_photo_path ?? r.photo_url,
+          user: {
+            id: r.user_id,
+            username: r.username,
+            fullname: r.fullname,
+            profile_pic_url: r.profile_pic_url,
+            is_verified: r.is_verified,
+          },
+          bird: r.common_name
+            ? { id: r.bird_id, common_name: r.common_name, scientific_name: r.scientific_name }
+            : null,
+          likes_count: likesCount,
+          comments_count: commentsCount,
+          has_liked: hasLiked,
+          reactions: hasLiked && currentUserId ? [{ user_id: currentUserId }] : [],
+          comments: [],
+        };
+      });
     }
 
     const { data, error } = await supabase
@@ -412,8 +616,8 @@ export const SightingRepository = {
         latitude, longitude, is_location_private, created_at, updated_at,
         users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
         birds (id, common_name, scientific_name),
-        reactions (user_id),
-        comments (id)
+        reactions (count),
+        comments (count)
       `)
       .eq('bird_id', birdId)
       .order('created_at', { ascending: false })
@@ -425,15 +629,32 @@ export const SightingRepository = {
     }
 
     const excludedUserIds = await getExcludedUserIds(currentUserId);
-    return (data || [])
-      .filter((item) => !excludedUserIds.has(item.user_id))
-      .map((item) => ({
+    const filteredData = (data || []).filter((item) => !excludedUserIds.has(item.user_id));
+
+    const sightingIds = filteredData.map((item) => item.id);
+    const [likedSightingIds, adjustments] = await Promise.all([
+      fetchUserLikedSightingIds(sightingIds, currentUserId),
+      getPendingSyncAdjustments(sightingIds, currentUserId),
+    ]);
+
+    const formattedData = filteredData.map((item) => {
+      const countsAndLike = resolveOnlineSightingCounts(
+        item,
+        likedSightingIds,
+        adjustments,
+        currentUserId
+      );
+
+      return {
         ...item,
         user: Array.isArray(item.users) ? item.users[0] : item.users,
         bird: item.birds,
-        reactions: item.reactions || [],
-        comments: item.comments || [],
-      }));
+        ...countsAndLike,
+      };
+    });
+
+    await refreshExistingSqliteCounts(formattedData, adjustments, currentUserId);
+    return formattedData;
   },
 
   /**
@@ -445,6 +666,7 @@ export const SightingRepository = {
       const rows = await db.getAllAsync<any>(
         `SELECT s.id, s.user_id, s.bird_id, s.description, s.photo_url, s.local_photo_path,
                 s.latitude, s.longitude, s.is_location_private, s.created_at,
+                s.likes_count, s.comments_count,
                 b.common_name, b.scientific_name,
                 u.username, u.fullname, u.profile_pic_url, u.is_verified
          FROM sightings s
@@ -459,48 +681,45 @@ export const SightingRepository = {
       );
 
       const sightingIds = rows.map((r) => r.id);
-      let localReactions: any[] = [];
-      let localComments: any[] = [];
-      if (sightingIds.length > 0) {
-        const placeholders = sightingIds.map(() => '?').join(',');
-        localReactions = await db.getAllAsync<any>(
-          `SELECT sighting_id, user_id FROM reactions WHERE sighting_id IN (${placeholders})`,
-          ...sightingIds
-        );
-        localComments = await db.getAllAsync<any>(
-          `SELECT id, sighting_id FROM comments WHERE sighting_id IN (${placeholders})`,
-          ...sightingIds
-        );
-      }
+      const likedSightingIds = await fetchLocalLikedSightingIds(sightingIds, currentUserId);
 
-      return rows.map((r) => ({
-        ...r,
-        is_location_private: Boolean(r.is_location_private),
-        user: r.username
-          ? {
-              id: r.user_id,
-              username: r.username,
-              fullname: r.fullname,
-              profile_pic_url: r.profile_pic_url,
-              is_verified: Boolean(r.is_verified),
-            }
-          : null,
-        bird: r.common_name
-          ? {
-              id: r.bird_id,
-              common_name: r.common_name,
-              scientific_name: r.scientific_name,
-              image_url: r.photo_url || r.local_photo_path,
-            }
-          : {
-              id: r.bird_id || r.id,
-              common_name: 'Ave observada',
-              scientific_name: 'Especie silvestre',
-              image_url: r.photo_url || r.local_photo_path,
-            },
-        reactions: localReactions.filter((react) => react.sighting_id === r.id),
-        comments: localComments.filter((comment) => comment.sighting_id === r.id),
-      }));
+      return rows.map((r) => {
+        const hasLiked = likedSightingIds.has(r.id);
+        const likesCount = Math.max(Number(r.likes_count ?? 0), hasLiked ? 1 : 0);
+        const commentsCount = Math.max(0, Number(r.comments_count ?? 0));
+
+        return {
+          ...r,
+          is_location_private: Boolean(r.is_location_private),
+          user: r.username
+            ? {
+                id: r.user_id,
+                username: r.username,
+                fullname: r.fullname,
+                profile_pic_url: r.profile_pic_url,
+                is_verified: Boolean(r.is_verified),
+              }
+            : null,
+          bird: r.common_name
+            ? {
+                id: r.bird_id,
+                common_name: r.common_name,
+                scientific_name: r.scientific_name,
+                image_url: r.photo_url || r.local_photo_path,
+              }
+            : {
+                id: r.bird_id || r.id,
+                common_name: 'Ave observada',
+                scientific_name: 'Especie silvestre',
+                image_url: r.photo_url || r.local_photo_path,
+              },
+          likes_count: likesCount,
+          comments_count: commentsCount,
+          has_liked: hasLiked,
+          reactions: hasLiked && currentUserId ? [{ user_id: currentUserId }] : [],
+          comments: [],
+        };
+      });
     }
 
     const { data, error } = await supabase
@@ -509,8 +728,8 @@ export const SightingRepository = {
         id, user_id, bird_id, description, photo_url, latitude, longitude, is_location_private, created_at,
         users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
         birds!sightings_bird_id_fkey (id, common_name, scientific_name, season, habitat_info, description),
-        reactions (user_id),
-        comments (id)
+        reactions (count),
+        comments (count)
       `)
       .eq('is_location_private', false)
       .not('latitude', 'is', null)
@@ -524,32 +743,48 @@ export const SightingRepository = {
     }
 
     const excludedUserIds = await getExcludedUserIds(currentUserId);
-    return (data || [])
-      .filter((item) => !excludedUserIds.has(item.user_id))
-      .map((item) => {
-        const rawBird = Array.isArray(item.birds) ? item.birds[0] : item.birds;
-        const rawUser = Array.isArray(item.users) ? item.users[0] : item.users;
-        return {
-          ...item,
-          user: rawUser || null,
-          bird: rawBird
-            ? {
-                ...rawBird,
-                image_url: item.photo_url,
-              }
-            : {
-                id: item.bird_id || item.id,
-                common_name: 'Ave observada',
-                scientific_name: 'Especie silvestre',
-                image_url: item.photo_url,
-              },
-          reactions: item.reactions || [],
-          comments: item.comments || [],
-        };
-      });
+    const filteredData = (data || []).filter((item) => !excludedUserIds.has(item.user_id));
+
+    const sightingIds = filteredData.map((item) => item.id);
+    const [likedSightingIds, adjustments] = await Promise.all([
+      fetchUserLikedSightingIds(sightingIds, currentUserId),
+      getPendingSyncAdjustments(sightingIds, currentUserId),
+    ]);
+
+    const formattedData = filteredData.map((item) => {
+      const rawBird = Array.isArray(item.birds) ? item.birds[0] : item.birds;
+      const rawUser = Array.isArray(item.users) ? item.users[0] : item.users;
+      const countsAndLike = resolveOnlineSightingCounts(
+        item,
+        likedSightingIds,
+        adjustments,
+        currentUserId
+      );
+
+      return {
+        ...item,
+        user: rawUser || null,
+        bird: rawBird
+          ? {
+              ...rawBird,
+              image_url: item.photo_url,
+            }
+          : {
+              id: item.bird_id || item.id,
+              common_name: 'Ave observada',
+              scientific_name: 'Especie silvestre',
+              image_url: item.photo_url,
+            },
+        ...countsAndLike,
+      };
+    });
+
+    await refreshExistingSqliteCounts(formattedData, adjustments, currentUserId);
+    return formattedData;
   },
 
-  async getByUserId(userId: string, page = 0, limit = 20): Promise<any[]> {
+  async getByUserId(userId: string, page = 0, limit = 20, currentUserId?: string): Promise<any[]> {
+    const viewerId = currentUserId ?? userId;
     if (!isOnline) {
       const rows = await db.getAllAsync<any>(
         `SELECT s.*, u.username, u.fullname, u.profile_pic_url, u.is_verified,
@@ -563,37 +798,33 @@ export const SightingRepository = {
         [userId, limit, page * limit]
       );
       const sightingIds = rows.map((r) => r.id);
+      const likedSightingIds = await fetchLocalLikedSightingIds(sightingIds, viewerId);
 
-      let localReactions: any[] = [];
-      let localComments: any[] = [];
-      if (sightingIds.length > 0) {
-        const placeholders = sightingIds.map(() => '?').join(',');
-        localReactions = await db.getAllAsync<any>(
-          `SELECT sighting_id, user_id FROM reactions WHERE sighting_id IN (${placeholders})`,
-          ...sightingIds
-        );
-        localComments = await db.getAllAsync<any>(
-          `SELECT id, sighting_id FROM comments WHERE sighting_id IN (${placeholders})`,
-          ...sightingIds
-        );
-      }
+      return rows.map((r) => {
+        const hasLiked = likedSightingIds.has(r.id);
+        const likesCount = Math.max(Number(r.likes_count ?? 0), hasLiked ? 1 : 0);
+        const commentsCount = Math.max(0, Number(r.comments_count ?? 0));
 
-      return rows.map((r) => ({
-        ...r,
-        photo_url: r.local_photo_path ?? r.photo_url,
-        user: {
-          id: r.user_id,
-          username: r.username,
-          fullname: r.fullname,
-          profile_pic_url: r.profile_pic_url,
-          is_verified: r.is_verified,
-        },
-        bird: r.common_name
-          ? { id: r.bird_id, common_name: r.common_name, scientific_name: r.scientific_name }
-          : null,
-        reactions: localReactions.filter((react) => react.sighting_id === r.id),
-        comments: localComments.filter((comment) => comment.sighting_id === r.id),
-      }));
+        return {
+          ...r,
+          photo_url: r.local_photo_path ?? r.photo_url,
+          user: {
+            id: r.user_id,
+            username: r.username,
+            fullname: r.fullname,
+            profile_pic_url: r.profile_pic_url,
+            is_verified: r.is_verified,
+          },
+          bird: r.common_name
+            ? { id: r.bird_id, common_name: r.common_name, scientific_name: r.scientific_name }
+            : null,
+          likes_count: likesCount,
+          comments_count: commentsCount,
+          has_liked: hasLiked,
+          reactions: hasLiked && viewerId ? [{ user_id: viewerId }] : [],
+          comments: [],
+        };
+      });
     }
 
     const from = page * limit;
@@ -606,8 +837,8 @@ export const SightingRepository = {
         latitude, longitude, is_location_private, created_at, updated_at,
         users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
         birds (id, common_name, scientific_name),
-        reactions (user_id),
-        comments (id)
+        reactions (count),
+        comments (count)
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
@@ -618,14 +849,28 @@ export const SightingRepository = {
       throw error;
     }
 
-    const formattedData =
-      data?.map((item) => ({
+    const rawRows = data || [];
+    const sightingIds = rawRows.map((item) => item.id);
+    const [likedSightingIds, adjustments] = await Promise.all([
+      fetchUserLikedSightingIds(sightingIds, viewerId),
+      getPendingSyncAdjustments(sightingIds, viewerId),
+    ]);
+
+    const formattedData = rawRows.map((item) => {
+      const countsAndLike = resolveOnlineSightingCounts(
+        item,
+        likedSightingIds,
+        adjustments,
+        viewerId
+      );
+
+      return {
         ...item,
         user: Array.isArray(item.users) ? item.users[0] : item.users,
         bird: item.birds,
-        reactions: item.reactions || [],
-        comments: item.comments || [],
-      })) || [];
+        ...countsAndLike,
+      };
+    });
 
     await Promise.all(
       formattedData.map(async (item) => {
@@ -633,13 +878,16 @@ export const SightingRepository = {
           await db.runAsync(
             `INSERT INTO sightings
               (id, user_id, bird_id, description, latitude, longitude,
-               is_location_private, photo_url, created_at, updated_at, sync_status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')
+               is_location_private, photo_url, likes_count, comments_count,
+               created_at, updated_at, sync_status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')
              ON CONFLICT(id) DO UPDATE SET
-               bird_id     = excluded.bird_id,
-               photo_url   = excluded.photo_url,
-               sync_status = 'synced',
-               updated_at  = excluded.updated_at`,
+               bird_id        = CASE WHEN sightings.sync_status = 'synced' THEN excluded.bird_id ELSE sightings.bird_id END,
+               photo_url      = CASE WHEN sightings.sync_status = 'synced' THEN excluded.photo_url ELSE sightings.photo_url END,
+               likes_count    = excluded.likes_count,
+               comments_count = excluded.comments_count,
+               sync_status    = CASE WHEN sightings.sync_status = 'synced' THEN 'synced' ELSE sightings.sync_status END,
+               updated_at     = CASE WHEN sightings.sync_status = 'synced' THEN excluded.updated_at ELSE sightings.updated_at END`,
             [
               item.id,
               item.user_id,
@@ -649,6 +897,8 @@ export const SightingRepository = {
               item.is_location_private ? null : item.longitude,
               item.is_location_private ? 1 : 0,
               item.photo_url,
+              item.likes_count,
+              item.comments_count,
               item.created_at,
               item.updated_at,
             ]
@@ -677,23 +927,7 @@ export const SightingRepository = {
             );
           }
 
-          if (item.reactions && item.reactions.length > 0) {
-            for (const react of item.reactions) {
-              await db.runAsync(
-                `INSERT OR IGNORE INTO reactions (user_id, sighting_id) VALUES (?, ?)`,
-                [react.user_id, item.id]
-              );
-            }
-          }
-
-          if (item.comments && item.comments.length > 0) {
-            for (const comm of item.comments) {
-              await db.runAsync(
-                `INSERT OR IGNORE INTO comments (id, sighting_id) VALUES (?, ?)`,
-                [comm.id, item.id]
-              );
-            }
-          }
+          await syncLocalUserReaction(item.id, item.has_liked, adjustments, viewerId);
         } catch (err) {
           console.error('Error caching item in getByUserId:', err);
         }

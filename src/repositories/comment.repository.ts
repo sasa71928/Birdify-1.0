@@ -13,6 +13,10 @@ export const CommentRepository = {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [localId, sightingId, userId, parentCommentId, content, isSubcomment ? 1 : 0, new Date().toISOString(), new Date().toISOString()]
       );
+      await db.runAsync(
+        `UPDATE sightings SET comments_count = COALESCE(comments_count, 0) + 1 WHERE id = ?`,
+        [sightingId]
+      );
 
       const payload = {
         id: localId,
@@ -52,6 +56,15 @@ export const CommentRepository = {
     if (error) {
       console.error('Error creating comment:', error);
       throw error;
+    }
+
+    try {
+      await db.runAsync(
+        `UPDATE sightings SET comments_count = COALESCE(comments_count, 0) + 1 WHERE id = ?`,
+        [sightingId]
+      );
+    } catch {
+      // Non-blocking local SQLite cache update
     }
 
     return data;

@@ -167,7 +167,7 @@ export default function ExploreScreen() {
   }, [selectedSighting]);
 
   const handleLikeToggled = useCallback(
-    (postId: string, hasLiked: boolean) => {
+    (postId: string, hasLiked: boolean, newCount: number) => {
       if (!user?.id) return;
       setSightings((prev) =>
         prev.map((s) => {
@@ -178,7 +178,12 @@ export default function ExploreScreen() {
               ? currentReactions
               : [...currentReactions, { user_id: user.id }]
             : currentReactions.filter((r: any) => r.user_id !== user.id);
-          return { ...s, reactions: updatedReactions };
+          return {
+            ...s,
+            has_liked: hasLiked,
+            likes_count: newCount,
+            reactions: updatedReactions,
+          };
         })
       );
       setSelectedPostSighting((prev: any) => {
@@ -189,25 +194,38 @@ export default function ExploreScreen() {
             ? currentReactions
             : [...currentReactions, { user_id: user.id }]
           : currentReactions.filter((r: any) => r.user_id !== user.id);
-        return { ...prev, reactions: updatedReactions };
+        return {
+          ...prev,
+          has_liked: hasLiked,
+          likes_count: newCount,
+          reactions: updatedReactions,
+        };
       });
     },
     [user?.id, setSightings]
   );
 
   const handleCommentAdded = useCallback(
-    (postId: string) => {
+    (postId: string, newCount: number) => {
       setSightings((prev) =>
         prev.map((s) => {
           if (s.id !== postId) return s;
           const currentComments = (s as any).comments || [];
-          return { ...s, comments: [...currentComments, { id: Date.now().toString() }] };
+          return {
+            ...s,
+            comments_count: newCount,
+            comments: [...currentComments, { id: Date.now().toString() }],
+          };
         })
       );
       setSelectedPostSighting((prev: any) => {
         if (!prev || prev.id !== postId) return prev;
         const currentComments = prev.comments || [];
-        return { ...prev, comments: [...currentComments, { id: Date.now().toString() }] };
+        return {
+          ...prev,
+          comments_count: newCount,
+          comments: [...currentComments, { id: Date.now().toString() }],
+        };
       });
     },
     [setSightings]

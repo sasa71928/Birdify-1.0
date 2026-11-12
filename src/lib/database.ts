@@ -40,6 +40,8 @@ export async function initDatabase() {
       is_location_private INTEGER DEFAULT 0,
       photo_url TEXT,
       local_photo_path TEXT,
+      likes_count INTEGER DEFAULT 0,
+      comments_count INTEGER DEFAULT 0,
       sync_status TEXT DEFAULT 'synced',
       sighting_date TEXT,
       created_at TEXT,
@@ -107,6 +109,31 @@ export async function initDatabase() {
         // Columna ya existe
       }
       await db.execAsync('PRAGMA user_version = 2');
+    }
+
+    if (currentVersion < 3) {
+      try {
+        await db.execAsync(`ALTER TABLE sightings ADD COLUMN likes_count INTEGER DEFAULT 0`);
+      } catch {
+        // Columna ya existe
+      }
+      try {
+        await db.execAsync(`ALTER TABLE sightings ADD COLUMN comments_count INTEGER DEFAULT 0`);
+      } catch {
+        // Columna ya existe
+      }
+      try {
+        await db.execAsync(`
+          UPDATE sightings
+          SET likes_count = (SELECT COUNT(*) FROM reactions r WHERE r.sighting_id = sightings.id),
+              comments_count = (SELECT COUNT(*) FROM comments c WHERE c.sighting_id = sightings.id)
+          WHERE COALESCE(likes_count, 0) = 0 AND COALESCE(comments_count, 0) = 0
+        `);
+        await db.execAsync(`DELETE FROM comments WHERE content IS NULL`);
+      } catch {
+        // Ignorar si falla el backfill inicial
+      }
+      await db.execAsync('PRAGMA user_version = 3');
     }
   } catch (migErr) {
     console.warn('[Database] Error comprobando versiones de migración SQLite:', migErr);
