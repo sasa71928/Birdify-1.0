@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '../../../context/AuthContext';
 import { chatStore } from '../data/chatStore';
 import { ChatRepository } from '../data/chat.repository';
+import { realtimeManager } from '../data/realtimeManager';
 import { ChatMessage, ChatReplyInfo } from '../types';
 
 export function useSendMessage(conversationId: string) {
@@ -63,15 +64,29 @@ export function useSendMessage(conversationId: string) {
         replyToId: currentReply?.id || null,
       });
 
-      chatStore.confirmPendingMessage(conversationId, tempId, {
+      const meta = chatStore.getConversation(conversationId).meta;
+      const senderMember = meta?.members.find((m) => m.id === user.id);
+      const confirmedMessage: ChatMessage = {
         ...pendingMessage,
         id: confirmed.id,
         imagePath: confirmed.imagePath,
         imageWidth: confirmed.imageWidth,
         imageHeight: confirmed.imageHeight,
+        createdAt: confirmed.createdAt || pendingMessage.createdAt,
         localImageUri: undefined,
+        sender: senderMember
+          ? {
+              id: senderMember.id,
+              username: senderMember.username,
+              fullname: senderMember.fullname,
+              profile_pic_url: senderMember.profile_pic_url,
+            }
+          : pendingMessage.sender,
         status: 'sent',
-      });
+      };
+
+      chatStore.confirmPendingMessage(conversationId, tempId, confirmedMessage);
+      realtimeManager.sendMessageBroadcast(conversationId, confirmedMessage);
     } catch (e) {
       console.warn('[useSendMessage] Error sending message:', e);
       chatStore.failPendingMessage(conversationId, tempId);
@@ -93,12 +108,29 @@ export function useSendMessage(conversationId: string) {
           replyToId: failedMsg.replyTo?.id || null,
         });
 
-        chatStore.confirmPendingMessage(conversationId, failedMsg.id, {
+        const meta = chatStore.getConversation(conversationId).meta;
+        const senderMember = meta?.members.find((m) => m.id === user.id);
+        const confirmedMessage: ChatMessage = {
           ...failedMsg,
+          id: confirmed.id,
           imagePath: confirmed.imagePath,
+          imageWidth: confirmed.imageWidth,
+          imageHeight: confirmed.imageHeight,
+          createdAt: confirmed.createdAt || failedMsg.createdAt,
           localImageUri: undefined,
+          sender: senderMember
+            ? {
+                id: senderMember.id,
+                username: senderMember.username,
+                fullname: senderMember.fullname,
+                profile_pic_url: senderMember.profile_pic_url,
+              }
+            : failedMsg.sender,
           status: 'sent',
-        });
+        };
+
+        chatStore.confirmPendingMessage(conversationId, failedMsg.id, confirmedMessage);
+        realtimeManager.sendMessageBroadcast(conversationId, confirmedMessage);
       } catch (e) {
         console.warn('[useSendMessage] Retry failed:', e);
         chatStore.failPendingMessage(conversationId, failedMsg.id);

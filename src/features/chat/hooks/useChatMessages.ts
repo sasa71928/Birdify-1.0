@@ -1,4 +1,6 @@
 import { useEffect, useCallback, useRef } from 'react';
+import { AppState } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { ChatRepository } from '../data/chat.repository';
 import { chatStore, useChatConversation } from '../data/chatStore';
 import { ChatMessage } from '../types';
@@ -10,28 +12,59 @@ export function useChatMessages(conversationId: string) {
   const hasMore = useChatConversation(conversationId, (s) => s.hasMore);
   const loadingOlder = useChatConversation(conversationId, (s) => s.loadingOlder);
 
-  const initialLoadDone = useRef(false);
+  const activeConvRef = useRef(conversationId);
+  const inFlightRef = useRef(false);
+  const requestSeqRef = useRef(0);
 
-  // Carga inicial
   useEffect(() => {
-    if (!conversationId) return;
+    activeConvRef.current = conversationId;
+    inFlightRef.current = false;
+  }, [conversationId]);
 
-    const loadInitial = async () => {
-      try {
-        const { messages, hasMore: more } = await ChatRepository.fetchMessagesPage(conversationId, {
-          limit: 40,
-        });
-        chatStore.setPage(conversationId, messages, { isPrepend: false, hasMore: more });
-        initialLoadDone.current = true;
-      } catch (e) {
-        console.warn('[useChatMessages] Initial load error:', e);
+  const refreshLatest = useCallback(async () => {
+    if (!conversationId || inFlightRef.current) return;
+
+    const targetConvId = conversationId;
+    const seq = ++requestSeqRef.current;
+    inFlightRef.current = true;
+
+    try {
+      const { messages, hasMore: more } = await ChatRepository.fetchMessagesPage(targetConvId, {
+        limit: 40,
+      });
+
+      if (activeConvRef.current !== targetConvId || requestSeqRef.current !== seq) {
+        return;
       }
-    };
 
-    if (!loaded && !initialLoadDone.current) {
-      loadInitial();
+      chatStore.setPage(targetConvId, messages, { isPrepend: false, hasMore: more });
+    } catch (e) {
+      console.warn('[useChatMessages] Refresh latest error:', e);
+    } finally {
+      if (activeConvRef.current === targetConvId && requestSeqRef.current === seq) {
+        inFlightRef.current = false;
+      }
     }
-  }, [conversationId, loaded]);
+  }, [conversationId]);
+
+  // Sincronizar la última página siempre al entrar o volver a enfocar el chat,
+  // y también al regresar desde segundo plano mientras el chat está activo.
+  // Si ya estaba en caché, se renderiza de inmediato sin skeleton mientras se actualiza.
+  useFocusEffect(
+    useCallback(() => {
+      refreshLatest();
+
+      const subscription = AppState.addEventListener('change', (nextState) => {
+        if (nextState === 'active') {
+          refreshLatest();
+        }
+      });
+
+      return () => {
+        subscription.remove();
+      };
+    }, [refreshLatest])
+  );
 
   // Carga paginada hacia arriba (mensajes más antiguos)
   const loadOlderMessages = useCallback(async () => {
@@ -69,6 +102,7 @@ export function useChatMessages(conversationId: string) {
     hasMore,
     loadingOlder,
     loadOlderMessages,
+    refreshLatest,
   };
 }
 

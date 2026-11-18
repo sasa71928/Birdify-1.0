@@ -310,6 +310,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
 
   useEffect(() => {
     if (!user) {
+      realtimeManager.destroy();
       setConversations([]);
       setMessagesMap({});
       setHasMoreMap({});
@@ -375,6 +376,7 @@ export function UnreadMessagesProvider({ children }: { children: React.ReactNode
 
           if (convId) {
             appendRealtimeMessage(convId, newMessage);
+            realtimeManager.handleIncomingDbMessage(newMessage, user.id);
           }
 
           if (convId && senderId !== user.id) {

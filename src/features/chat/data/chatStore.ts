@@ -26,6 +26,22 @@ const DEFAULT_STATE: ConversationState = {
 
 type StoreListener = () => void;
 
+function getMessageTimestamp(createdAt: string): number {
+  const ms = Date.parse(createdAt);
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
+function compareMessageOrder(
+  a: { createdAt: string; id: string },
+  b: { createdAt: string; id: string }
+): number {
+  const diff = getMessageTimestamp(a.createdAt) - getMessageTimestamp(b.createdAt);
+  if (diff !== 0) return diff;
+  if (a.id < b.id) return -1;
+  if (a.id > b.id) return 1;
+  return 0;
+}
+
 class ChatStore {
   private state: Record<string, ConversationState> = {};
   private listeners = new Set<StoreListener>();
@@ -86,25 +102,69 @@ class ChatStore {
     const current = this.ensureConversation(convId);
     const byId = { ...current.byId };
     const incomingIds: string[] = [];
+    const seenIncoming = new Set<string>();
 
     for (const msg of messages) {
-      byId[msg.id] = msg;
-      incomingIds.push(msg.id);
+      const existing = byId[msg.id];
+      byId[msg.id] =
+        existing && existing.status === 'read' && msg.status === 'sent'
+          ? { ...msg, status: 'read' }
+          : msg;
+      if (!seenIncoming.has(msg.id)) {
+        seenIncoming.add(msg.id);
+        incomingIds.push(msg.id);
+      }
     }
 
     let nextIds: string[];
+    let nextHasMore = options.hasMore !== undefined ? options.hasMore : current.hasMore;
+
     if (options.isPrepend) {
       // Mensajes históricos anteriores van al inicio de la lista cronológica
       const existingIdsSet = new Set(current.ids);
       const newOldIds = incomingIds.filter((id) => !existingIdsSet.has(id));
       nextIds = [...newOldIds, ...current.ids];
     } else {
-      // Carga inicial o reemplazo
-      // Mantener mensajes locales pendientes si los hubiera
-      const pendingIds = current.ids.filter((id) => current.byId[id]?.status === 'sending');
-      const incomingSet = new Set(incomingIds);
-      const preservedPending = pendingIds.filter((id) => !incomingSet.has(id));
-      nextIds = [...incomingIds, ...preservedPending];
+      // Carga inicial o resincronización de la última página:
+      // 1) Conservar mensajes locales pendientes o fallidos aún no confirmados
+      const pendingIds = current.ids.filter((id) => {
+        const status = current.byId[id]?.status;
+        return (status === 'sending' || status === 'failed') && !seenIncoming.has(id);
+      });
+
+      if (incomingIds.length === 0) {
+        nextIds = pendingIds;
+      } else {
+        const oldestIncoming = byId[incomingIds[0]];
+        const newestIncoming = byId[incomingIds[incomingIds.length - 1]];
+
+        // 2) Conservar historial más antiguo ya paginado si la conversación ya estaba cargada
+        const preservedOlder = current.loaded
+          ? current.ids.filter((id) => {
+              if (seenIncoming.has(id)) return false;
+              const existing = current.byId[id];
+              if (!existing || existing.status === 'sending' || existing.status === 'failed') {
+                return false;
+              }
+              return compareMessageOrder(existing, oldestIncoming) < 0;
+            })
+          : [];
+
+        // 3) Conservar mensajes recién llegados por realtime mientras la petición estaba en vuelo
+        const preservedNewer = current.ids.filter((id) => {
+          if (seenIncoming.has(id)) return false;
+          const existing = current.byId[id];
+          if (!existing || existing.status === 'sending' || existing.status === 'failed') {
+            return false;
+          }
+          return compareMessageOrder(existing, newestIncoming) > 0;
+        });
+
+        nextIds = [...preservedOlder, ...incomingIds, ...preservedNewer, ...pendingIds];
+        if (preservedOlder.length > 0) {
+          nextHasMore = current.hasMore;
+        }
+      }
     }
 
     this.state = {
@@ -114,7 +174,7 @@ class ChatStore {
         ids: nextIds,
         byId,
         loaded: true,
-        hasMore: options.hasMore !== undefined ? options.hasMore : current.hasMore,
+        hasMore: nextHasMore,
         loadingOlder: false,
         lastAccess: Date.now(),
       },
@@ -204,10 +264,80 @@ class ChatStore {
 
   upsertMessage(convId: string, message: ChatMessage) {
     const current = this.ensureConversation(convId);
-    const byId = { ...current.byId, [message.id]: message };
-    const nextIds = current.ids.includes(message.id)
-      ? current.ids
-      : [...current.ids, message.id];
+    const existing = current.byId[message.id];
+
+    const merged: ChatMessage = existing
+      ? {
+          ...existing,
+          ...message,
+          sender: message.sender ?? existing.sender,
+          replyTo: message.replyTo ?? existing.replyTo,
+          reactions:
+            message.reactions && message.reactions.length > 0
+              ? message.reactions
+              : existing.reactions,
+          status:
+            existing.status === 'read' && message.status === 'sent' ? 'read' : message.status,
+        }
+      : message;
+
+    const hadSenderTyping = Boolean(current.typingUsersMap[message.senderId]);
+
+    if (
+      existing &&
+      !hadSenderTyping &&
+      existing.text === merged.text &&
+      existing.imagePath === merged.imagePath &&
+      existing.isDeleted === merged.isDeleted &&
+      existing.status === merged.status &&
+      Boolean(existing.sender) === Boolean(merged.sender) &&
+      Boolean(existing.replyTo) === Boolean(merged.replyTo) &&
+      existing.reactions.length === merged.reactions.length
+    ) {
+      return;
+    }
+
+    const byId = { ...current.byId, [message.id]: merged };
+
+    let nextIds: string[];
+    if (current.ids.includes(message.id)) {
+      nextIds = current.ids;
+    } else if (current.ids.length === 0) {
+      nextIds = [message.id];
+    } else {
+      const lastMsg = current.byId[current.ids[current.ids.length - 1]];
+      if (!lastMsg || compareMessageOrder(lastMsg, merged) <= 0) {
+        nextIds = [...current.ids, message.id];
+      } else {
+        const insertIdx = current.ids.findIndex((id) => {
+          const item = current.byId[id];
+          return item ? compareMessageOrder(merged, item) < 0 : false;
+        });
+        if (insertIdx === -1) {
+          nextIds = [...current.ids, message.id];
+        } else {
+          nextIds = [
+            ...current.ids.slice(0, insertIdx),
+            message.id,
+            ...current.ids.slice(insertIdx),
+          ];
+        }
+      }
+    }
+
+    let nextTypingMap = current.typingUsersMap;
+    let nextTypingIds = current.typingUserIds;
+    if (hadSenderTyping) {
+      const key = `${convId}_${message.senderId}`;
+      const existingTimer = this.typingTimers.get(key);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+        this.typingTimers.delete(key);
+      }
+      nextTypingMap = { ...current.typingUsersMap };
+      delete nextTypingMap[message.senderId];
+      nextTypingIds = Object.keys(nextTypingMap);
+    }
 
     this.state = {
       ...this.state,
@@ -215,6 +345,8 @@ class ChatStore {
         ...current,
         ids: nextIds,
         byId,
+        typingUsersMap: nextTypingMap,
+        typingUserIds: nextTypingIds,
         lastAccess: Date.now(),
       },
     };

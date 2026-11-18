@@ -29,7 +29,8 @@ export function useChatBootstrap(conversationId: string) {
     loadBootstrap();
 
     if (user?.id) {
-      realtimeManager.joinConversationChannel(conversationId, user.email || 'user');
+      realtimeManager.initGlobalSubscription(user.id);
+      realtimeManager.joinConversationChannel(conversationId, user.email || 'user', user.id);
     }
 
     return () => {
