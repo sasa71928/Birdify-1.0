@@ -48,7 +48,7 @@ export const AuthService = {
       }
 
       // Si no contiene un '@' o no tiene un formato de correo simple, asumimos que es username
-      const isEmail = email.includes('@') && email.indexOf('.') > email.indexOf('@');
+      const isEmail = email.includes('@') && email.lastIndexOf('.') > email.indexOf('@');
 
       if (!isEmail) {
         // Sanitizar username para evitar inyecciones de comodines
