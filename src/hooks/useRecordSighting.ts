@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
-import { isOnline, addToQueue, generateId } from '../services/syncService';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { isOnline } from '../services/syncService';
 import db from '../lib/database';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Dimensions, Animated, PanResponder } from 'react-native';
+import { Dimensions, Animated, PanResponder, DeviceEventEmitter } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import MapView from 'react-native-maps';
@@ -13,7 +13,8 @@ import { supabase } from '../lib/supabase';
 import { BirdRepository } from '../repositories/bird.repository';
 import { SightingRepository } from '../repositories/sighting.repository';
 import { handleError } from '../utils/errorHandler';
-import { compressImage, prepareImageForUpload } from '../utils/imageCompressor';
+import { prepareImageForUpload } from '../utils/imageCompressor';
+import { isValidUuid } from '../utils/uuid';
 import { useT } from '../i18n';
 
 type RecordSightingNavProp = NativeStackNavigationProp<RootStackParamList>;
@@ -29,33 +30,58 @@ export function useRecordSighting(editingSightingId?: string, preselectedBird?: 
   const [dbBirdsCatalog, setDbBirdsCatalog] = useState<
     { id: string; common_name: string; scientific_name: string }[]
   >([]);
+  const [loadingCatalog, setLoadingCatalog] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    let mounted = true;
-    BirdRepository.getAll()
-      .then((birds) => {
-        if (mounted) {
-          setDbBirdsCatalog(
-            birds.map((b) => ({
-              id: b.id,
-              common_name: b.common_name,
-              scientific_name: b.scientific_name,
-            }))
-          );
-        }
-      })
-      .catch((e) => console.error('Failed to load birds catalog', e));
+    mountedRef.current = true;
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
   }, []);
 
+  const loadBirdsCatalog = useCallback(async () => {
+    setLoadingCatalog(true);
+    setCatalogError(null);
+    try {
+      const birds = await BirdRepository.getAll();
+      if (!mountedRef.current) return;
+      const validBirds = (birds || [])
+        .filter((b) => isValidUuid(b?.id))
+        .map((b) => ({
+          id: b.id,
+          common_name: b.common_name,
+          scientific_name: b.scientific_name,
+        }));
+      setDbBirdsCatalog(validBirds);
+    } catch (e) {
+      console.error('Failed to load birds catalog', e);
+      if (!mountedRef.current) return;
+      setCatalogError(
+        'No se pudo cargar el catálogo de aves. Revisa tu conexión e inténtalo de nuevo.'
+      );
+    } finally {
+      if (mountedRef.current) {
+        setLoadingCatalog(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    loadBirdsCatalog();
+  }, [loadBirdsCatalog]);
+
+  const hasValidPreselectedBird = Boolean(preselectedBird && isValidUuid(preselectedBird.id));
+
   const [birdName, setBirdName] = useState(
-    preselectedBird ? (preselectedBird.name || preselectedBird.common_name || '') : ''
+    hasValidPreselectedBird
+      ? (preselectedBird.name || preselectedBird.common_name || '')
+      : ''
   );
   const [notes, setNotes] = useState('');
   const [selectedBird, setSelectedBird] = useState<any>(
-    preselectedBird
+    hasValidPreselectedBird
       ? {
           id: preselectedBird.id,
           common_name: preselectedBird.name || preselectedBird.common_name,
@@ -109,6 +135,15 @@ export function useRecordSighting(editingSightingId?: string, preselectedBird?: 
     if (!editingSightingId) return;
 
     const loadSighting = async () => {
+      if (!isValidUuid(editingSightingId)) {
+        handleError(
+          new Error('Identificador de avistamiento inválido.'),
+          setToast,
+          'Error cargando avistamiento'
+        );
+        return;
+      }
+
       if (!isOnline) {
         try {
           const row = await db.getFirstAsync<any>(
@@ -121,11 +156,13 @@ export function useRecordSighting(editingSightingId?: string, preselectedBird?: 
           if (row) {
             setEditingSighting({
               ...row,
-              birds: {
-                id: row.bird_id,
-                common_name: row.common_name,
-                scientific_name: row.scientific_name,
-              },
+              birds: isValidUuid(row.bird_id)
+                ? {
+                    id: row.bird_id,
+                    common_name: row.common_name,
+                    scientific_name: row.scientific_name,
+                  }
+                : null,
             });
           }
         } catch (e) {
@@ -153,9 +190,16 @@ export function useRecordSighting(editingSightingId?: string, preselectedBird?: 
   useEffect(() => {
     if (!editingSighting) return;
 
-    setBirdName(editingSighting.birds?.common_name || '');
-    if (editingSighting.birds?.id) {
-      setSelectedBird(editingSighting.birds);
+    const rawBird = Array.isArray(editingSighting.birds)
+      ? editingSighting.birds[0]
+      : editingSighting.birds;
+
+    if (rawBird && isValidUuid(rawBird.id)) {
+      setBirdName(rawBird.common_name || '');
+      setSelectedBird(rawBird);
+    } else {
+      setBirdName('');
+      setSelectedBird(null);
     }
     setNotes(editingSighting.description || '');
     setRegion({
@@ -341,33 +385,29 @@ export function useRecordSighting(editingSightingId?: string, preselectedBird?: 
     }
   };
 
-  const resolveCatalogBird = async (searchName: string): Promise<{ id: string; common_name: string; scientific_name?: string } | null> => {
-    if (selectedBird?.id) {
-      return selectedBird;
+  const resolveCatalogBird = async (): Promise<{
+    id: string;
+    common_name: string;
+    scientific_name?: string;
+  } | null> => {
+    // Exigir selección explícita de una especie con UUID válido (sin asignar coincidencias parciales)
+    if (!selectedBird || !isValidUuid(selectedBird.id)) {
+      return null;
     }
 
-    const exactCatalogMatch = dbBirdsCatalog.find(
-      (b) => b.common_name.toLowerCase() === searchName.toLowerCase()
-    );
-    if (exactCatalogMatch) {
-      return exactCatalogMatch;
+    const catalogMatch = dbBirdsCatalog.find((b) => b.id === selectedBird.id);
+    if (catalogMatch) {
+      return catalogMatch;
     }
 
-    if (!isOnline) {
-      const existingLocalBird = await db.getFirstAsync<{ id: string; common_name: string; scientific_name: string }>(
-        `SELECT id, common_name, scientific_name FROM birds WHERE LOWER(common_name) = LOWER(?) LIMIT 1`,
-        [searchName]
-      );
-      return existingLocalBird ?? null;
-    }
-
-    const birds = await BirdRepository.search(searchName);
-    const exactRemote = birds?.find(
-      (b: any) => b.common_name?.toLowerCase() === searchName.toLowerCase()
-    ) || birds?.[0];
-
-    if (exactRemote?.id) {
-      return exactRemote as any;
+    // Verificar referencia contra el catálogo disponible (útil para preselectedBird o modo edición)
+    const verifiedBird = await BirdRepository.getById(selectedBird.id);
+    if (verifiedBird && isValidUuid(verifiedBird.id)) {
+      return {
+        id: verifiedBird.id,
+        common_name: verifiedBird.common_name,
+        scientific_name: verifiedBird.scientific_name,
+      };
     }
 
     return null;
@@ -381,8 +421,12 @@ export function useRecordSighting(editingSightingId?: string, preselectedBird?: 
       handleError('Sesión Inválida', setToast, 'Inicia sesión para compartir un avistamiento.');
       return;
     }
-    if (!birdName.trim()) {
-      handleError('Información incompleta', setToast, t('sighting.requireBird'));
+    if (!birdName.trim() || !selectedBird || !isValidUuid(selectedBird.id)) {
+      handleError(
+        'Información incompleta',
+        setToast,
+        'Selecciona una especie existente del catálogo desplegable para registrar el avistamiento.'
+      );
       return;
     }
     if (imageUris.length === 0) {
@@ -393,11 +437,10 @@ export function useRecordSighting(editingSightingId?: string, preselectedBird?: 
     isSubmittingRef.current = true;
     setIsPosting(true);
     try {
-      const searchName = (selectedBird ? selectedBird.common_name : birdName).trim();
-      const matchedBird = await resolveCatalogBird(searchName);
+      const matchedBird = await resolveCatalogBird();
 
-      // AUD-011: Validar siempre contra el catálogo oficial (online y offline) para evitar asignación aleatoria o bloqueo en sync_queue
-      if (!matchedBird?.id) {
+      // Validar contra el catálogo antes de subir fotos, escribir en SQLite o encolar operaciones
+      if (!matchedBird || !isValidUuid(matchedBird.id)) {
         throw new Error(
           'Selecciona una especie existente del catálogo desplegable para registrar el avistamiento.'
         );
@@ -421,43 +464,19 @@ export function useRecordSighting(editingSightingId?: string, preselectedBird?: 
           return;
         }
 
-        const sightingId = generateId();
-        const nowIso = new Date().toISOString();
-
-        await db.runAsync(
-          `INSERT INTO sightings 
-            (id, user_id, bird_id, description, latitude, longitude, 
-            is_location_private, photo_url, local_photo_path, sighting_date, created_at, sync_status)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-          [
-            sightingId,
-            user.id,
-            matchedBird.id,
-            notes,
-            isPrivate ? null : region.latitude,
-            isPrivate ? null : region.longitude,
-            isPrivate ? 1 : 0,
-            localPhotoUrls,
-            JSON.stringify(imageUris),
-            nowIso,
-            nowIso,
-          ]
-        );
-
-        await addToQueue('sightings', 'INSERT', {
-          id: sightingId,
+        await SightingRepository.create({
           user_id: user.id,
           bird_id: matchedBird.id,
           description: notes,
           latitude: isPrivate ? null : region.latitude,
           longitude: isPrivate ? null : region.longitude,
           is_location_private: isPrivate,
-          sighting_date: nowIso,
-          created_at: nowIso,
+          photo_url: localPhotoUrls,
+          sighting_date: new Date().toISOString(),
           _localImagePaths: JSON.stringify(imageUris),
           _birdName: matchedBird.common_name,
           _scientificName: matchedBird.scientific_name ?? null,
-        });
+        } as any);
 
         showToast(
           'Avistamiento guardado offline. Se sincronizará al recuperar conexión.',
@@ -538,6 +557,7 @@ export function useRecordSighting(editingSightingId?: string, preselectedBird?: 
         showToast(t('sighting.successPublished'), 'success');
       }
 
+      DeviceEventEmitter.emit('refresh_feed');
       setShouldNavigateToFeed(true);
     } catch (error: any) {
       showToast(error.message || 'No se pudo publicar el avistamiento.', 'error');
@@ -553,7 +573,7 @@ export function useRecordSighting(editingSightingId?: string, preselectedBird?: 
   };
 
   const handleBirdSelect = (bird: any) => {
-    if (!canEdit) return;
+    if (!canEdit || !bird || !isValidUuid(bird.id)) return;
     setBirdName(bird.common_name);
     setSelectedBird(bird);
     setShowDropdown(false);
@@ -599,6 +619,9 @@ export function useRecordSighting(editingSightingId?: string, preselectedBird?: 
     isEditMode,
     isLocked,
     canEdit,
+    dbBirdsCatalog,
+    loadingCatalog,
+    catalogError,
     filteredBirds,
     mapRef,
     panY,
@@ -621,6 +644,7 @@ export function useRecordSighting(editingSightingId?: string, preselectedBird?: 
     handleBirdSelect,
     handleClearBird,
     handleRegionChange,
+    retryLoadCatalog: loadBirdsCatalog,
     showToast,
   };
 }

@@ -4,7 +4,51 @@ import { supabase } from '../lib/supabase';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import { DeviceEventEmitter } from 'react-native';
-import { compressImage, prepareImageForUpload } from '../utils/imageCompressor';
+import { prepareImageForUpload } from '../utils/imageCompressor';
+import { isValidUuid } from '../utils/uuid';
+
+export interface InvalidPendingSightingReport {
+  queueId: string;
+  operation: string;
+  sightingId: string | null;
+  invalidBirdId: string | null;
+  birdName: string | null;
+}
+
+/**
+ * Inspecciona operaciones pendientes en sync_queue con bird_id no-UUID (ej. 'unidentified_bird')
+ * sin modificarlas, borrarlas ni marcarlas como sincronizadas.
+ */
+export async function getPendingSightingsWithInvalidBird(): Promise<InvalidPendingSightingReport[]> {
+  const reports: InvalidPendingSightingReport[] = [];
+  try {
+    const rows = await db.getAllAsync<{ id: string; operation: string; payload: string }>(
+      `SELECT id, operation, payload FROM sync_queue WHERE table_name = 'sightings' ORDER BY created_at ASC`
+    );
+    for (const row of rows) {
+      try {
+        const parsed = JSON.parse(row.payload);
+        if (
+          (row.operation === 'INSERT' && !isValidUuid(parsed?.bird_id)) ||
+          (row.operation === 'UPDATE' && 'bird_id' in parsed && !isValidUuid(parsed?.bird_id))
+        ) {
+          reports.push({
+            queueId: row.id,
+            operation: row.operation,
+            sightingId: parsed?.id ?? null,
+            invalidBirdId: parsed?.bird_id ?? null,
+            birdName: parsed?._birdName ?? null,
+          });
+        }
+      } catch {
+        // Ignorar payload malformado
+      }
+    }
+  } catch (e) {
+    console.warn('[syncService] Error inspeccionando pendientes con bird_id inválido:', e);
+  }
+  return reports;
+}
 
 export let isOnline = false;
 
@@ -67,23 +111,45 @@ export async function flushSyncQueue() {
           const { _localImagePaths, _localImagePath, _birdName, _scientificName, ...sightingData } = payload;
 
           if (row.operation === 'INSERT') {
-            // 1. Resolver bird_id válido en catálogo de Supabase
-            let finalBirdId: string | null = sightingData.bird_id ?? null;
+            // 1. Validar formato UUID de id y bird_id antes de consultar o subir fotos
+            const finalBirdId: string | null = sightingData.bird_id ?? null;
 
-            if (_birdName && (!finalBirdId || String(finalBirdId).endsWith('_bird'))) {
-              const { data: birds } = await supabase
-                .from('birds')
-                .select('id')
-                .ilike('common_name', _birdName)
-                .limit(1);
-
-              if (birds && birds.length > 0) {
-                finalBirdId = birds[0].id;
-              }
+            if (!isValidUuid(sightingData.id)) {
+              console.warn(
+                `[syncService] Operación INSERT pendiente conservada sin enviar por sighting id inválido: "${sightingData.id}" (queueId=${row.id}).`
+              );
+              continue;
             }
 
-            if (!finalBirdId || String(finalBirdId).endsWith('_bird')) {
-              throw new Error(`La especie "${_birdName || 'desconocida'}" no existe en el catálogo oficial.`);
+            if (!isValidUuid(finalBirdId)) {
+              console.warn(
+                `[syncService] Operación INSERT pendiente conservada sin enviar por bird_id inválido "${finalBirdId}" (sightingId=${sightingData.id}, especie="${_birdName || 'sin nombre'}", queueId=${row.id}). Requiere seleccionar una especie válida del catálogo.`
+              );
+              DeviceEventEmitter.emit('sync_invalid_bird_detected', {
+                queueId: row.id,
+                operation: row.operation,
+                sightingId: sightingData.id,
+                invalidBirdId: finalBirdId,
+                birdName: _birdName ?? null,
+              });
+              continue;
+            }
+
+            // Verificar que el bird_id exista realmente en el catálogo de Supabase antes de subir imágenes
+            const { data: catalogBird, error: birdCheckError } = await supabase
+              .from('birds')
+              .select('id')
+              .eq('id', finalBirdId)
+              .maybeSingle();
+
+            if (birdCheckError) {
+              throw birdCheckError;
+            }
+            if (!catalogBird?.id) {
+              console.warn(
+                `[syncService] Operación INSERT pendiente conservada sin enviar: bird_id "${finalBirdId}" no existe en el catálogo oficial (sightingId=${sightingData.id}, queueId=${row.id}).`
+              );
+              continue;
             }
 
             // 2. Subir imágenes locales a Supabase Storage mediante ArrayBuffer directo (AUD-022)
@@ -162,22 +228,6 @@ export async function flushSyncQueue() {
             ));
 
             if (!error) {
-              if (sightingData.bird_id !== finalBirdId) {
-                const existingLocalBird = await db.getFirstAsync<{ id: string }>(
-                  `SELECT id FROM birds WHERE id = ? LIMIT 1`,
-                  [finalBirdId]
-                );
-
-                if (existingLocalBird) {
-                  await db.runAsync(`DELETE FROM birds WHERE id = ?`, [sightingData.bird_id]);
-                } else {
-                  await db.runAsync(`UPDATE birds SET id = ? WHERE id = ?`, [
-                    finalBirdId,
-                    sightingData.bird_id,
-                  ]);
-                }
-              }
-
               await db.runAsync(
                 `UPDATE sightings
                  SET photo_url = ?, sync_status = 'synced', bird_id = ?
@@ -186,11 +236,56 @@ export async function flushSyncQueue() {
               );
             }
           } else if (row.operation === 'UPDATE') {
+            if (!isValidUuid(sightingData.id)) {
+              console.warn(
+                `[syncService] Operación UPDATE pendiente conservada sin enviar por sighting id inválido: "${sightingData.id}" (queueId=${row.id}).`
+              );
+              continue;
+            }
+
+            if ('bird_id' in sightingData) {
+              if (!isValidUuid(sightingData.bird_id)) {
+                console.warn(
+                  `[syncService] Operación UPDATE pendiente conservada sin enviar por bird_id inválido "${sightingData.bird_id}" (sightingId=${sightingData.id}, queueId=${row.id}). Requiere seleccionar una especie válida del catálogo.`
+                );
+                DeviceEventEmitter.emit('sync_invalid_bird_detected', {
+                  queueId: row.id,
+                  operation: row.operation,
+                  sightingId: sightingData.id,
+                  invalidBirdId: sightingData.bird_id ?? null,
+                  birdName: _birdName ?? null,
+                });
+                continue;
+              }
+
+              const { data: catalogBird, error: birdCheckError } = await supabase
+                .from('birds')
+                .select('id')
+                .eq('id', sightingData.bird_id)
+                .maybeSingle();
+
+              if (birdCheckError) {
+                throw birdCheckError;
+              }
+              if (!catalogBird?.id) {
+                console.warn(
+                  `[syncService] Operación UPDATE pendiente conservada sin enviar: bird_id "${sightingData.bird_id}" no existe en el catálogo oficial (sightingId=${sightingData.id}, queueId=${row.id}).`
+                );
+                continue;
+              }
+            }
+
             ({ error } = await supabase.from('sightings').update(sightingData).eq('id', sightingData.id));
             if (!error) {
               await db.runAsync(`UPDATE sightings SET sync_status = 'synced' WHERE id = ?`, [sightingData.id]);
             }
           } else if (row.operation === 'DELETE') {
+            if (!isValidUuid(sightingData.id)) {
+              console.warn(
+                `[syncService] Operación DELETE pendiente omitida por sighting id inválido: "${sightingData.id}" (queueId=${row.id}).`
+              );
+              continue;
+            }
             ({ error } = await supabase.from('sightings').delete().eq('id', sightingData.id));
           }
         } else {

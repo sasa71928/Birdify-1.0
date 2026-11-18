@@ -2,9 +2,12 @@ import { supabase } from '../lib/supabase';
 import { Bird } from '../types/models';
 import db from '../lib/database';
 import { isOnline } from '../services/syncService';
+import { isValidUuid } from '../utils/uuid';
 
 export const BirdRepository = {
   async getAll(): Promise<Bird[]> {
+    let remoteError: unknown = null;
+
     if (isOnline) {
       try {
         const { data, error } = await supabase
@@ -13,12 +16,13 @@ export const BirdRepository = {
           .order('common_name', { ascending: true });
 
         if (!error && data) {
+          const validBirds = data.filter((b) => isValidUuid(b?.id));
           // Guardar en SQLite en segundo plano
           try {
-            const remoteIds = data.map(b => b.id);
+            const remoteIds = validBirds.map((b) => b.id);
             if (remoteIds.length > 0) {
-              // Eliminar aves locales cacheadas que ya no existen en Supabase (excluyendo temporales de offline)
-              // Las aves temporales offline contienen '_bird' y no tienen longitud de UUID (36 caracteres)
+              // Eliminar aves locales cacheadas con UUID que ya no existen en Supabase
+              // (se conservan registros legacy no-UUID para no borrar referencias pendientes)
               const placeholders = remoteIds.map(() => '?').join(',');
               await db.runAsync(
                 `DELETE FROM birds 
@@ -28,7 +32,7 @@ export const BirdRepository = {
               );
             }
 
-            for (const b of data) {
+            for (const b of validBirds) {
               await db.runAsync(
                 `INSERT OR REPLACE INTO birds (id, common_name, scientific_name, description, season, habitat_info, ideal_zones, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
                 [b.id, b.common_name, b.scientific_name, b.description, b.season, b.habitat_info, b.ideal_zones, b.image_url ?? null]
@@ -37,18 +41,54 @@ export const BirdRepository = {
           } catch (sqliteErr) {
             console.error('Error guardando birds en SQLite:', sqliteErr);
           }
-          return data;
+          return validBirds;
         }
+        remoteError = error;
       } catch (e) {
+        remoteError = e;
         console.log('Error fetching birds from Supabase, falling back to SQLite:', e);
       }
     }
 
-    // Fallback a SQLite
+    // Fallback a SQLite (solo especies con UUID válido del catálogo)
     const localBirds = await db.getAllAsync<Bird>(
       `SELECT * FROM birds ORDER BY common_name ASC`
     );
-    return localBirds;
+    const validLocalBirds = (localBirds || []).filter((b) => isValidUuid(b?.id));
+
+    if (validLocalBirds.length === 0 && remoteError) {
+      throw remoteError;
+    }
+
+    return validLocalBirds;
+  },
+
+  async getById(birdId: string): Promise<Bird | null> {
+    if (!isValidUuid(birdId)) {
+      return null;
+    }
+
+    if (isOnline) {
+      try {
+        const { data, error } = await supabase
+          .from('birds')
+          .select('*')
+          .eq('id', birdId)
+          .maybeSingle();
+
+        if (!error) {
+          return (data as Bird) ?? null;
+        }
+      } catch (e) {
+        console.log('Error fetching bird by id from Supabase, falling back to SQLite:', e);
+      }
+    }
+
+    const localBird = await db.getFirstAsync<Bird>(
+      `SELECT * FROM birds WHERE id = ? LIMIT 1`,
+      [birdId]
+    );
+    return localBird ?? null;
   },
 
   async search(query: string): Promise<Bird[]> {
@@ -64,7 +104,7 @@ export const BirdRepository = {
           .limit(10);
 
         if (!error && data) {
-          return data;
+          return data.filter((b) => isValidUuid(b?.id));
         }
       } catch (e) {
         console.log('Error searching birds from Supabase, falling back to SQLite:', e);
@@ -76,6 +116,6 @@ export const BirdRepository = {
       `SELECT * FROM birds WHERE common_name LIKE ? OR scientific_name LIKE ? LIMIT 10`,
       [`%${sanitized}%`, `%${sanitized}%`]
     );
-    return localBirds;
+    return (localBirds || []).filter((b) => isValidUuid(b?.id));
   }
 };

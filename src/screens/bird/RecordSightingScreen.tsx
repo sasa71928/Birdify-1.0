@@ -90,6 +90,9 @@ export default function RecordSightingScreen({ route }: { route: any }) {
     isEditMode,
     isLocked,
     canEdit,
+    dbBirdsCatalog,
+    loadingCatalog,
+    catalogError,
     filteredBirds,
     mapRef,
     panY,
@@ -110,6 +113,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
     handleBirdSelect,
     handleClearBird,
     handleRegionChange,
+    retryLoadCatalog,
   } = useRecordSighting(editingSightingId, preselectedBird);
 
   const handleAddTag = (tag: string) => {
@@ -383,7 +387,9 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                     onFocus={() => {
                       if (!canEdit) return;
                       setIsSearchFocused(true);
-                      if (birdName.length > 0) setShowDropdown(true);
+                      if (birdName.length > 0 || dbBirdsCatalog.length > 0) {
+                        setShowDropdown(true);
+                      }
                       setTimeout(() => {
                         scrollRef.current?.scrollTo({ y: 180, animated: true });
                       }, 120);
@@ -393,7 +399,7 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                       if (!canEdit) return;
                       setBirdName(text);
                       setSelectedBird(null);
-                      setShowDropdown(text.length > 0);
+                      setShowDropdown(text.length > 0 || dbBirdsCatalog.length > 0);
                     }}
                     editable={!isLocked}
                   />
@@ -408,8 +414,128 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                   )}
                 </View>
 
+                {/* Estado de carga o error del catálogo */}
+                {loadingCatalog && dbBirdsCatalog.length === 0 && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 8,
+                      paddingVertical: 10,
+                      paddingHorizontal: 4,
+                    }}
+                  >
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: colors.textSecondary,
+                        fontFamily: 'PlusJakartaSans',
+                      }}
+                    >
+                      Cargando catálogo de especies...
+                    </Text>
+                  </View>
+                )}
+
+                {!loadingCatalog && catalogError && dbBirdsCatalog.length === 0 && (
+                  <View
+                    style={{
+                      marginTop: 10,
+                      padding: 12,
+                      borderRadius: 12,
+                      backgroundColor: colors.componentBase,
+                      gap: 8,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: colors.textPrimary,
+                        fontFamily: 'PlusJakartaSans',
+                      }}
+                    >
+                      {catalogError}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={retryLoadCatalog}
+                      activeOpacity={0.8}
+                      style={{
+                        alignSelf: 'flex-start',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        paddingHorizontal: 14,
+                        paddingVertical: 7,
+                        borderRadius: 999,
+                        backgroundColor: colors.primary,
+                      }}
+                    >
+                      <Ionicons name="refresh" size={14} color="#FFFFFF" />
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          color: '#FFFFFF',
+                          fontFamily: 'PlusJakartaSans-SemiBold',
+                        }}
+                      >
+                        Reintentar
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {!loadingCatalog && !catalogError && dbBirdsCatalog.length === 0 && (
+                  <View
+                    style={{
+                      marginTop: 10,
+                      padding: 12,
+                      borderRadius: 12,
+                      backgroundColor: colors.componentBase,
+                      gap: 8,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: colors.textSecondary,
+                        fontFamily: 'PlusJakartaSans',
+                      }}
+                    >
+                      {isOffline
+                        ? 'El catálogo de aves aún no está disponible sin conexión.'
+                        : 'No hay especies disponibles en el catálogo en este momento.'}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={retryLoadCatalog}
+                      activeOpacity={0.8}
+                      style={{
+                        alignSelf: 'flex-start',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        paddingHorizontal: 14,
+                        paddingVertical: 7,
+                        borderRadius: 999,
+                        backgroundColor: colors.primary,
+                      }}
+                    >
+                      <Ionicons name="refresh" size={14} color="#FFFFFF" />
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          color: '#FFFFFF',
+                          fontFamily: 'PlusJakartaSans-SemiBold',
+                        }}
+                      >
+                        Reintentar
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
                 {/* Dropdown de Coincidencias */}
-                {showDropdown && (
+                {showDropdown && dbBirdsCatalog.length > 0 && (
                   <View style={styles.dropdownCard}>
                     <ScrollView
                       nestedScrollEnabled
@@ -443,34 +569,24 @@ export default function RecordSightingScreen({ route }: { route: any }) {
                       ))}
 
                       {filteredBirds.length === 0 && (
-                        <TouchableOpacity
-                          style={styles.dropdownItem}
-                          onPress={() => {
-                            setSelectedBird({
-                              id: 'unidentified_bird',
-                              common_name: birdName,
-                              scientific_name: 'Especie silvestre',
-                            });
-                            setShowDropdown(false);
-                          }}
-                        >
+                        <View style={styles.dropdownItem}>
                           <Ionicons
-                            name="add-circle-outline"
+                            name="search-outline"
                             size={18}
-                            color={colors.primary}
+                            color={colors.textSecondary}
                           />
                           <Text
                             style={{
-                              fontSize: 13.5,
-                              color: colors.primary,
-                              fontFamily: 'PlusJakartaSans-SemiBold',
+                              flex: 1,
+                              fontSize: 13,
+                              color: colors.textSecondary,
+                              fontFamily: 'PlusJakartaSans',
+                              lineHeight: 18,
                             }}
                           >
-                            {t('sighting.createAsNewSpecies', {
-                              name: birdName,
-                            })}
+                            No encontramos esa ave. Busca por otro nombre o selecciona una especie del catálogo
                           </Text>
-                        </TouchableOpacity>
+                        </View>
                       )}
                     </ScrollView>
                   </View>

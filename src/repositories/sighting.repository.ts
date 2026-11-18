@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import { Sighting } from '../types/models';
 import db from '../lib/database';
 import { isOnline, addToQueue, generateId } from '../services/syncService';
+import { isValidUuid } from '../utils/uuid';
 
 // Lista blanca estricta de columnas permitidas en UPDATE dinámico sobre SQLite (AUD-018)
 const ALLOWED_SIGHTING_UPDATE_COLUMNS = new Set([
@@ -281,15 +282,63 @@ async function refreshExistingSqliteCounts(
   );
 }
 
+async function assertValidCatalogBirdId(birdId: unknown): Promise<string> {
+  if (!isValidUuid(birdId)) {
+    throw new Error(
+      'Debes seleccionar una especie válida del catálogo antes de guardar el avistamiento.'
+    );
+  }
+
+  const normalizedId = birdId.trim();
+
+  if (!isOnline) {
+    const localBird = await db.getFirstAsync<{ id: string }>(
+      `SELECT id FROM birds WHERE id = ? LIMIT 1`,
+      [normalizedId]
+    );
+    if (!localBird) {
+      throw new Error(
+        'La especie seleccionada no se encuentra en el catálogo local. Selecciona una especie disponible.'
+      );
+    }
+    return normalizedId;
+  }
+
+  const { data: remoteBird, error } = await supabase
+    .from('birds')
+    .select('id')
+    .eq('id', normalizedId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  if (!remoteBird?.id) {
+    throw new Error(
+      'La especie seleccionada no existe en el catálogo oficial. Selecciona una especie válida.'
+    );
+  }
+
+  return normalizedId;
+}
+
 export const SightingRepository = {
   async create(sighting: Omit<Sighting, 'id' | 'created_at' | 'updated_at'>): Promise<Sighting> {
+    const validBirdId = await assertValidCatalogBirdId(sighting.bird_id);
+    const normalizedSighting = {
+      ...sighting,
+      bird_id: validBirdId,
+    };
+
     // ── MODO OFFLINE ──────────────────────────────────────────────────────────
     if (!isOnline) {
       const localId = generateId();
       const now = new Date().toISOString();
+      const sightingDate = normalizedSighting.sighting_date || now;
       const localRecord: any = {
         id: localId,
-        ...sighting,
+        ...normalizedSighting,
+        sighting_date: sightingDate,
         sync_status: 'pending',
         created_at: now,
         updated_at: now,
@@ -298,42 +347,48 @@ export const SightingRepository = {
       await db.runAsync(
         `INSERT INTO sightings
           (id, user_id, bird_id, description, latitude, longitude,
-           is_location_private, photo_url, local_photo_path, created_at, updated_at, sync_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           is_location_private, photo_url, local_photo_path, sighting_date, created_at, updated_at, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           localRecord.id,
           localRecord.user_id,
-          localRecord.bird_id ?? null,
+          localRecord.bird_id,
           localRecord.description ?? null,
           localRecord.is_location_private ? null : (localRecord.latitude ?? null),
           localRecord.is_location_private ? null : (localRecord.longitude ?? null),
           localRecord.is_location_private ? 1 : 0,
           localRecord.photo_url ?? null,
-          (sighting as any)._localImagePaths ?? null,
+          (normalizedSighting as any)._localImagePaths ?? null,
+          sightingDate,
           localRecord.created_at,
           localRecord.updated_at,
           'pending',
         ]
       );
 
-      if ((sighting as any)._birdName && localRecord.bird_id) {
+      if ((normalizedSighting as any)._birdName && localRecord.bird_id) {
         await db
           .runAsync(
             `INSERT OR REPLACE INTO birds (id, common_name, scientific_name) VALUES (?, ?, ?)`,
             [
               localRecord.bird_id,
-              (sighting as any)._birdName,
-              (sighting as any)._scientificName ?? (sighting as any)._birdName + ' sp.',
+              (normalizedSighting as any)._birdName,
+              (normalizedSighting as any)._scientificName ?? (normalizedSighting as any)._birdName + ' sp.',
             ]
           )
           .catch(() => {});
       }
 
-      const queuePayload: any = { ...sighting, id: localId };
-      if ((sighting as any)._localImagePaths) {
-        queuePayload._localImagePaths = (sighting as any)._localImagePaths;
-        queuePayload._birdName = (sighting as any)._birdName;
-        queuePayload._scientificName = (sighting as any)._scientificName;
+      const queuePayload: any = {
+        ...normalizedSighting,
+        id: localId,
+        sighting_date: sightingDate,
+        created_at: now,
+      };
+      if ((normalizedSighting as any)._localImagePaths) {
+        queuePayload._localImagePaths = (normalizedSighting as any)._localImagePaths;
+        queuePayload._birdName = (normalizedSighting as any)._birdName;
+        queuePayload._scientificName = (normalizedSighting as any)._scientificName;
       }
       await addToQueue('sightings', 'INSERT', queuePayload);
 
@@ -341,7 +396,8 @@ export const SightingRepository = {
     }
 
     // ── MODO ONLINE ───────────────────────────────────────────────────────────
-    const { _localImagePaths, _birdName, _scientificName, ...cleanSighting } = sighting as any;
+    const { _localImagePaths, _birdName, _scientificName, ...cleanSighting } =
+      normalizedSighting as any;
 
     const { data, error } = await supabase
       .from('sightings')
@@ -354,8 +410,8 @@ export const SightingRepository = {
     db.runAsync(
       `INSERT INTO sightings
         (id, user_id, bird_id, description, latitude, longitude,
-         is_location_private, photo_url, local_photo_path, created_at, updated_at, sync_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')
+         is_location_private, photo_url, local_photo_path, sighting_date, created_at, updated_at, sync_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')
        ON CONFLICT(id) DO UPDATE SET
          photo_url   = excluded.photo_url,
          bird_id     = excluded.bird_id,
@@ -370,7 +426,8 @@ export const SightingRepository = {
         data.longitude,
         data.is_location_private ? 1 : 0,
         data.photo_url,
-        (sighting as any)._localImagePaths ?? null,
+        (normalizedSighting as any)._localImagePaths ?? null,
+        data.sighting_date ?? data.created_at,
         data.created_at,
         data.updated_at,
       ]
@@ -394,6 +451,10 @@ export const SightingRepository = {
     id: string,
     changes: Partial<Omit<Sighting, 'id' | 'created_at' | 'updated_at'>>
   ): Promise<Sighting> {
+    if (!isValidUuid(id)) {
+      throw new Error('El identificador del avistamiento no es válido.');
+    }
+
     const now = new Date().toISOString();
 
     // AUD-018: Filtrar estrictamente contra lista blanca de columnas válidas
@@ -401,8 +462,14 @@ export const SightingRepository = {
       ALLOWED_SIGHTING_UPDATE_COLUMNS.has(key)
     );
     const safeChanges = Object.fromEntries(safeEntries);
-    const fields = safeEntries.map(([key]) => key);
-    const values: Array<string | number | null> = safeEntries.map(([key, val]) => {
+
+    if ('bird_id' in safeChanges) {
+      safeChanges.bird_id = await assertValidCatalogBirdId(safeChanges.bird_id);
+    }
+
+    const normalizedEntries = Object.entries(safeChanges);
+    const fields = normalizedEntries.map(([key]) => key);
+    const values: Array<string | number | null> = normalizedEntries.map(([key, val]) => {
       if (key === 'is_location_private') return val ? 1 : 0;
       if (val === null || val === undefined) return null;
       if (typeof val === 'number' || typeof val === 'string') return val;
@@ -832,6 +899,10 @@ export const SightingRepository = {
    * evitando el truncado a los últimos 20 posts globales.
    */
   async getByBirdId(birdId: string, currentUserId?: string, limit = 50): Promise<any[]> {
+    if (!isValidUuid(birdId)) {
+      return [];
+    }
+
     if (!isOnline) {
       const rows = await db.getAllAsync<any>(
         `SELECT s.*, u.username, u.fullname, u.profile_pic_url, u.is_verified,
@@ -1204,6 +1275,10 @@ export const SightingRepository = {
   },
 
   async delete(id: string): Promise<void> {
+    if (!isValidUuid(id)) {
+      throw new Error('El identificador del avistamiento no es válido.');
+    }
+
     if (!isOnline) {
       // AUD-019: Diferenciar entre cancelar un borrador pendiente nunca sincronizado vs encolar DELETE remoto
       const localRow = await db.getFirstAsync<{ sync_status: string | null }>(
