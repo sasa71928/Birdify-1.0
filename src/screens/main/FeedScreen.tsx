@@ -6,6 +6,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -32,8 +33,15 @@ export default function FeedScreen() {
     posts,
     isLoading,
     isRefreshing,
+    isLoadingMore,
+    hasMore,
+    loadError,
+    loadMoreError,
     toast,
     setToast,
+    loadMore,
+    retryLoadMore,
+    retryInitialLoad,
     handlePostDeleted,
     handleLikeToggled,
     handleCommentAdded,
@@ -42,7 +50,6 @@ export default function FeedScreen() {
 
   const {
     preferences,
-    filterPosts,
     refreshFollows,
     setFilterMode,
     setProximityRadius,
@@ -53,16 +60,10 @@ export default function FeedScreen() {
   const [showNewBanner, setShowNewBanner] = useState(false);
   const listRef = useRef<FlatList>(null);
 
-  // Filtrar publicaciones según preferencias del usuario
-  const filteredPosts = useMemo(
-    () => filterPosts(posts),
-    [posts, filterPosts]
-  );
-
-  // Al enfocar, refrescar relaciones de follow para que los filtros estén siempre al día
+  // Al enfocar, refrescar relaciones de follow respetando su caché por TTL
   useFocusEffect(
     useCallback(() => {
-      refreshFollows();
+      refreshFollows(false);
       if (hasNewPosts) {
         setShowNewBanner(true);
       }
@@ -99,9 +100,6 @@ export default function FeedScreen() {
   };
 
   const emptyFilterMessage = useMemo(() => {
-    if (posts.length === 0) {
-      return t('feed.emptyCommunity');
-    }
     switch (preferences.filterMode) {
       case 'following':
         return t('feed.emptyFilterFollowing');
@@ -118,7 +116,51 @@ export default function FeedScreen() {
           ? t('feed.emptyFilterVerified')
           : t('feed.emptyCommunity');
     }
-  }, [posts.length, preferences.filterMode, preferences.proximityRadiusKm, preferences.onlyVerified, t]);
+  }, [preferences.filterMode, preferences.proximityRadiusKm, preferences.onlyVerified, t]);
+
+  const renderFooter = useCallback(() => {
+    if (isLoadingMore) {
+      return (
+        <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      );
+    }
+
+    if (loadMoreError) {
+      return (
+        <View style={{ paddingVertical: 16, paddingHorizontal: 20, alignItems: 'center', gap: 8 }}>
+          <Text style={{ color: colors.textSecondary, fontSize: 13, textAlign: 'center' }}>
+            {loadMoreError}
+          </Text>
+          <TouchableOpacity
+            onPress={retryLoadMore}
+            activeOpacity={0.8}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              borderRadius: 999,
+              backgroundColor: colors.primary,
+            }}
+          >
+            <Ionicons name="refresh" size={14} color="#FFFFFF" />
+            <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>
+              Reintentar
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (!hasMore && posts.length > 0) {
+      return <View style={{ height: 12 }} />;
+    }
+
+    return null;
+  }, [isLoadingMore, loadMoreError, hasMore, posts.length, colors, retryLoadMore]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -143,7 +185,48 @@ export default function FeedScreen() {
 
       {isLoading ? (
         <FeedSkeleton />
-      ) : filteredPosts.length === 0 ? (
+      ) : loadError && posts.length === 0 ? (
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingHorizontal: 32,
+            gap: 12,
+          }}
+        >
+          <Ionicons name="alert-circle-outline" size={44} color={colors.primary} />
+          <Text
+            style={{
+              color: colors.textPrimary,
+              fontSize: 15,
+              textAlign: 'center',
+              lineHeight: 22,
+            }}
+          >
+            {loadError}
+          </Text>
+          <TouchableOpacity
+            onPress={retryInitialLoad}
+            activeOpacity={0.85}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              paddingHorizontal: 20,
+              paddingVertical: 10,
+              borderRadius: 999,
+              backgroundColor: colors.primary,
+              marginTop: 4,
+            }}
+          >
+            <Ionicons name="refresh" size={16} color="#FFFFFF" />
+            <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>
+              Reintentar
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : posts.length === 0 ? (
         <FeedEmptyState
           filterMode={preferences.filterMode}
           onlyVerified={preferences.onlyVerified}
@@ -160,7 +243,7 @@ export default function FeedScreen() {
         <View style={styles.container}>
           <FlatList
             ref={listRef}
-            data={filteredPosts}
+            data={posts}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
             contentContainerStyle={styles.listContent}
@@ -169,6 +252,9 @@ export default function FeedScreen() {
             maxToRenderPerBatch={3}
             windowSize={5}
             removeClippedSubviews={true}
+            onEndReached={() => loadMore(false)}
+            onEndReachedThreshold={0.4}
+            ListFooterComponent={renderFooter}
             refreshControl={
               <RefreshControl
                 refreshing={isRefreshing}

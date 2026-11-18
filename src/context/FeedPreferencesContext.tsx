@@ -4,9 +4,10 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
   ReactNode,
 } from 'react';
-import { Alert } from 'react-native';
+import { Alert, DeviceEventEmitter } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useAuth } from './AuthContext';
@@ -33,6 +34,7 @@ export const DEFAULT_FEED_PREFERENCES: FeedPreferences = {
 };
 
 const STORAGE_KEY = '@birdify_feed_preferences_v1';
+const FOLLOWS_CACHE_TTL_MS = 60_000;
 
 export function calculateDistanceKm(
   lat1: number,
@@ -56,6 +58,10 @@ export function calculateDistanceKm(
 interface FeedPreferencesContextType {
   preferences: FeedPreferences;
   isLoadingPreferences: boolean;
+  isLoadingFollows: boolean;
+  hasLoadedFollows: boolean;
+  followsError: string | null;
+  isLocating: boolean;
   userLocation: { latitude: number; longitude: number } | null;
   locationPermissionGranted: boolean;
   followingIds: Set<string>;
@@ -64,7 +70,8 @@ interface FeedPreferencesContextType {
   setProximityRadius: (radius: number) => Promise<void>;
   setOnlyVerified: (onlyVerified: boolean) => Promise<void>;
   updatePreferences: (patch: Partial<FeedPreferences>) => Promise<void>;
-  refreshFollows: () => Promise<void>;
+  refreshFollows: (force?: boolean) => Promise<boolean>;
+  invalidateFollows: () => void;
   requestLocation: () => Promise<{ latitude: number; longitude: number } | null>;
   filterPosts: (posts: Post[]) => Post[];
 }
@@ -81,6 +88,10 @@ export const FeedPreferencesProvider: React.FC<{ children: ReactNode }> = ({
     DEFAULT_FEED_PREFERENCES
   );
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
+  const [isLoadingFollows, setIsLoadingFollows] = useState(false);
+  const [hasLoadedFollows, setHasLoadedFollows] = useState(false);
+  const [followsError, setFollowsError] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
   const [userLocation, setUserLocation] = useState<{
     latitude: number;
     longitude: number;
@@ -88,6 +99,19 @@ export const FeedPreferencesProvider: React.FC<{ children: ReactNode }> = ({
   const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [followerIds, setFollowerIds] = useState<Set<string>>(new Set());
+
+  const followsCacheRef = useRef<{
+    userId?: string;
+    timestamp: number;
+    hasLoaded: boolean;
+  }>({
+    userId: undefined,
+    timestamp: 0,
+    hasLoaded: false,
+  });
+  const followsInFlightRef = useRef<Promise<boolean> | null>(null);
+  const currentUserIdRef = useRef<string | undefined>(user?.id);
+  currentUserIdRef.current = user?.id;
 
   // Cargar preferencias guardadas en AsyncStorage
   useEffect(() => {
@@ -119,31 +143,167 @@ export const FeedPreferencesProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, []);
 
-  // Cargar seguidos y seguidores del usuario autenticado
-  const refreshFollows = useCallback(async () => {
-    if (!user?.id) {
-      setFollowingIds(new Set());
-      setFollowerIds(new Set());
-      return;
-    }
-    try {
-      const [following, followers] = await Promise.all([
-        FollowRepository.getFollowingIds(user.id),
-        FollowRepository.getFollowerIds(user.id),
-      ]);
-      setFollowingIds(following);
-      setFollowerIds(followers);
-    } catch (err) {
-      console.error('Error refreshing follows for feed:', err);
-    }
-  }, [user?.id]);
+  const invalidateFollows = useCallback(() => {
+    followsCacheRef.current.timestamp = 0;
+  }, []);
 
+  // Cargar seguidos y seguidores del usuario autenticado con caché por TTL y deduplicación
+  const refreshFollows = useCallback(
+    async (force = false): Promise<boolean> => {
+      const targetUserId = user?.id;
+      if (!targetUserId) {
+        setFollowingIds(new Set());
+        setFollowerIds(new Set());
+        setHasLoadedFollows(false);
+        setIsLoadingFollows(false);
+        setFollowsError(null);
+        followsCacheRef.current = {
+          userId: undefined,
+          timestamp: 0,
+          hasLoaded: false,
+        };
+        followsInFlightRef.current = null;
+        return true;
+      }
+
+      const now = Date.now();
+      const cached = followsCacheRef.current;
+      if (
+        !force &&
+        cached.userId === targetUserId &&
+        cached.hasLoaded &&
+        now - cached.timestamp < FOLLOWS_CACHE_TTL_MS
+      ) {
+        return true;
+      }
+
+      if (followsInFlightRef.current) {
+        return followsInFlightRef.current;
+      }
+
+      if (!cached.hasLoaded || cached.userId !== targetUserId) {
+        setIsLoadingFollows(true);
+      }
+      setFollowsError(null);
+
+      const requestPromise = (async () => {
+        try {
+          const [following, followers] = await Promise.all([
+            FollowRepository.getFollowingIds(targetUserId),
+            FollowRepository.getFollowerIds(targetUserId),
+          ]);
+
+          if (currentUserIdRef.current !== targetUserId) {
+            return false;
+          }
+
+          setFollowingIds(following);
+          setFollowerIds(followers);
+          setHasLoadedFollows(true);
+          setFollowsError(null);
+          followsCacheRef.current = {
+            userId: targetUserId,
+            timestamp: Date.now(),
+            hasLoaded: true,
+          };
+          return true;
+        } catch (err: any) {
+          console.error('Error refreshing follows for feed:', err);
+          if (currentUserIdRef.current !== targetUserId) {
+            return false;
+          }
+          // No convertir un error de red/consulta en una lista vacía válida:
+          // si no había datos previos válidos para este usuario, exponer el error
+          if (
+            !followsCacheRef.current.hasLoaded ||
+            followsCacheRef.current.userId !== targetUserId
+          ) {
+            setHasLoadedFollows(false);
+            setFollowsError(
+              err?.message || 'No se pudo cargar tu lista de seguidos y seguidores.'
+            );
+          }
+          return false;
+        } finally {
+          followsInFlightRef.current = null;
+          if (currentUserIdRef.current === targetUserId) {
+            setIsLoadingFollows(false);
+          }
+        }
+      })();
+
+      followsInFlightRef.current = requestPromise;
+      return requestPromise;
+    },
+    [user?.id]
+  );
+
+  // Limpiar y recargar cuando cambia el usuario autenticado o cierra sesión
   useEffect(() => {
-    refreshFollows();
-  }, [refreshFollows]);
+    const previousUserId = followsCacheRef.current.userId;
+    if (previousUserId && previousUserId !== user?.id) {
+      FollowRepository.clearSyncFlags(previousUserId);
+    }
+
+    setFollowingIds(new Set());
+    setFollowerIds(new Set());
+    setHasLoadedFollows(false);
+    setFollowsError(null);
+    followsCacheRef.current = {
+      userId: user?.id,
+      timestamp: 0,
+      hasLoaded: false,
+    };
+    followsInFlightRef.current = null;
+
+    if (user?.id) {
+      refreshFollows(true);
+    } else {
+      setIsLoadingFollows(false);
+    }
+  }, [user?.id, refreshFollows]);
+
+  // Actualizar e invalidar caché inmediatamente cuando el usuario sigue, deja de seguir o bloquea
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('follows_changed', (payload) => {
+      if (!user?.id) return;
+      followsCacheRef.current.timestamp = 0;
+
+      if (payload?.followerId === user.id && payload?.followingId) {
+        if (payload.action === 'follow') {
+          setFollowingIds((prev) => {
+            if (prev.has(payload.followingId)) return prev;
+            const next = new Set(prev);
+            next.add(payload.followingId);
+            return next;
+          });
+        } else if (payload.action === 'unfollow' || payload.action === 'block') {
+          setFollowingIds((prev) => {
+            if (!prev.has(payload.followingId)) return prev;
+            const next = new Set(prev);
+            next.delete(payload.followingId);
+            return next;
+          });
+          if (payload.action === 'block') {
+            setFollowerIds((prev) => {
+              if (!prev.has(payload.followingId)) return prev;
+              const next = new Set(prev);
+              next.delete(payload.followingId);
+              return next;
+            });
+          }
+        }
+      }
+    });
+
+    return () => {
+      sub.remove();
+    };
+  }, [user?.id]);
 
   // Obtener ubicación del usuario
   const requestLocation = useCallback(async () => {
+    setIsLocating(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -163,6 +323,8 @@ export const FeedPreferencesProvider: React.FC<{ children: ReactNode }> = ({
     } catch (err) {
       console.error('Error getting location for feed proximity:', err);
       return null;
+    } finally {
+      setIsLocating(false);
     }
   }, []);
 
@@ -196,9 +358,15 @@ export const FeedPreferencesProvider: React.FC<{ children: ReactNode }> = ({
           return;
         }
       }
+      if (
+        (mode === 'following' || mode === 'followers' || mode === 'mutuals') &&
+        user?.id
+      ) {
+        refreshFollows(false);
+      }
       await updatePreferences({ filterMode: mode });
     },
-    [updatePreferences, userLocation, requestLocation]
+    [updatePreferences, userLocation, requestLocation, user?.id, refreshFollows]
   );
 
   const setProximityRadius = useCallback(
@@ -215,11 +383,9 @@ export const FeedPreferencesProvider: React.FC<{ children: ReactNode }> = ({
     [updatePreferences]
   );
 
-  // Función principal para filtrar posts
+  // Función de respaldo para filtrar una lista de posts en memoria con las mismas reglas
   const filterPosts = useCallback(
     (posts: Post[]): Post[] => {
-      const currentUserId = user?.id;
-
       return posts.filter((post) => {
         // 1. Filtro de usuarios verificados
         if (preferences.onlyVerified && !post.isVerified) {
@@ -229,19 +395,16 @@ export const FeedPreferencesProvider: React.FC<{ children: ReactNode }> = ({
         // 2. Filtro principal
         switch (preferences.filterMode) {
           case 'following': {
-            if (post.userId === currentUserId) return true;
             if (!post.userId) return false;
             return followingIds.has(post.userId);
           }
 
           case 'followers': {
-            if (post.userId === currentUserId) return true;
             if (!post.userId) return false;
             return followerIds.has(post.userId);
           }
 
           case 'mutuals': {
-            if (post.userId === currentUserId) return true;
             if (!post.userId) return false;
             return (
               followingIds.has(post.userId) && followerIds.has(post.userId)
@@ -249,8 +412,7 @@ export const FeedPreferencesProvider: React.FC<{ children: ReactNode }> = ({
           }
 
           case 'proximity': {
-            if (post.userId === currentUserId) return true;
-            if (!userLocation) return true; // fallback si no hay ubicación
+            if (!userLocation) return false;
             if (post.latitude == null || post.longitude == null) {
               return false; // avistamiento con ubicación privada o no especificada
             }
@@ -270,7 +432,6 @@ export const FeedPreferencesProvider: React.FC<{ children: ReactNode }> = ({
       });
     },
     [
-      user?.id,
       preferences.filterMode,
       preferences.proximityRadiusKm,
       preferences.onlyVerified,
@@ -285,6 +446,10 @@ export const FeedPreferencesProvider: React.FC<{ children: ReactNode }> = ({
       value={{
         preferences,
         isLoadingPreferences,
+        isLoadingFollows,
+        hasLoadedFollows,
+        followsError,
+        isLocating,
         userLocation,
         locationPermissionGranted,
         followingIds,
@@ -294,6 +459,7 @@ export const FeedPreferencesProvider: React.FC<{ children: ReactNode }> = ({
         setOnlyVerified,
         updatePreferences,
         refreshFollows,
+        invalidateFollows,
         requestLocation,
         filterPosts,
       }}

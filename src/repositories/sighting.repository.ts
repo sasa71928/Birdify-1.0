@@ -15,6 +15,47 @@ const ALLOWED_SIGHTING_UPDATE_COLUMNS = new Set([
   'sighting_date',
 ]);
 
+export interface FeedQueryFilters {
+  filterMode?: 'all' | 'following' | 'followers' | 'mutuals' | 'proximity';
+  /**
+   * null / undefined = sin filtro de autores.
+   * [] = filtro de autores activo sin autores coincidentes (no debe caer al Feed global).
+   */
+  authorIds?: string[] | null;
+  onlyVerified?: boolean;
+  proximity?: {
+    latitude: number;
+    longitude: number;
+    radiusKm: number;
+  } | null;
+  offset?: number;
+}
+
+export interface FeedPageResult {
+  items: any[];
+  hasMore: boolean;
+  nextOffset: number;
+}
+
+function calculateFeedDistanceKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 async function getExcludedUserIds(currentUserId?: string): Promise<Set<string>> {
   const excluded = new Set<string>();
   if (!currentUserId || !isOnline) return excluded;
@@ -63,8 +104,8 @@ async function fetchUserLikedSightingIds(
     .in('sighting_id', sightingIds);
 
   if (myReactionsError) {
-    console.warn('[SightingRepository] Error consultando reacciones propias:', myReactionsError);
-    return likedSightingIds;
+    console.warn('[SightingRepository] Error consultando reacciones propias, usando respaldo local:', myReactionsError);
+    return fetchLocalLikedSightingIds(sightingIds, currentUserId);
   }
 
   for (const row of myReactions || []) {
@@ -407,23 +448,152 @@ export const SightingRepository = {
     return data;
   },
 
-  async getFeed(currentUserId?: string, page = 0, limit = 20): Promise<any[]> {
-    if (!isOnline) {
-      const rows = await db.getAllAsync<any>(
-        `SELECT s.*, u.username, u.fullname, u.profile_pic_url, u.is_verified,
-                b.common_name, b.scientific_name
-         FROM sightings s
-         LEFT JOIN users u ON s.user_id = u.id
-         LEFT JOIN birds b ON s.bird_id = b.id
-         ORDER BY s.created_at DESC
-         LIMIT ? OFFSET ?`,
-        [limit, page * limit]
-      );
+  async getFeedPage(
+    currentUserId?: string,
+    page = 0,
+    limit = 20,
+    filters?: FeedQueryFilters
+  ): Promise<FeedPageResult> {
+    const mode = filters?.filterMode ?? 'all';
+    const hasAuthorFilter =
+      mode === 'following' ||
+      mode === 'followers' ||
+      mode === 'mutuals' ||
+      Array.isArray(filters?.authorIds);
 
-      const sightingIds = rows.map((r) => r.id);
+    const rawAuthorIds = hasAuthorFilter ? (filters?.authorIds ?? []) : null;
+    if (hasAuthorFilter && (!rawAuthorIds || rawAuthorIds.length === 0)) {
+      return { items: [], hasMore: false, nextOffset: 0 };
+    }
+
+    if (mode === 'proximity') {
+      if (
+        !filters?.proximity ||
+        typeof filters.proximity.latitude !== 'number' ||
+        typeof filters.proximity.longitude !== 'number'
+      ) {
+        return { items: [], hasMore: false, nextOffset: 0 };
+      }
+    }
+
+    let boundingBox: {
+      minLat: number;
+      maxLat: number;
+      minLon: number;
+      maxLon: number;
+      centerLat: number;
+      centerLon: number;
+      radiusKm: number;
+    } | null = null;
+
+    if (mode === 'proximity' && filters?.proximity) {
+      const { latitude, longitude, radiusKm } = filters.proximity;
+      const latDelta = radiusKm / 111.045;
+      const cosLat = Math.max(Math.cos((latitude * Math.PI) / 180), 0.01);
+      const lonDelta = radiusKm / (111.045 * cosLat);
+      boundingBox = {
+        minLat: Math.max(-90, latitude - latDelta),
+        maxLat: Math.min(90, latitude + latDelta),
+        minLon: Math.max(-180, longitude - lonDelta),
+        maxLon: Math.min(180, longitude + lonDelta),
+        centerLat: latitude,
+        centerLon: longitude,
+        radiusKm,
+      };
+    }
+
+    const MAX_SCAN_CHUNKS = 3;
+    let currentOffset =
+      typeof filters?.offset === 'number' ? filters.offset : page * limit;
+
+    if (!isOnline) {
+      const whereClauses: string[] = ['1 = 1'];
+      const whereParams: any[] = [];
+
+      if (hasAuthorFilter && rawAuthorIds && rawAuthorIds.length > 0) {
+        const placeholders = rawAuthorIds.map(() => '?').join(',');
+        whereClauses.push(`s.user_id IN (${placeholders})`);
+        whereParams.push(...rawAuthorIds);
+      }
+
+      if (filters?.onlyVerified) {
+        whereClauses.push('u.is_verified = 1');
+      }
+
+      if (boundingBox) {
+        whereClauses.push('s.is_location_private = 0');
+        whereClauses.push('s.latitude IS NOT NULL AND s.longitude IS NOT NULL');
+        whereClauses.push(
+          's.latitude >= ? AND s.latitude <= ? AND s.longitude >= ? AND s.longitude <= ?'
+        );
+        whereParams.push(
+          boundingBox.minLat,
+          boundingBox.maxLat,
+          boundingBox.minLon,
+          boundingBox.maxLon
+        );
+      }
+
+      const collectedRows: any[] = [];
+      let hasMore = false;
+
+      for (let chunk = 0; chunk < MAX_SCAN_CHUNKS; chunk++) {
+        const rows = await db.getAllAsync<any>(
+          `SELECT s.*, u.username, u.fullname, u.profile_pic_url, u.is_verified,
+                  b.common_name, b.scientific_name
+           FROM sightings s
+           LEFT JOIN users u ON s.user_id = u.id
+           LEFT JOIN birds b ON s.bird_id = b.id
+           WHERE ${whereClauses.join(' AND ')}
+           ORDER BY s.created_at DESC, s.id DESC
+           LIMIT ? OFFSET ?`,
+          [...whereParams, limit, currentOffset]
+        );
+
+        let inspectedCount = 0;
+        for (const r of rows) {
+          inspectedCount += 1;
+          if (boundingBox) {
+            if (r.is_location_private || r.latitude == null || r.longitude == null) {
+              continue;
+            }
+            const dist = calculateFeedDistanceKm(
+              boundingBox.centerLat,
+              boundingBox.centerLon,
+              Number(r.latitude),
+              Number(r.longitude)
+            );
+            if (dist > boundingBox.radiusKm) {
+              continue;
+            }
+          }
+          collectedRows.push(r);
+          if (collectedRows.length === limit) {
+            break;
+          }
+        }
+
+        currentOffset += inspectedCount;
+
+        if (inspectedCount < rows.length) {
+          hasMore = true;
+          break;
+        }
+        if (rows.length < limit) {
+          hasMore = false;
+          break;
+        }
+        if (collectedRows.length === limit) {
+          hasMore = true;
+          break;
+        }
+        hasMore = true;
+      }
+
+      const sightingIds = collectedRows.map((r) => r.id);
       const likedSightingIds = await fetchLocalLikedSightingIds(sightingIds, currentUserId);
 
-      return rows.map((r) => {
+      const items = collectedRows.map((r) => {
         const hasLiked = likedSightingIds.has(r.id);
         const likesCount = Math.max(Number(r.likes_count ?? 0), hasLiked ? 1 : 0);
         const commentsCount = Math.max(0, Number(r.comments_count ?? 0));
@@ -436,7 +606,7 @@ export const SightingRepository = {
             username: r.username,
             fullname: r.fullname,
             profile_pic_url: r.profile_pic_url,
-            is_verified: r.is_verified,
+            is_verified: Boolean(r.is_verified),
           },
           bird: r.common_name
             ? { id: r.bird_id, common_name: r.common_name, scientific_name: r.scientific_name }
@@ -448,39 +618,120 @@ export const SightingRepository = {
           comments: [],
         };
       });
-    }
 
-    const from = page * limit;
-    const to = from + limit - 1;
-
-    const { data, error } = await supabase
-      .from('sightings')
-      .select(`
-        id, user_id, bird_id, description, photo_url,
-        latitude, longitude, is_location_private, created_at, updated_at,
-        users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified),
-        birds (id, common_name, scientific_name),
-        reactions (count),
-        comments (count)
-      `)
-      .order('created_at', { ascending: false })
-      .range(from, to);
-
-    if (error) {
-      console.error('Error in getFeed:', error);
-      throw error;
+      return { items, hasMore, nextOffset: currentOffset };
     }
 
     const excludedUserIds = await getExcludedUserIds(currentUserId);
-    const filteredData = (data || []).filter((item) => !excludedUserIds.has(item.user_id));
+    const allowedAuthorIds =
+      hasAuthorFilter && rawAuthorIds
+        ? rawAuthorIds.filter((id) => !excludedUserIds.has(id))
+        : null;
 
-    const sightingIds = filteredData.map((item) => item.id);
+    if (hasAuthorFilter && (!allowedAuthorIds || allowedAuthorIds.length === 0)) {
+      return { items: [], hasMore: false, nextOffset: 0 };
+    }
+
+    const usersRelationSelect = filters?.onlyVerified
+      ? 'users!sightings_user_id_fkey!inner (id, username, fullname, profile_pic_url, is_verified)'
+      : 'users!sightings_user_id_fkey (id, username, fullname, profile_pic_url, is_verified)';
+
+    const selectQuery = `
+      id, user_id, bird_id, description, photo_url,
+      latitude, longitude, is_location_private, created_at, updated_at,
+      ${usersRelationSelect},
+      birds (id, common_name, scientific_name),
+      reactions (count),
+      comments (count)
+    `;
+
+    const collectedRaw: any[] = [];
+    let hasMore = false;
+
+    for (let chunk = 0; chunk < MAX_SCAN_CHUNKS; chunk++) {
+      let query = supabase.from('sightings').select(selectQuery);
+
+      if (hasAuthorFilter && allowedAuthorIds) {
+        query = query.in('user_id', allowedAuthorIds);
+      }
+
+      if (filters?.onlyVerified) {
+        query = query.eq('users.is_verified', true);
+      }
+
+      if (boundingBox) {
+        query = query
+          .eq('is_location_private', false)
+          .not('latitude', 'is', null)
+          .not('longitude', 'is', null)
+          .gte('latitude', boundingBox.minLat)
+          .lte('latitude', boundingBox.maxLat)
+          .gte('longitude', boundingBox.minLon)
+          .lte('longitude', boundingBox.maxLon);
+      }
+
+      const { data, error } = await query
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(currentOffset, currentOffset + limit - 1);
+
+      if (error) {
+        console.error('Error in getFeed:', error);
+        throw error;
+      }
+
+      const rawBatch: any[] = data || [];
+      let inspectedCount = 0;
+
+      for (const item of rawBatch) {
+        inspectedCount += 1;
+        if (excludedUserIds.has(item.user_id)) {
+          continue;
+        }
+        if (boundingBox) {
+          if (item.is_location_private || item.latitude == null || item.longitude == null) {
+            continue;
+          }
+          const dist = calculateFeedDistanceKm(
+            boundingBox.centerLat,
+            boundingBox.centerLon,
+            Number(item.latitude),
+            Number(item.longitude)
+          );
+          if (dist > boundingBox.radiusKm) {
+            continue;
+          }
+        }
+        collectedRaw.push(item);
+        if (collectedRaw.length === limit) {
+          break;
+        }
+      }
+
+      currentOffset += inspectedCount;
+
+      if (inspectedCount < rawBatch.length) {
+        hasMore = true;
+        break;
+      }
+      if (rawBatch.length < limit) {
+        hasMore = false;
+        break;
+      }
+      if (collectedRaw.length === limit) {
+        hasMore = true;
+        break;
+      }
+      hasMore = true;
+    }
+
+    const sightingIds = collectedRaw.map((item) => item.id);
     const [likedSightingIds, adjustments] = await Promise.all([
       fetchUserLikedSightingIds(sightingIds, currentUserId),
       getPendingSyncAdjustments(sightingIds, currentUserId),
     ]);
 
-    const formattedData = filteredData.map((item) => {
+    const formattedData = collectedRaw.map((item) => {
       const countsAndLike = resolveOnlineSightingCounts(
         item,
         likedSightingIds,
@@ -507,6 +758,7 @@ export const SightingRepository = {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')
              ON CONFLICT(id) DO UPDATE SET
                bird_id        = CASE WHEN sightings.sync_status = 'synced' THEN excluded.bird_id ELSE sightings.bird_id END,
+               description    = CASE WHEN sightings.sync_status = 'synced' THEN excluded.description ELSE sightings.description END,
                photo_url      = CASE WHEN sightings.sync_status = 'synced' THEN excluded.photo_url ELSE sightings.photo_url END,
                likes_count    = excluded.likes_count,
                comments_count = excluded.comments_count,
@@ -558,7 +810,21 @@ export const SightingRepository = {
       })
     );
 
-    return formattedData;
+    return {
+      items: formattedData,
+      hasMore,
+      nextOffset: currentOffset,
+    };
+  },
+
+  async getFeed(
+    currentUserId?: string,
+    page = 0,
+    limit = 20,
+    filters?: FeedQueryFilters
+  ): Promise<any[]> {
+    const result = await this.getFeedPage(currentUserId, page, limit, filters);
+    return result.items;
   },
 
   /**

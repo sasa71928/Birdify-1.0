@@ -1,4 +1,6 @@
+import { DeviceEventEmitter } from 'react-native';
 import { supabase } from '../lib/supabase';
+import db from '../lib/database';
 
 export const UserBlockRepository = {
   async block(blockerId: string, blockedId: string): Promise<void> {
@@ -35,6 +37,22 @@ export const UserBlockRepository = {
       });
 
     if (error) throw error;
+
+    try {
+      await db.runAsync(
+        `DELETE FROM follows WHERE (follower_id = ? AND following_id = ?) OR (follower_id = ? AND following_id = ?)`,
+        [blockerId, blockedId, blockedId, blockerId]
+      );
+      await db.runAsync(`DELETE FROM sightings WHERE user_id = ?`, [blockedId]);
+    } catch {
+      // Limpieza local no bloqueante
+    }
+
+    DeviceEventEmitter.emit('follows_changed', {
+      followerId: blockerId,
+      followingId: blockedId,
+      action: 'block',
+    });
   },
 
   async unblock(blockerId: string, blockedId: string): Promise<void> {

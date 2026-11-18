@@ -1,15 +1,20 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { DeviceEventEmitter } from 'react-native';
-import { SightingRepository } from '../repositories/sighting.repository';
+import { SightingRepository, FeedQueryFilters } from '../repositories/sighting.repository';
 import { useAuth } from '../context/AuthContext';
-import FeedItem, { Post } from '../components/FeedItem';
+import { useFeedPreferences } from '../context/FeedPreferencesContext';
+import { Post } from '../components/FeedItem';
 import { handleError } from '../utils/errorHandler';
 import { useNewSightings } from '../context/NewSightingsContext';
 
 const CACHE_TTL_MS = 60000;
+const FEED_PAGE_SIZE = 20;
 
-interface FeedCache {
+interface FeedCacheEntry {
   posts: Post[];
+  page: number;
+  nextOffset: number;
+  hasMore: boolean;
   timestamp: number;
   userId?: string;
 }
@@ -112,118 +117,478 @@ export function mapSightingToPost(sighting: any, currentUserObjOrId?: any): Post
 export function useFeed() {
   const { user } = useAuth();
   const { clearNewPosts } = useNewSightings();
-  const cacheRef = useRef<FeedCache | null>(null);
+  const {
+    preferences,
+    isLoadingPreferences,
+    hasLoadedFollows,
+    followsError,
+    isLocating,
+    userLocation,
+    followingIds,
+    followerIds,
+    refreshFollows,
+    requestLocation,
+  } = useFeedPreferences();
+
+  const cacheMapRef = useRef<Map<string, FeedCacheEntry>>(new Map());
   const requestIdRef = useRef(0);
+  const pageRef = useRef(0);
+  const nextOffsetRef = useRef(0);
+  const loadingMoreRef = useRef(false);
   const prevUserIdRef = useRef<string | undefined>(user?.id);
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' }>({
     visible: false,
     message: '',
     type: 'success',
   });
 
-  const loadFeed = useCallback(async (forceRefresh = false) => {
-    const now = Date.now();
-    const currentUserId = user?.id;
-    const cached = cacheRef.current;
+  const isAuthorFilter =
+    preferences.filterMode === 'following' ||
+    preferences.filterMode === 'followers' ||
+    preferences.filterMode === 'mutuals';
 
-    if (!forceRefresh && cached && cached.userId === currentUserId && (now - cached.timestamp) < CACHE_TTL_MS) {
-      setPosts(cached.posts);
-      return;
+  const resolvedAuthorIds = useMemo<string[] | null>(() => {
+    if (!isAuthorFilter) return null;
+    if (!user?.id) return [];
+    if (!hasLoadedFollows) return null;
+
+    if (preferences.filterMode === 'following') {
+      return Array.from(followingIds);
     }
-
-    const requestId = ++requestIdRef.current;
-
-    try {
-      const sightings = await SightingRepository.getFeed(currentUserId);
-      if (requestId !== requestIdRef.current) return;
-
-      const mappedPosts = sightings.map((item) => mapSightingToPost(item, user));
-      cacheRef.current = {
-        posts: mappedPosts,
-        timestamp: Date.now(),
-        userId: currentUserId,
-      };
-      setPosts(mappedPosts);
-      // Limpiar nuevos posts al recargar manualmente
-      clearNewPosts();
-    } catch (error) {
-      if (requestId !== requestIdRef.current) return;
-      handleError(error, setToast, 'Error cargando el feed');
+    if (preferences.filterMode === 'followers') {
+      return Array.from(followerIds);
     }
-  }, [user, clearNewPosts]);
+    return Array.from(followingIds).filter((id) => followerIds.has(id));
+  }, [
+    isAuthorFilter,
+    user?.id,
+    hasLoadedFollows,
+    preferences.filterMode,
+    followingIds,
+    followerIds,
+  ]);
+
+  const isFilterDataPending =
+    isLoadingPreferences ||
+    (isAuthorFilter && Boolean(user?.id) && !hasLoadedFollows && !followsError) ||
+    (preferences.filterMode === 'proximity' && !userLocation && isLocating);
+
+  const queryKey = useMemo(() => {
+    const userPart = user?.id ?? 'anon';
+    const verifiedPart = preferences.onlyVerified ? 'v1' : 'v0';
+    let modePart: string = preferences.filterMode;
+    if (isAuthorFilter) {
+      const sortedAuthors = resolvedAuthorIds
+        ? [...resolvedAuthorIds].sort().join(',')
+        : 'pending';
+      modePart = `${preferences.filterMode}:[${sortedAuthors}]`;
+    } else if (preferences.filterMode === 'proximity') {
+      const locPart = userLocation
+        ? `${userLocation.latitude.toFixed(3)},${userLocation.longitude.toFixed(3)},r=${preferences.proximityRadiusKm}`
+        : 'noloc';
+      modePart = `proximity:${locPart}`;
+    }
+    return `${userPart}|${modePart}|${verifiedPart}`;
+  }, [
+    user?.id,
+    preferences.filterMode,
+    preferences.onlyVerified,
+    preferences.proximityRadiusKm,
+    isAuthorFilter,
+    resolvedAuthorIds,
+    userLocation,
+  ]);
+
+  const buildFeedFilters = useCallback(
+    (offset: number): FeedQueryFilters => ({
+      filterMode: preferences.filterMode,
+      authorIds: isAuthorFilter ? (resolvedAuthorIds ?? []) : null,
+      onlyVerified: preferences.onlyVerified,
+      proximity:
+        preferences.filterMode === 'proximity' && userLocation
+          ? {
+              latitude: userLocation.latitude,
+              longitude: userLocation.longitude,
+              radiusKm: preferences.proximityRadiusKm,
+            }
+          : null,
+      offset,
+    }),
+    [
+      preferences.filterMode,
+      preferences.onlyVerified,
+      preferences.proximityRadiusKm,
+      isAuthorFilter,
+      resolvedAuthorIds,
+      userLocation,
+    ]
+  );
+
+  const loadFeed = useCallback(
+    async (forceRefresh = false) => {
+      if (isFilterDataPending) {
+        return;
+      }
+
+      if (isAuthorFilter && user?.id && !hasLoadedFollows && followsError) {
+        setPosts([]);
+        setHasMore(false);
+        setLoadError(followsError);
+        return;
+      }
+
+      if (preferences.filterMode === 'proximity' && !userLocation && !isLocating) {
+        setPosts([]);
+        setHasMore(false);
+        setLoadError(
+          'Se requiere acceso a tu ubicación para filtrar avistamientos cercanos.'
+        );
+        return;
+      }
+
+      const now = Date.now();
+      const currentUserId = user?.id;
+      const cached = cacheMapRef.current.get(queryKey);
+
+      if (
+        !forceRefresh &&
+        cached &&
+        cached.userId === currentUserId &&
+        now - cached.timestamp < CACHE_TTL_MS
+      ) {
+        setPosts(cached.posts);
+        setHasMore(cached.hasMore);
+        pageRef.current = cached.page;
+        nextOffsetRef.current = cached.nextOffset;
+        setLoadError(null);
+        setLoadMoreError(null);
+        return;
+      }
+
+      const requestId = ++requestIdRef.current;
+      loadingMoreRef.current = false;
+      setIsLoadingMore(false);
+      setLoadError(null);
+      setLoadMoreError(null);
+
+      try {
+        const result = await SightingRepository.getFeedPage(
+          currentUserId,
+          0,
+          FEED_PAGE_SIZE,
+          buildFeedFilters(0)
+        );
+        if (requestId !== requestIdRef.current) return;
+
+        const seenIds = new Set<string>();
+        const mappedPosts: Post[] = [];
+        for (const item of result.items) {
+          if (!item?.id || seenIds.has(item.id)) continue;
+          seenIds.add(item.id);
+          mappedPosts.push(mapSightingToPost(item, user));
+        }
+
+        pageRef.current = 0;
+        nextOffsetRef.current = result.nextOffset;
+        setHasMore(result.hasMore);
+        setPosts(mappedPosts);
+        setLoadError(null);
+
+        cacheMapRef.current.set(queryKey, {
+          posts: mappedPosts,
+          page: 0,
+          nextOffset: result.nextOffset,
+          hasMore: result.hasMore,
+          timestamp: Date.now(),
+          userId: currentUserId,
+        });
+
+        clearNewPosts();
+      } catch (error) {
+        if (requestId !== requestIdRef.current) return;
+        setLoadError('No se pudieron cargar las publicaciones. Revisa tu conexión e inténtalo de nuevo.');
+        handleError(error, setToast, 'Error cargando el feed');
+      }
+    },
+    [
+      isFilterDataPending,
+      isAuthorFilter,
+      user,
+      hasLoadedFollows,
+      followsError,
+      preferences.filterMode,
+      userLocation,
+      isLocating,
+      queryKey,
+      buildFeedFilters,
+      clearNewPosts,
+    ]
+  );
+
+  const loadMore = useCallback(
+    async (isRetry = false) => {
+      if (
+        isLoading ||
+        isRefreshing ||
+        loadingMoreRef.current ||
+        !hasMore ||
+        isFilterDataPending ||
+        Boolean(loadError) ||
+        (Boolean(loadMoreError) && !isRetry)
+      ) {
+        return;
+      }
+
+      loadingMoreRef.current = true;
+      setIsLoadingMore(true);
+      setLoadMoreError(null);
+
+      const activeRequestId = requestIdRef.current;
+      const targetPage = pageRef.current + 1;
+      const targetOffset = nextOffsetRef.current;
+      const activeQueryKey = queryKey;
+      const currentUserId = user?.id;
+
+      try {
+        const result = await SightingRepository.getFeedPage(
+          currentUserId,
+          targetPage,
+          FEED_PAGE_SIZE,
+          buildFeedFilters(targetOffset)
+        );
+
+        if (activeRequestId !== requestIdRef.current) return;
+
+        const mappedNew = result.items.map((item) => mapSightingToPost(item, user));
+
+        pageRef.current = targetPage;
+        nextOffsetRef.current = result.nextOffset;
+        setHasMore(result.hasMore);
+
+        setPosts((prev) => {
+          const existingIds = new Set(prev.map((p) => p.id));
+          const uniqueNew = mappedNew.filter((p) => !existingIds.has(p.id));
+          const combined = [...prev, ...uniqueNew];
+
+          cacheMapRef.current.set(activeQueryKey, {
+            posts: combined,
+            page: targetPage,
+            nextOffset: result.nextOffset,
+            hasMore: result.hasMore,
+            timestamp: Date.now(),
+            userId: currentUserId,
+          });
+
+          return combined;
+        });
+      } catch (error) {
+        if (activeRequestId !== requestIdRef.current) return;
+        setLoadMoreError('No se pudieron cargar más publicaciones.');
+        handleError(error, setToast, 'Error cargando más publicaciones');
+      } finally {
+        if (activeRequestId === requestIdRef.current) {
+          loadingMoreRef.current = false;
+          setIsLoadingMore(false);
+        }
+      }
+    },
+    [
+      isLoading,
+      isRefreshing,
+      hasMore,
+      isFilterDataPending,
+      loadError,
+      loadMoreError,
+      queryKey,
+      user,
+      buildFeedFilters,
+    ]
+  );
+
+  const retryLoadMore = useCallback(async () => {
+    await loadMore(true);
+  }, [loadMore]);
 
   const handlePostDeleted = useCallback(async () => {
-    cacheRef.current = null;
+    cacheMapRef.current.clear();
     await loadFeed(true);
   }, [loadFeed]);
 
-  const handleLikeToggled = useCallback((postId: string, hasLiked: boolean, newCount: number) => {
-    setPosts((prev) =>
-      prev.map((p) => (p.id === postId ? { ...p, hasLiked, likes: newCount } : p))
-    );
-    if (cacheRef.current && cacheRef.current.userId === user?.id) {
-      cacheRef.current = {
-        ...cacheRef.current,
-        posts: cacheRef.current.posts.map((p) =>
-          p.id === postId ? { ...p, hasLiked, likes: newCount } : p
-        ),
-      };
-    }
-  }, [user?.id]);
+  const handleLikeToggled = useCallback(
+    (postId: string, hasLiked: boolean, newCount: number) => {
+      setPosts((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, hasLiked, likes: newCount } : p))
+      );
+      cacheMapRef.current.forEach((entry, key) => {
+        if (entry.userId === user?.id && entry.posts.some((p) => p.id === postId)) {
+          cacheMapRef.current.set(key, {
+            ...entry,
+            posts: entry.posts.map((p) =>
+              p.id === postId ? { ...p, hasLiked, likes: newCount } : p
+            ),
+          });
+        }
+      });
+    },
+    [user?.id]
+  );
 
-  const handleCommentAdded = useCallback((postId: string, newCount: number) => {
-    setPosts((prev) =>
-      prev.map((p) => (p.id === postId ? { ...p, comments: newCount } : p))
-    );
-    if (cacheRef.current && cacheRef.current.userId === user?.id) {
-      cacheRef.current = {
-        ...cacheRef.current,
-        posts: cacheRef.current.posts.map((p) =>
-          p.id === postId ? { ...p, comments: newCount } : p
-        ),
-      };
-    }
-  }, [user?.id]);
+  const handleCommentAdded = useCallback(
+    (postId: string, newCount: number) => {
+      setPosts((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, comments: newCount } : p))
+      );
+      cacheMapRef.current.forEach((entry, key) => {
+        if (entry.userId === user?.id && entry.posts.some((p) => p.id === postId)) {
+          cacheMapRef.current.set(key, {
+            ...entry,
+            posts: entry.posts.map((p) =>
+              p.id === postId ? { ...p, comments: newCount } : p
+            ),
+          });
+        }
+      });
+    },
+    [user?.id]
+  );
 
-  const initialLoad = useCallback(async (forceRefresh = false) => {
-    setIsLoading(true);
-    await loadFeed(forceRefresh);
-    setIsLoading(false);
-  }, [loadFeed]);
-
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await loadFeed(true);
-    setIsRefreshing(false);
-  };
+    try {
+      if (isAuthorFilter && user?.id) {
+        const ok = await refreshFollows(true);
+        if (!ok && !hasLoadedFollows) {
+          return;
+        }
+      }
+      if (preferences.filterMode === 'proximity' && !userLocation) {
+        const coords = await requestLocation();
+        if (!coords) {
+          setLoadError(
+            'Se requiere acceso a tu ubicación para filtrar avistamientos cercanos.'
+          );
+          return;
+        }
+      }
+      await loadFeed(true);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [
+    isAuthorFilter,
+    user?.id,
+    refreshFollows,
+    hasLoadedFollows,
+    preferences.filterMode,
+    userLocation,
+    requestLocation,
+    loadFeed,
+  ]);
 
-  // Invalidar caché y recargar cuando cambia el usuario autenticado o cierra sesión
+  const retryInitialLoad = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      if (isAuthorFilter && user?.id && !hasLoadedFollows) {
+        const ok = await refreshFollows(true);
+        if (!ok) return;
+      }
+      if (preferences.filterMode === 'proximity' && !userLocation) {
+        const coords = await requestLocation();
+        if (!coords) {
+          setLoadError(
+            'Se requiere acceso a tu ubicación para filtrar avistamientos cercanos.'
+          );
+          return;
+        }
+      }
+      await loadFeed(true);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [
+    isAuthorFilter,
+    user?.id,
+    hasLoadedFollows,
+    refreshFollows,
+    preferences.filterMode,
+    userLocation,
+    requestLocation,
+    loadFeed,
+  ]);
+
+  // Limpiar caché completa al cambiar de usuario o cerrar sesión
   useEffect(() => {
     if (prevUserIdRef.current !== user?.id) {
       prevUserIdRef.current = user?.id;
-      cacheRef.current = null;
-      initialLoad(true);
+      cacheMapRef.current.clear();
+      requestIdRef.current += 1;
+      pageRef.current = 0;
+      nextOffsetRef.current = 0;
+      loadingMoreRef.current = false;
+      setPosts([]);
+      setHasMore(false);
+      setLoadError(null);
+      setLoadMoreError(null);
     }
-  }, [user?.id, initialLoad]);
+  }, [user?.id]);
 
+  // Reaccionar a cambios de filtro, usuario o finalización de prerrequisitos
   useEffect(() => {
-    initialLoad();
+    requestIdRef.current += 1;
+    loadingMoreRef.current = false;
+    setIsLoadingMore(false);
+    setLoadMoreError(null);
 
-    // Sincronización pasiva periódica (5 minutos = 300,000 ms) para ahorrar batería y datos
+    if (isFilterDataPending) {
+      setIsLoading(true);
+      setLoadError(null);
+      return;
+    }
+
+    let cancelled = false;
+    const run = async () => {
+      const cached = cacheMapRef.current.get(queryKey);
+      const isFresh =
+        cached &&
+        cached.userId === user?.id &&
+        Date.now() - cached.timestamp < CACHE_TTL_MS;
+
+      if (!isFresh) {
+        setIsLoading(true);
+      }
+      await loadFeed(false);
+      if (!cancelled) {
+        setIsLoading(false);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [queryKey, isFilterDataPending, loadFeed, user?.id]);
+
+  // Sincronización periódica y eventos globales
+  useEffect(() => {
     const intervalId = setInterval(() => {
       loadFeed(true);
     }, 300000);
 
-    // Recargar feed cuando la cola offline termina de sincronizarse
     const syncListener = DeviceEventEmitter.addListener('sync_completed', () => {
+      cacheMapRef.current.clear();
       loadFeed(true);
     });
 
     const refreshListener = DeviceEventEmitter.addListener('refresh_feed', () => {
+      cacheMapRef.current.clear();
       loadFeed(true);
     });
 
@@ -232,15 +597,22 @@ export function useFeed() {
       syncListener.remove();
       refreshListener.remove();
     };
-  }, [initialLoad, loadFeed]);
+  }, [loadFeed]);
 
   return {
     posts,
     isLoading,
     isRefreshing,
+    isLoadingMore,
+    hasMore,
+    loadError,
+    loadMoreError,
     toast,
     setToast,
     loadFeed,
+    loadMore,
+    retryLoadMore,
+    retryInitialLoad,
     handlePostDeleted,
     handleLikeToggled,
     handleCommentAdded,
